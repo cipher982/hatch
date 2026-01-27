@@ -48,3 +48,4 @@ cli.py → runner.py → backends.py → subprocess(claude/codex/gemini)
 
 <!-- Agents: append below. Human compacts weekly. -->
 
+- (2026-01-27) [tool] `uv run pytest -v` omits dev extras; use `uv run --extra dev pytest -v` (or `uv run --python .venv/bin/python -m pytest -v`) after `uv sync --all-extras`.
