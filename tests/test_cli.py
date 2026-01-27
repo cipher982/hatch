@@ -100,6 +100,24 @@ class TestCreateParser:
         args = parser.parse_args(["--model", "gpt-5", "test"])
         assert args.model == "gpt-5"
 
+    def test_output_format_flag(self):
+        """--output-format flag works."""
+        parser = create_parser()
+        args = parser.parse_args(["--output-format", "stream-json", "test"])
+        assert args.output_format == "stream-json"
+
+    def test_output_format_default(self):
+        """Default output format is text."""
+        parser = create_parser()
+        args = parser.parse_args(["test"])
+        assert args.output_format == "text"
+
+    def test_include_partial_messages_flag(self):
+        """--include-partial-messages flag works."""
+        parser = create_parser()
+        args = parser.parse_args(["--include-partial-messages", "test"])
+        assert args.include_partial_messages is True
+
     def test_api_key_flag(self):
         """--api-key flag works."""
         parser = create_parser()

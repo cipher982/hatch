@@ -123,6 +123,24 @@ class TestConfigureZai:
             "--dangerously-skip-permissions",
         ]
 
+    def test_command_with_stream_json(self, mock_zai_key, laptop_context):
+        """Command includes stream-json and partial messages when requested."""
+        config = configure_zai(
+            "test prompt",
+            laptop_context,
+            output_format="stream-json",
+            include_partial_messages=True,
+        )
+        assert config.cmd == [
+            "claude",
+            "--print",
+            "-",
+            "--output-format",
+            "stream-json",
+            "--dangerously-skip-permissions",
+            "--include-partial-messages",
+        ]
+
     def test_env_vars_set_correctly(self, mock_zai_key, laptop_context):
         """Environment variables set correctly."""
         config = configure_zai("test prompt", laptop_context)
@@ -177,6 +195,24 @@ class TestConfigureBedrock:
             "--output-format",
             "text",
             "--dangerously-skip-permissions",
+        ]
+
+    def test_command_with_stream_json(self, laptop_context):
+        """Command includes stream-json and partial messages when requested."""
+        config = configure_bedrock(
+            "test prompt",
+            laptop_context,
+            output_format="stream-json",
+            include_partial_messages=True,
+        )
+        assert config.cmd == [
+            "claude",
+            "--print",
+            "-",
+            "--output-format",
+            "stream-json",
+            "--dangerously-skip-permissions",
+            "--include-partial-messages",
         ]
 
     def test_env_vars_set_correctly(self, laptop_context):
@@ -273,7 +309,7 @@ class TestConfigureGemini:
     def test_command_structure(self, laptop_context):
         """Command has correct structure."""
         config = configure_gemini("test prompt", laptop_context)
-        assert config.cmd == ["gemini", "-p", "-"]
+        assert config.cmd == ["gemini", "--model", "gemini-3-flash-preview", "--yolo", "-p", "-"]
 
     def test_no_api_key_required(self, clean_env, laptop_context):
         """Does not require API key (uses OAuth)."""

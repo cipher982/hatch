@@ -88,9 +88,29 @@ Environment Variables:
     )
 
     parser.add_argument(
+        "--output-format",
+        choices=["text", "json", "stream-json"],
+        default="text",
+        help="Claude output format (Claude backends only)",
+    )
+
+    parser.add_argument(
+        "--include-partial-messages",
+        action="store_true",
+        help="Include partial messages in Claude output (Claude backends only)",
+    )
+
+    parser.add_argument(
         "--api-key",
         metavar="KEY",
         help="API key override (otherwise from environment)",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--resume",
+        metavar="SESSION_ID",
+        help="Resume a previous Claude Code session by ID (Claude backends only)",
     )
 
     parser.add_argument(
@@ -206,6 +226,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         backend_kwargs["model"] = args.model
     if args.api_key:
         backend_kwargs["api_key"] = args.api_key
+    if args.resume:
+        backend_kwargs["resume"] = args.resume
+    if args.output_format:
+        backend_kwargs["output_format"] = args.output_format
+    if args.include_partial_messages:
+        backend_kwargs["include_partial_messages"] = True
 
     # Get config (may raise ValueError for missing API key)
     try:

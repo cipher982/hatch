@@ -56,6 +56,9 @@ def configure_zai(
     api_key: str | None = None,
     base_url: str = "https://api.z.ai/api/anthropic",
     model: str = "glm-4.7",
+    resume: str | None = None,
+    output_format: str = "text",
+    include_partial_messages: bool = False,
     **_: Any,
 ) -> BackendConfig:
     """Configure z.ai backend (Claude Code CLI with GLM-4.7).
@@ -87,9 +90,16 @@ def configure_zai(
         "--print",
         "-",  # Read prompt from stdin
         "--output-format",
-        "text",
+        output_format,
         "--dangerously-skip-permissions",
     ]
+
+    if include_partial_messages:
+        cmd.append("--include-partial-messages")
+
+    # Add resume flag for session continuity
+    if resume:
+        cmd.extend(["--resume", resume])
 
     return BackendConfig(
         cmd=cmd,
@@ -106,6 +116,9 @@ def configure_bedrock(
     model: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
     aws_profile: str = "zh-qa-engineer",
     aws_region: str = "us-east-1",
+    resume: str | None = None,
+    output_format: str = "text",
+    include_partial_messages: bool = False,
     **_: Any,
 ) -> BackendConfig:
     """Configure Bedrock backend (Claude Code CLI with AWS Bedrock).
@@ -131,9 +144,16 @@ def configure_bedrock(
         "--print",
         "-",  # Read prompt from stdin
         "--output-format",
-        "text",
+        output_format,
         "--dangerously-skip-permissions",
     ]
+
+    if include_partial_messages:
+        cmd.append("--include-partial-messages")
+
+    # Add resume flag for session continuity
+    if resume:
+        cmd.extend(["--resume", resume])
 
     return BackendConfig(cmd=cmd, env=env, stdin_data=prompt.encode("utf-8"))
 
