@@ -55,7 +55,7 @@ def configure_zai(
     *,
     api_key: str | None = None,
     base_url: str = "https://api.z.ai/api/anthropic",
-    model: str = "glm-4.7",
+    model: str = "glm-5",
     resume: str | None = None,
     output_format: str = "text",
     include_partial_messages: bool = False,
