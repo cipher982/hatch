@@ -116,7 +116,7 @@ async def run(
     backend: Backend,
     *,
     cwd: str | Path | None = None,
-    timeout_s: int = 300,
+    timeout_s: int = 900,
     **backend_kwargs: Any,
 ) -> AgentResult:
     """Run an agent CLI and return the result.
@@ -125,7 +125,7 @@ async def run(
         prompt: The prompt to send to the agent
         backend: Which backend to use (zai, bedrock, codex, gemini)
         cwd: Working directory for the agent
-        timeout_s: Timeout in seconds (default 5 minutes)
+        timeout_s: Timeout in seconds (default 15 minutes)
         **backend_kwargs: Backend-specific options (api_key, model, etc.)
 
     Returns:

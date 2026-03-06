@@ -65,10 +65,10 @@ class TestCreateParser:
             parser.parse_args(["-b", "invalid", "test"])
 
     def test_timeout_default(self):
-        """Default timeout is 300."""
+        """Default timeout is 900."""
         parser = create_parser()
         args = parser.parse_args(["test"])
-        assert args.timeout == 300
+        assert args.timeout == 900
 
     def test_timeout_short_flag(self):
         """Short -t flag works."""

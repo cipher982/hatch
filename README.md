@@ -10,11 +10,16 @@ uv tool install -e ~/git/hatch
 
 ## Usage
 
+Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
+
 ```bash
 hatch "What is 2+2?"
-hatch -b codex "Write unit tests"
+hatch -b codex --reasoning-effort low "Write unit tests"
 hatch -b codex --skip-git-repo-check "What is 2+2?"  # Handy for one-off prompts outside a repo
 hatch --json "Analyze this" | jq .output
+
+# Reasoning effort is a flag, not prompt prose
+hatch -b codex --reasoning-effort low "Review this function"
 ```
 
 ## Library

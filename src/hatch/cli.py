@@ -33,7 +33,7 @@ def create_parser() -> argparse.ArgumentParser:
         epilog="""\
 Examples:
   hatch "What is 2+2?"
-  hatch -b codex "Write unit tests"
+  hatch -b codex --reasoning-effort low "Write unit tests"
   hatch -b bedrock --cwd /path/to/project "Fix the bug"
   hatch --json "Analyze this" | jq .output
 
@@ -69,9 +69,9 @@ Environment Variables:
         "-t",
         "--timeout",
         type=int,
-        default=300,
+        default=900,
         metavar="SECONDS",
-        help="Timeout in seconds (default: 300)",
+        help="Timeout in seconds (default: 900)",
     )
 
     parser.add_argument(
