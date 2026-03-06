@@ -301,6 +301,11 @@ class TestConfigureCodex:
         config = configure_codex("test", laptop_context)
         assert "-c" not in config.cmd
 
+    def test_skip_git_repo_check(self, mock_openai_key, laptop_context):
+        """Skip git repo check adds Codex flag."""
+        config = configure_codex("test", laptop_context, skip_git_repo_check=True)
+        assert "--skip-git-repo-check" in config.cmd
+
     def test_prompt_via_stdin(self, mock_openai_key, laptop_context):
         """Prompt passed via stdin_data."""
         config = configure_codex("my codex prompt", laptop_context)

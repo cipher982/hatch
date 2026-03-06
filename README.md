@@ -13,6 +13,7 @@ uv tool install -e ~/git/hatch
 ```bash
 hatch "What is 2+2?"
 hatch -b codex "Write unit tests"
+hatch -b codex --skip-git-repo-check "What is 2+2?"  # Handy for one-off prompts outside a repo
 hatch --json "Analyze this" | jq .output
 ```
 

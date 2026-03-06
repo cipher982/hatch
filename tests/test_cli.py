@@ -88,6 +88,12 @@ class TestCreateParser:
         args = parser.parse_args(["--cwd", "/path/to/dir", "test"])
         assert args.cwd == "/path/to/dir"
 
+    def test_skip_git_repo_check_flag(self):
+        """--skip-git-repo-check flag works."""
+        parser = create_parser()
+        args = parser.parse_args(["-b", "codex", "--skip-git-repo-check", "test"])
+        assert args.skip_git_repo_check is True
+
     def test_cwd_short_flag(self):
         """Short -C flag works."""
         parser = create_parser()

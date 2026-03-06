@@ -165,6 +165,7 @@ def configure_codex(
     api_key: str | None = None,
     model: str | None = None,
     reasoning_effort: str | None = None,
+    skip_git_repo_check: bool = False,
     full_auto: bool = True,
     **_: Any,
 ) -> BackendConfig:
@@ -206,6 +207,9 @@ def configure_codex(
     # Reasoning effort override — passed as -c config override
     if reasoning_effort:
         cmd.extend(["-c", f"model_reasoning_effort={reasoning_effort}"])
+
+    if skip_git_repo_check:
+        cmd.append("--skip-git-repo-check")
 
     return BackendConfig(cmd=cmd, env=env, stdin_data=prompt.encode("utf-8"))
 
