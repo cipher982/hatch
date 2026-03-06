@@ -12,7 +12,7 @@ license = "MIT"
 authors = [
     { name = "David Rose", email = "david010@gmail.com" }
 ]
-keywords = ["ai", "agent", "cli", "claude", "codex", "gemini", "zerg", "swarm"]
+keywords = ["ai", "agent", "cli", "claude", "codex", "gemini", "zai"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -40,7 +40,7 @@ dev = [
 hatch = "hatch.cli:main"
 
 [project.urls]
-Repository = "https://github.com/davidrose/hatch"
+Repository = "https://github.com/cipher982/hatch"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hatch"]
@@ -48,6 +48,7 @@ packages = ["src/hatch"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: marks tests that make real API calls (slow, requires credentials)",
 ]

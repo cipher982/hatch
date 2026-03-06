@@ -131,15 +131,26 @@ async def run(
     Returns:
         AgentResult with ok, output, duration_ms, error, etc.
     """
-    _validate_timeout(timeout_s)
-    _validate_cwd(cwd)
+    start = time.monotonic()
+
+    try:
+        _validate_timeout(timeout_s)
+        _validate_cwd(cwd)
+    except ValueError as e:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        return AgentResult(
+            ok=False,
+            output="",
+            exit_code=-3,
+            duration_ms=duration_ms,
+            error=str(e),
+        )
 
     ctx = detect_context()
     config = get_config(backend, prompt, ctx, **backend_kwargs)
     env = config.build_env()
 
     cwd_str = str(cwd) if cwd else None
-    start = time.monotonic()
 
     try:
         stdout, stderr, return_code, timed_out = await asyncio.to_thread(

@@ -1,4 +1,4 @@
-# agent-run
+# hatch
 
 Headless AI agent CLI runner. Zero dependencies, stdlib only.
 

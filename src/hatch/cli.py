@@ -88,6 +88,12 @@ Environment Variables:
     )
 
     parser.add_argument(
+        "--reasoning-effort",
+        choices=["low", "medium", "high", "xhigh"],
+        help="Codex reasoning effort level (codex backend only)",
+    )
+
+    parser.add_argument(
         "--output-format",
         choices=["text", "json", "stream-json"],
         default="text",
@@ -118,6 +124,12 @@ Environment Variables:
         action="store_true",
         dest="json_output",
         help="Output JSON result instead of plain text",
+    )
+
+    parser.add_argument(
+        "--automation",
+        action="store_true",
+        help="Mark session as automation (hidden from Longhouse timeline by default, still searchable)",
     )
 
     parser.add_argument(
@@ -226,6 +238,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         backend_kwargs["model"] = args.model
     if args.api_key:
         backend_kwargs["api_key"] = args.api_key
+    if args.reasoning_effort:
+        backend_kwargs["reasoning_effort"] = args.reasoning_effort
     if args.resume:
         backend_kwargs["resume"] = args.resume
     if args.output_format:
@@ -255,6 +269,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Build environment
     env = config.build_env()
+    if getattr(args, "automation", False):
+        env["LONGHOUSE_IS_SIDECHAIN"] = "1"
     cwd = args.cwd
 
     # Run the agent

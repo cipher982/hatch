@@ -113,7 +113,7 @@ def configure_bedrock(
     prompt: str,
     ctx: ExecutionContext | None = None,
     *,
-    model: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    model: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     aws_profile: str = "zh-qa-engineer",
     aws_region: str = "us-east-1",
     resume: str | None = None,
@@ -164,6 +164,7 @@ def configure_codex(
     *,
     api_key: str | None = None,
     model: str | None = None,
+    reasoning_effort: str | None = None,
     full_auto: bool = True,
     **_: Any,
 ) -> BackendConfig:
@@ -202,6 +203,10 @@ def configure_codex(
     if model:
         cmd.extend(["-m", model])
 
+    # Reasoning effort override — passed as -c config override
+    if reasoning_effort:
+        cmd.extend(["-c", f"model_reasoning_effort={reasoning_effort}"])
+
     return BackendConfig(cmd=cmd, env=env, stdin_data=prompt.encode("utf-8"))
 
 
@@ -209,7 +214,7 @@ def configure_gemini(
     prompt: str,
     ctx: ExecutionContext | None = None,
     *,
-    model: str = "gemini-3-flash-preview",
+    model: str = "gemini-3-pro-preview",
     **_: Any,
 ) -> BackendConfig:
     """Configure Gemini backend (Google Gemini CLI).

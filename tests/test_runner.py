@@ -240,6 +240,24 @@ class TestAsyncRun:
         assert result.status == "timeout"
         assert "timed out" in result.error.lower()
 
+    async def test_invalid_timeout_returns_error(self):
+        """Invalid timeout returns error result (no exception)."""
+        result = await run("test prompt", Backend.ZAI, timeout_s=0)
+
+        assert result.ok is False
+        assert result.exit_code == -3
+        assert "timeout_s must be > 0" in result.error
+
+    async def test_invalid_cwd_returns_error(self, tmp_path):
+        """Invalid cwd returns error result (no exception)."""
+        bad_path = tmp_path / "missing"
+
+        result = await run("test prompt", Backend.ZAI, cwd=bad_path)
+
+        assert result.ok is False
+        assert result.exit_code == -3
+        assert "cwd does not exist" in result.error
+
     async def test_error_result(
         self, mock_subprocess, mock_context, mock_get_config, mock_zai_key
     ):

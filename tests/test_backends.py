@@ -146,7 +146,7 @@ class TestConfigureZai:
         config = configure_zai("test prompt", laptop_context)
         assert config.env["ANTHROPIC_BASE_URL"] == "https://api.z.ai/api/anthropic"
         assert config.env["ANTHROPIC_AUTH_TOKEN"] == mock_zai_key
-        assert config.env["ANTHROPIC_MODEL"] == "glm-4.7"
+        assert config.env["ANTHROPIC_MODEL"] == "glm-5"
 
     def test_unsets_bedrock_vars(self, mock_zai_key, laptop_context):
         """Unsets CLAUDE_CODE_USE_BEDROCK and ANTHROPIC_API_KEY."""
@@ -221,7 +221,7 @@ class TestConfigureBedrock:
         assert config.env["CLAUDE_CODE_USE_BEDROCK"] == "1"
         assert config.env["AWS_PROFILE"] == "zh-qa-engineer"
         assert config.env["AWS_REGION"] == "us-east-1"
-        assert "claude-sonnet" in config.env["ANTHROPIC_MODEL"]
+        assert "claude-haiku" in config.env["ANTHROPIC_MODEL"]
 
     def test_custom_aws_profile(self, laptop_context):
         """Custom AWS profile can be specified."""
@@ -290,6 +290,17 @@ class TestConfigureCodex:
         assert "-m" in config.cmd
         assert "gpt-5" in config.cmd
 
+    def test_reasoning_effort(self, mock_openai_key, laptop_context):
+        """Reasoning effort adds -c flag."""
+        config = configure_codex("test", laptop_context, reasoning_effort="high")
+        assert "-c" in config.cmd
+        assert "model_reasoning_effort=high" in config.cmd
+
+    def test_no_reasoning_effort_by_default(self, mock_openai_key, laptop_context):
+        """No reasoning effort flag when not specified."""
+        config = configure_codex("test", laptop_context)
+        assert "-c" not in config.cmd
+
     def test_prompt_via_stdin(self, mock_openai_key, laptop_context):
         """Prompt passed via stdin_data."""
         config = configure_codex("my codex prompt", laptop_context)
@@ -309,7 +320,7 @@ class TestConfigureGemini:
     def test_command_structure(self, laptop_context):
         """Command has correct structure."""
         config = configure_gemini("test prompt", laptop_context)
-        assert config.cmd == ["gemini", "--model", "gemini-3-flash-preview", "--yolo", "-p", "-"]
+        assert config.cmd == ["gemini", "--model", "gemini-3-pro-preview", "--yolo", "-p", "-"]
 
     def test_no_api_key_required(self, clean_env, laptop_context):
         """Does not require API key (uses OAuth)."""
