@@ -271,6 +271,12 @@ class TestMain:
             yield config
 
     @pytest.fixture
+    def mock_hydrate_backend_kwargs(self):
+        """Mock credential hydration."""
+        with mock.patch("hatch.cli.hydrate_backend_kwargs", side_effect=lambda backend, kwargs: dict(kwargs)) as m:
+            yield m
+
+    @pytest.fixture
     def mock_detect_context(self):
         """Mock detect_context."""
         from hatch.context import ExecutionContext
@@ -280,7 +286,7 @@ class TestMain:
             yield ctx
 
     def test_success_output(
-        self, mock_run_sync, mock_get_config, mock_detect_context, mock_zai_key, capsys
+        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
     ):
         """Successful run outputs result."""
         mock_run_sync.return_value = ("Hello World", "", 0, False)
@@ -292,7 +298,7 @@ class TestMain:
         assert "Hello World" in captured.out
 
     def test_json_output(
-        self, mock_run_sync, mock_get_config, mock_detect_context, mock_zai_key, capsys
+        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
     ):
         """JSON output mode works."""
         mock_run_sync.return_value = ("output text", "", 0, False)
@@ -306,7 +312,7 @@ class TestMain:
         assert data["output"] == "output text"
 
     def test_error_to_stderr(
-        self, mock_run_sync, mock_get_config, mock_detect_context, mock_zai_key, capsys
+        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
     ):
         """Errors go to stderr."""
         mock_run_sync.return_value = ("", "error msg", 1, False)
@@ -318,7 +324,7 @@ class TestMain:
         assert "Error" in captured.err
 
     def test_json_error(
-        self, mock_run_sync, mock_get_config, mock_detect_context, mock_zai_key, capsys
+        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
     ):
         """JSON mode includes errors."""
         mock_run_sync.return_value = ("", "error msg", 1, False)
@@ -332,7 +338,7 @@ class TestMain:
         assert data["error"] is not None
 
     def test_timeout_exit_code(
-        self, mock_run_sync, mock_get_config, mock_detect_context, mock_zai_key
+        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
         """Timeout returns correct exit code."""
         mock_run_sync.return_value = ("", "", -1, True)
@@ -343,8 +349,11 @@ class TestMain:
 
     def test_missing_api_key(self, clean_env, mock_detect_context, capsys):
         """Missing API key returns config error."""
-        # Don't mock get_config - let it fail
-        exit_code = main(["-b", "zai", "test prompt"])
+        with mock.patch(
+            "hatch.cli.hydrate_backend_kwargs",
+            side_effect=ValueError("ZAI_API_KEY not set"),
+        ):
+            exit_code = main(["-b", "zai", "test prompt"])
 
         assert exit_code == EXIT_CONFIG_ERROR
         captured = capsys.readouterr()
@@ -352,7 +361,11 @@ class TestMain:
 
     def test_missing_api_key_json(self, clean_env, mock_detect_context, capsys):
         """Missing API key in JSON mode."""
-        exit_code = main(["--json", "-b", "zai", "test prompt"])
+        with mock.patch(
+            "hatch.cli.hydrate_backend_kwargs",
+            side_effect=ValueError("ZAI_API_KEY not set"),
+        ):
+            exit_code = main(["--json", "-b", "zai", "test prompt"])
 
         assert exit_code == EXIT_CONFIG_ERROR
         captured = capsys.readouterr()
@@ -361,7 +374,7 @@ class TestMain:
         assert "ZAI_API_KEY" in data["error"]
 
     def test_cli_not_found(
-        self, mock_get_config, mock_detect_context, mock_zai_key, capsys
+        self, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
     ):
         """CLI not found returns correct exit code."""
         with mock.patch(
@@ -373,7 +386,7 @@ class TestMain:
         assert exit_code == EXIT_NOT_FOUND
 
     def test_backend_passed_correctly(
-        self, mock_run_sync, mock_detect_context, mock_zai_key
+        self, mock_run_sync, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
         """Backend is passed to get_config."""
         mock_run_sync.return_value = ("output", "", 0, False)
@@ -392,7 +405,7 @@ class TestMain:
             assert args[0] == Backend.BEDROCK
 
     def test_model_kwarg_passed(
-        self, mock_run_sync, mock_detect_context, mock_zai_key
+        self, mock_run_sync, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
         """Model is passed as kwarg."""
         mock_run_sync.return_value = ("output", "", 0, False)
@@ -412,7 +425,7 @@ class TestMain:
     def test_api_key_kwarg_passed(
         self, mock_run_sync, mock_detect_context
     ):
-        """API key is passed as kwarg."""
+        """API key is passed into credential hydration."""
         mock_run_sync.return_value = ("output", "", 0, False)
 
         with mock.patch("hatch.cli.get_config") as mock_config:
@@ -422,13 +435,17 @@ class TestMain:
                 cmd=["test"], env={}, stdin_data=b"test"
             )
 
-            main(["--api-key", "sk-test", "-b", "zai", "test"])
+            with mock.patch(
+                "hatch.cli.hydrate_backend_kwargs",
+                side_effect=lambda backend, kwargs: dict(kwargs),
+            ) as mock_hydrate:
+                main(["--api-key", "sk-test", "-b", "zai", "test"])
 
-            kwargs = mock_config.call_args[1]
-            assert kwargs.get("api_key") == "sk-test"
+            hydrated_kwargs = mock_hydrate.call_args[0][1]
+            assert hydrated_kwargs.get("api_key") == "sk-test"
 
     def test_timeout_passed(
-        self, mock_run_sync, mock_get_config, mock_detect_context, mock_zai_key
+        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
         """Timeout is passed to run_sync."""
         mock_run_sync.return_value = ("output", "", 0, False)
@@ -455,7 +472,7 @@ class TestMain:
         assert "timeout" in data["error"].lower()
 
     def test_cwd_passed(
-        self, mock_run_sync, mock_get_config, mock_detect_context, mock_zai_key
+        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
         """CWD is passed to run_sync."""
         mock_run_sync.return_value = ("output", "", 0, False)
@@ -483,7 +500,7 @@ class TestMain:
         assert "cwd" in data["error"].lower()
 
     def test_strips_trailing_whitespace(
-        self, mock_run_sync, mock_get_config, mock_detect_context, mock_zai_key, capsys
+        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
     ):
         """Output trailing whitespace is stripped."""
         mock_run_sync.return_value = ("output\n\n\n", "", 0, False)
@@ -493,6 +510,29 @@ class TestMain:
         captured = capsys.readouterr()
         # Should have exactly one newline (from print)
         assert captured.out == "output\n"
+
+    def test_hydrated_kwargs_passed_to_get_config(
+        self, mock_run_sync, mock_detect_context, mock_zai_key
+    ):
+        """Credential hydration output is what get_config receives."""
+        mock_run_sync.return_value = ("output", "", 0, False)
+
+        with mock.patch("hatch.cli.get_config") as mock_config:
+            from hatch.backends import BackendConfig
+
+            mock_config.return_value = BackendConfig(
+                cmd=["test"], env={}, stdin_data=b"test"
+            )
+
+            with mock.patch(
+                "hatch.cli.hydrate_backend_kwargs",
+                return_value={"api_key": "resolved-key", "model": "custom"},
+            ):
+                main(["-b", "codex", "--model", "custom", "test"])
+
+            kwargs = mock_config.call_args[1]
+            assert kwargs["api_key"] == "resolved-key"
+            assert kwargs["model"] == "custom"
 
 
 class TestMainWithStdin:
@@ -512,8 +552,12 @@ class TestMainWithStdin:
                             cmd=["test"], env={}, stdin_data=b"test"
                         )
 
-                        with mock.patch("hatch.cli.detect_context"):
-                            main([])
+                        with mock.patch(
+                            "hatch.cli.hydrate_backend_kwargs",
+                            side_effect=lambda backend, kwargs: dict(kwargs),
+                        ):
+                            with mock.patch("hatch.cli.detect_context"):
+                                main([])
 
                     # Verify get_config was called with stdin prompt
                     call_args = mock_config.call_args[0]

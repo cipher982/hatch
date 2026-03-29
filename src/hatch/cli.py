@@ -13,6 +13,7 @@ from hatch import __version__
 from hatch.backends import Backend
 from hatch.backends import get_config
 from hatch.context import detect_context
+from hatch.credentials import hydrate_backend_kwargs
 from hatch.runner import AgentResult
 from hatch.runner import run_sync
 
@@ -255,10 +256,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.include_partial_messages:
         backend_kwargs["include_partial_messages"] = True
 
-    # Get config (may raise ValueError for missing API key)
+    # Resolve credentials before building backend config.
     try:
         ctx = detect_context()
-        config = get_config(backend, prompt, ctx, **backend_kwargs)
+        resolved_backend_kwargs = hydrate_backend_kwargs(backend, backend_kwargs)
+        config = get_config(backend, prompt, ctx, **resolved_backend_kwargs)
     except ValueError as e:
         if args.json_output:
             error_result = {

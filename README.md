@@ -2,6 +2,11 @@
 
 Headless agent runner for Claude Code, Codex, Gemini, and z.ai.
 
+Credentials are resolved explicitly before backend launch:
+- CLI `--api-key` override wins
+- Existing shell env wins next
+- Personal backends (`zai`, `codex`) then load from `~/git/me/scripts/infisical-get.py`
+
 ## Install
 
 ```bash

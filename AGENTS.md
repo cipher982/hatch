@@ -15,7 +15,9 @@ uv run pytest -v -m integration  # Real API calls (needs creds)
 ## Architecture
 
 ```
-cli.py → runner.py → backends.py → subprocess(claude/codex/gemini)
+cli.py / runner.py → credentials.py → backends.py → subprocess(claude/codex/gemini)
+                        ↓
+                   infisical-get.py
            ↓
        context.py (container detection)
 ```
@@ -41,6 +43,7 @@ cli.py → runner.py → backends.py → subprocess(claude/codex/gemini)
 1. **z.ai uses `ANTHROPIC_AUTH_TOKEN`** not `ANTHROPIC_API_KEY` - and must unset `CLAUDE_CODE_USE_BEDROCK`
 2. **Tests mock subprocess** - no real CLI calls except `integration` marked tests
 3. **Don't add dependencies** - the zero-deps constraint is intentional
+4. **Credential loading lives in `credentials.py`** - do not fetch secrets inside backend config builders
 
 ---
 
@@ -49,3 +52,4 @@ cli.py → runner.py → backends.py → subprocess(claude/codex/gemini)
 <!-- Agents: append below. Human compacts weekly. -->
 
 - (2026-01-27) [tool] `uv run pytest -v` omits dev extras; use `uv run --extra dev pytest -v` (or `uv run --python .venv/bin/python -m pytest -v`) after `uv sync --all-extras`.
+- (2026-03-29) [design] Keep backend builders pure; hatch credential policy belongs in one preflight resolver that uses the canonical `infisical-get.py` helper instead of ad hoc backend fallbacks.

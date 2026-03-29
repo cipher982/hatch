@@ -12,6 +12,7 @@ from typing import Any
 from hatch.backends import Backend
 from hatch.backends import get_config
 from hatch.context import detect_context
+from hatch.credentials import hydrate_backend_kwargs
 
 
 @dataclass
@@ -147,7 +148,8 @@ async def run(
         )
 
     ctx = detect_context()
-    config = get_config(backend, prompt, ctx, **backend_kwargs)
+    resolved_backend_kwargs = hydrate_backend_kwargs(backend, backend_kwargs)
+    config = get_config(backend, prompt, ctx, **resolved_backend_kwargs)
     env = config.build_env()
 
     cwd_str = str(cwd) if cwd else None

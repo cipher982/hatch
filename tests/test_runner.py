@@ -202,6 +202,12 @@ class TestAsyncRun:
             yield ctx
 
     @pytest.fixture
+    def mock_hydrate_backend_kwargs(self):
+        """Mock credential hydration."""
+        with mock.patch("hatch.runner.hydrate_backend_kwargs", side_effect=lambda backend, kwargs: dict(kwargs)) as m:
+            yield m
+
+    @pytest.fixture
     def mock_get_config(self):
         """Mock get_config."""
         from hatch.backends import BackendConfig
@@ -215,7 +221,7 @@ class TestAsyncRun:
             yield config
 
     async def test_success_result(
-        self, mock_subprocess, mock_context, mock_get_config, mock_zai_key
+        self, mock_subprocess, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key
     ):
         """Successful run returns ok result."""
         mock_subprocess.return_value = ("output text", "", 0, False)
@@ -228,7 +234,7 @@ class TestAsyncRun:
         assert result.status == "ok"
 
     async def test_timeout_result(
-        self, mock_subprocess, mock_context, mock_get_config, mock_zai_key
+        self, mock_subprocess, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key
     ):
         """Timeout returns appropriate result."""
         mock_subprocess.return_value = ("", "", -1, True)
@@ -259,7 +265,7 @@ class TestAsyncRun:
         assert "cwd does not exist" in result.error
 
     async def test_error_result(
-        self, mock_subprocess, mock_context, mock_get_config, mock_zai_key
+        self, mock_subprocess, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key
     ):
         """Non-zero exit returns error result."""
         mock_subprocess.return_value = ("", "error message", 1, False)
@@ -272,7 +278,7 @@ class TestAsyncRun:
         assert result.stderr == "error message"
 
     async def test_empty_output_is_error(
-        self, mock_subprocess, mock_context, mock_get_config, mock_zai_key
+        self, mock_subprocess, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key
     ):
         """Empty output is treated as error."""
         mock_subprocess.return_value = ("   ", "", 0, False)
@@ -282,7 +288,7 @@ class TestAsyncRun:
         assert result.ok is False
         assert "empty output" in result.error.lower()
 
-    async def test_cli_not_found(self, mock_context, mock_get_config, mock_zai_key):
+    async def test_cli_not_found(self, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key):
         """FileNotFoundError returns not_found result."""
         with mock.patch(
             "hatch.runner._run_subprocess",
@@ -296,7 +302,7 @@ class TestAsyncRun:
         assert "not found" in result.error.lower()
 
     async def test_unexpected_exception(
-        self, mock_context, mock_get_config, mock_zai_key
+        self, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key
     ):
         """Unexpected exceptions are caught."""
         with mock.patch(
@@ -310,7 +316,7 @@ class TestAsyncRun:
         assert "something bad" in result.error
 
     async def test_duration_tracked(
-        self, mock_subprocess, mock_context, mock_get_config, mock_zai_key
+        self, mock_subprocess, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key
     ):
         """Duration is tracked in result."""
         mock_subprocess.return_value = ("output", "", 0, False)
@@ -322,7 +328,7 @@ class TestAsyncRun:
         assert result.duration_ms < 1000
 
     async def test_cwd_passed_to_subprocess(
-        self, mock_subprocess, mock_context, mock_get_config, mock_zai_key, tmp_path
+        self, mock_subprocess, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key, tmp_path
     ):
         """cwd is passed to subprocess."""
         mock_subprocess.return_value = ("output", "", 0, False)
@@ -346,10 +352,15 @@ class TestAsyncRun:
                 cmd=["test"], env={}, stdin_data=b"test"
             )
 
-            await run("test", Backend.ZAI, model="custom-model")
+            with mock.patch(
+                "hatch.runner.hydrate_backend_kwargs",
+                return_value={"api_key": "resolved-key", "model": "custom-model"},
+            ):
+                await run("test", Backend.ZAI, model="custom-model")
 
             mock_config.assert_called_once()
             kwargs = mock_config.call_args[1]
+            assert kwargs.get("api_key") == "resolved-key"
             assert kwargs.get("model") == "custom-model"
 
 
@@ -375,7 +386,11 @@ class TestRunIntegrationWithRealCommands:
 
         with mock.patch("hatch.runner.get_config", return_value=config):
             with mock.patch("hatch.runner.detect_context", return_value=ctx):
-                result = await run("ignored", Backend.ZAI)
+                with mock.patch(
+                    "hatch.runner.hydrate_backend_kwargs",
+                    side_effect=lambda backend, kwargs: dict(kwargs),
+                ):
+                    result = await run("ignored", Backend.ZAI)
 
         assert result.ok is True
         assert "hello world" in result.output

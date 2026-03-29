@@ -6,10 +6,7 @@ for its respective CLI tool.
 
 from __future__ import annotations
 
-import json
 import os
-import shutil
-import subprocess
 from dataclasses import dataclass
 from dataclasses import field
 from enum import Enum
@@ -17,40 +14,6 @@ from typing import Any
 
 from hatch.context import ExecutionContext
 from hatch.context import detect_context
-
-
-_PERSONAL_SHELL_PROJECT_ID = "a3f40ca4-1a1f-4499-be6b-8a4e96b3a3cf"
-_INFISICAL_DOMAIN = "https://secrets.drose.io"
-
-
-def _fetch_infisical(secret_key: str, project_id: str = _PERSONAL_SHELL_PROJECT_ID) -> str | None:
-    """Try to fetch a secret from Infisical. Returns None on any failure."""
-    if shutil.which("infisical") is None:
-        return None
-    try:
-        result = subprocess.run(
-            [
-                "infisical", "secrets",
-                "--projectId", project_id,
-                "--env", "dev",
-                "--path", "/",
-                "--output", "json",
-                "--silent",
-                "--domain", _INFISICAL_DOMAIN,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode != 0:
-            return None
-        for item in json.loads(result.stdout or "[]"):
-            if isinstance(item, dict) and item.get("secretKey") == secret_key:
-                return item.get("secretValue") or None
-    except Exception:
-        pass
-    return None
-
 
 class Backend(str, Enum):
     """Supported agent backends."""
@@ -212,9 +175,9 @@ def configure_codex(
     """
     ctx = ctx or detect_context()
 
-    key = api_key or os.environ.get("OPENAI_API_KEY") or _fetch_infisical("OPENAI_API_KEY")
+    key = api_key or os.environ.get("OPENAI_API_KEY")
     if not key:
-        raise ValueError("OPENAI_API_KEY not set and not found in Infisical")
+        raise ValueError("OPENAI_API_KEY not set and no api_key provided")
 
     env = {
         "OPENAI_API_KEY": key,
