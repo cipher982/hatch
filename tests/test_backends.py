@@ -121,6 +121,13 @@ class TestConfigureZai:
             "--output-format",
             "text",
             "--dangerously-skip-permissions",
+            "--setting-sources",
+            "local",
+            "--no-session-persistence",
+            "--tools",
+            "",
+            "--effort",
+            "low",
         ]
 
     def test_command_with_stream_json(self, mock_zai_key, laptop_context):
@@ -138,6 +145,13 @@ class TestConfigureZai:
             "--output-format",
             "stream-json",
             "--dangerously-skip-permissions",
+            "--setting-sources",
+            "local",
+            "--no-session-persistence",
+            "--tools",
+            "",
+            "--effort",
+            "low",
             "--include-partial-messages",
         ]
 
@@ -195,6 +209,13 @@ class TestConfigureBedrock:
             "--output-format",
             "text",
             "--dangerously-skip-permissions",
+            "--setting-sources",
+            "local",
+            "--no-session-persistence",
+            "--tools",
+            "",
+            "--effort",
+            "low",
         ]
 
     def test_command_with_stream_json(self, laptop_context):
@@ -212,6 +233,13 @@ class TestConfigureBedrock:
             "--output-format",
             "stream-json",
             "--dangerously-skip-permissions",
+            "--setting-sources",
+            "local",
+            "--no-session-persistence",
+            "--tools",
+            "",
+            "--effort",
+            "low",
             "--include-partial-messages",
         ]
 

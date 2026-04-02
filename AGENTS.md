@@ -44,6 +44,7 @@ cli.py / runner.py → credentials.py → backends.py → subprocess(claude/code
 2. **Tests mock subprocess** - no real CLI calls except `integration` marked tests
 3. **Don't add dependencies** - the zero-deps constraint is intentional
 4. **Credential loading lives in `credentials.py`** - do not fetch secrets inside backend config builders
+5. **Claude backends should stay minimal in headless mode** - always pass `--setting-sources local --no-session-persistence --tools "" --effort low` so automation does not inherit interactive hooks/plugins/MCP state
 
 ---
 

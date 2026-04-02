@@ -15,6 +15,36 @@ from typing import Any
 from hatch.context import ExecutionContext
 from hatch.context import detect_context
 
+
+def _build_simple_claude_headless_cmd(
+    *,
+    output_format: str,
+    include_partial_messages: bool,
+    effort: str = "low",
+) -> list[str]:
+    """Build a minimal Claude headless command that avoids user profile overhead."""
+    cmd = [
+        "claude",
+        "--print",
+        "-",  # Read prompt from stdin
+        "--output-format",
+        output_format,
+        "--dangerously-skip-permissions",
+        "--setting-sources",
+        "local",
+        "--no-session-persistence",
+        "--tools",
+        "",
+        "--effort",
+        effort,
+    ]
+
+    if include_partial_messages:
+        cmd.append("--include-partial-messages")
+
+    return cmd
+
+
 class Backend(str, Enum):
     """Supported agent backends."""
 
@@ -83,18 +113,10 @@ def configure_zai(
     if ctx.in_container and not ctx.home_writable:
         env["HOME"] = "/tmp"
 
-    # Use stdin for prompt to avoid ARG_MAX (--print reads from stdin with -)
-    cmd = [
-        "claude",
-        "--print",
-        "-",  # Read prompt from stdin
-        "--output-format",
-        output_format,
-        "--dangerously-skip-permissions",
-    ]
-
-    if include_partial_messages:
-        cmd.append("--include-partial-messages")
+    cmd = _build_simple_claude_headless_cmd(
+        output_format=output_format,
+        include_partial_messages=include_partial_messages,
+    )
 
     # Add resume flag for session continuity
     if resume:
@@ -137,18 +159,10 @@ def configure_bedrock(
     if ctx.in_container and not ctx.home_writable:
         env["HOME"] = "/tmp"
 
-    # Use stdin for prompt to avoid ARG_MAX (--print reads from stdin with -)
-    cmd = [
-        "claude",
-        "--print",
-        "-",  # Read prompt from stdin
-        "--output-format",
-        output_format,
-        "--dangerously-skip-permissions",
-    ]
-
-    if include_partial_messages:
-        cmd.append("--include-partial-messages")
+    cmd = _build_simple_claude_headless_cmd(
+        output_format=output_format,
+        include_partial_messages=include_partial_messages,
+    )
 
     # Add resume flag for session continuity
     if resume:
