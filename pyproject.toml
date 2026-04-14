@@ -27,8 +27,9 @@ classifiers = [
     "Topic :: Utilities",
 ]
 
-# Zero dependencies - stdlib only!
-dependencies = []
+dependencies = [
+    "fastmcp>=2.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -44,6 +45,12 @@ Repository = "https://github.com/cipher982/hatch"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hatch"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/hatch/mcp/opencode.json" = "hatch/mcp/opencode.json"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/hatch/mcp/opencode.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

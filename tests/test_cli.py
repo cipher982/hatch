@@ -212,6 +212,28 @@ class TestCreateParser:
         assert "--automation" in captured.out
 
 
+class TestSpecialCommands:
+    """Tests for MCP-special command dispatch."""
+
+    def test_mcp_dispatches_to_server(self):
+        with mock.patch("hatch.mcp.server.main") as mcp_main:
+            exit_code = main(["mcp"])
+        mcp_main.assert_called_once_with()
+        assert exit_code == EXIT_SUCCESS
+
+    def test_mcp_doctor_dispatches(self):
+        with mock.patch("hatch.mcp.doctor.main", return_value=7) as doctor_main:
+            exit_code = main(["mcp", "doctor", "tools"])
+        doctor_main.assert_called_once_with(["tools"])
+        assert exit_code == 7
+
+    def test_mcp_unknown_subcommand_is_config_error(self, capsys):
+        exit_code = main(["mcp", "wat"])
+        captured = capsys.readouterr()
+        assert "unknown hatch mcp subcommand" in captured.err
+        assert exit_code == EXIT_CONFIG_ERROR
+
+
 class TestGetPrompt:
     """Tests for get_prompt function."""
 

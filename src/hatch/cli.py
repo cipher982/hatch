@@ -113,6 +113,41 @@ def infer_machine_defaults(argv: Sequence[str], stdout_is_tty: bool) -> tuple[bo
     return True, True
 
 
+def _print_mcp_help() -> None:
+    print(
+        "usage: hatch mcp [doctor ...]\n\n"
+        "  hatch mcp                 Run the hatch MCP server over stdio\n"
+        "  hatch mcp doctor tools    Verify the server exposes the expected tools\n"
+        "  hatch mcp doctor smoke --cwd /abs/path\n",
+        file=sys.stderr,
+    )
+
+
+def _dispatch_special_command(raw_argv: Sequence[str]) -> int | None:
+    if not raw_argv or raw_argv[0] != "mcp":
+        return None
+
+    if len(raw_argv) == 1:
+        from hatch.mcp.server import main as mcp_main
+
+        mcp_main()
+        return EXIT_SUCCESS
+
+    subcommand = raw_argv[1]
+    if subcommand in {"-h", "--help"}:
+        _print_mcp_help()
+        return EXIT_SUCCESS
+
+    if subcommand == "doctor":
+        from hatch.mcp.doctor import main as mcp_doctor_main
+
+        return int(mcp_doctor_main(raw_argv[2:]))
+
+    print(f"Error: unknown hatch mcp subcommand '{subcommand}'", file=sys.stderr)
+    _print_mcp_help()
+    return EXIT_CONFIG_ERROR
+
+
 def opencode_progress_label(model_name: str) -> str:
     """Map shared-runtime models to user-facing progress labels."""
     if model_name.startswith("openai/"):
@@ -201,6 +236,7 @@ Default:
 Advanced:
   hatch codex max --reasoning-effort low "Write unit tests"
   hatch -b gemini "Summarize this image"
+  hatch mcp              # run the MCP server
   hatch --json "Analyze this" | jq .output
   hatch --advanced-help   # show raw/backend-specific flags
 
@@ -350,6 +386,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         Exit code (0 for success, non-zero for errors)
     """
     raw_argv = list(sys.argv[1:] if argv is None else argv)
+    special_exit_code = _dispatch_special_command(raw_argv)
+    if special_exit_code is not None:
+        return special_exit_code
     parser = create_parser(show_advanced=_has_explicit_flag(raw_argv, "--advanced-help"))
     try:
         normalized_argv = normalize_argv(raw_argv)
