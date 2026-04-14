@@ -25,6 +25,13 @@ def _build_simple_claude_headless_cmd(
     """Build a minimal Claude headless command that avoids user profile overhead."""
     cmd = [
         "claude",
+    ]
+
+    # Claude CLI requires --verbose when using stream-json under --print.
+    if output_format == "stream-json":
+        cmd.append("--verbose")
+
+    cmd.extend([
         "--print",
         "-",  # Read prompt from stdin
         "--output-format",
@@ -37,7 +44,7 @@ def _build_simple_claude_headless_cmd(
         "",
         "--effort",
         effort,
-    ]
+    ])
 
     if include_partial_messages:
         cmd.append("--include-partial-messages")
@@ -48,10 +55,11 @@ def _build_simple_claude_headless_cmd(
 class Backend(str, Enum):
     """Supported agent backends."""
 
-    ZAI = "zai"  # Claude Code CLI with z.ai/GLM-4.7
+    ZAI = "zai"  # Claude Code CLI with z.ai/GLM-5.1
     BEDROCK = "bedrock"  # Claude Code CLI with AWS Bedrock
     CODEX = "codex"  # OpenAI Codex CLI
     GEMINI = "gemini"  # Google Gemini CLI
+    OPENCODE = "opencode"  # OpenCode runtime with provider-native models
 
 
 @dataclass
@@ -84,13 +92,13 @@ def configure_zai(
     *,
     api_key: str | None = None,
     base_url: str = "https://api.z.ai/api/anthropic",
-    model: str = "glm-5",
+    model: str = "glm-5.1",
     resume: str | None = None,
     output_format: str = "text",
     include_partial_messages: bool = False,
     **_: Any,
 ) -> BackendConfig:
-    """Configure z.ai backend (Claude Code CLI with GLM-4.7).
+    """Configure z.ai backend (Claude Code CLI with GLM-5.1).
 
     Key insight: z.ai uses ANTHROPIC_AUTH_TOKEN (not ANTHROPIC_API_KEY),
     and requires CLAUDE_CODE_USE_BEDROCK to be unset.
@@ -134,7 +142,7 @@ def configure_bedrock(
     prompt: str,
     ctx: ExecutionContext | None = None,
     *,
-    model: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    model: str = "us.anthropic.claude-sonnet-4-6",
     aws_profile: str = "zh-qa-engineer",
     aws_region: str = "us-east-1",
     resume: str | None = None,
@@ -168,7 +176,16 @@ def configure_bedrock(
     if resume:
         cmd.extend(["--resume", resume])
 
-    return BackendConfig(cmd=cmd, env=env, stdin_data=prompt.encode("utf-8"))
+    return BackendConfig(
+        cmd=cmd,
+        env=env,
+        env_unset=[
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_BASE_URL",
+        ],
+        stdin_data=prompt.encode("utf-8"),
+    )
 
 
 def configure_codex(
@@ -261,12 +278,79 @@ def configure_gemini(
     return BackendConfig(cmd=cmd, env=env, stdin_data=prompt.encode("utf-8"))
 
 
+def _map_opencode_variant(model: str, reasoning_effort: str | None) -> str | None:
+    """Map hatch reasoning-effort levels onto OpenCode model variants."""
+    if not reasoning_effort:
+        return None
+
+    if model.startswith("openai/"):
+        # GPT-5 family supports minimal/low/medium/high. Codex xhigh maps to high.
+        if reasoning_effort == "xhigh":
+            return "high"
+        return reasoning_effort
+
+    return None
+
+
+def configure_opencode(
+    prompt: str,
+    ctx: ExecutionContext | None = None,
+    *,
+    model: str | None = None,
+    api_key: str | None = None,
+    reasoning_effort: str | None = None,
+    agent: str | None = None,
+    aws_profile: str | None = None,
+    aws_region: str | None = None,
+    pure: bool = True,
+    **_: Any,
+) -> BackendConfig:
+    """Configure OpenCode for provider-native non-interactive execution."""
+    ctx = ctx or detect_context()
+
+    if not model:
+        raise ValueError("OpenCode backend requires an explicit model")
+
+    env: dict[str, str] = {}
+
+    # Set HOME for containers (OpenCode writes under user config/state dirs).
+    if ctx.in_container and not ctx.home_writable:
+        env["HOME"] = ctx.effective_home
+
+    if model.startswith("openai/") and api_key:
+        env["OPENAI_API_KEY"] = api_key
+
+    if model.startswith("amazon-bedrock/"):
+        env["AWS_PROFILE"] = aws_profile or os.environ.get("AWS_PROFILE", "zh-qa-engineer")
+        env["AWS_REGION"] = aws_region or os.environ.get("AWS_REGION", "us-east-1")
+
+    cmd = ["opencode", "run"]
+
+    if pure:
+        cmd.append("--pure")
+
+    cmd.extend(["--format", "json", "-m", model])
+
+    variant = _map_opencode_variant(model, reasoning_effort)
+    if variant:
+        cmd.extend(["--variant", variant])
+
+    if agent:
+        cmd.extend(["--agent", agent])
+
+    # OpenCode's non-interactive CLI accepts the prompt as argv, not stdin.
+    cmd.append(prompt)
+
+    return BackendConfig(cmd=cmd, env=env, stdin_data=None)
+
+
 # Backend to configure function mapping
 BACKEND_CONFIGURATORS = {
     Backend.ZAI: configure_zai,
     Backend.BEDROCK: configure_bedrock,
     Backend.CODEX: configure_codex,
     Backend.GEMINI: configure_gemini,
+    Backend.OPENCODE: configure_opencode,
 }
 
 

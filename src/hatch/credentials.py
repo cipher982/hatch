@@ -33,6 +33,8 @@ SECRET_SPECS: dict[Backend, SecretSpec] = {
 
 def _load_secret_from_helper(spec: SecretSpec) -> str | None:
     """Fetch a secret via the canonical local helper."""
+    if os.environ.get("HATCH_DISABLE_SECRET_HELPER", "").strip() == "1":
+        return None
     if not os.path.exists(_INFISICAL_HELPER):
         return None
 
@@ -88,3 +90,20 @@ def hydrate_backend_kwargs(
         f"{spec.env_var} not set and hatch could not load it via "
         f"{_INFISICAL_HELPER} --project {spec.project}"
     )
+
+
+def credential_backend_for(
+    backend: Backend,
+    backend_kwargs: dict,
+) -> Backend | None:
+    """Choose which credential policy applies for a backend/model combination."""
+    if backend != Backend.OPENCODE:
+        return backend
+
+    model = str(backend_kwargs.get("model") or "")
+    if model.startswith("openai/"):
+        return Backend.CODEX
+    if model.startswith("z.ai/") or model.startswith("zai/"):
+        return Backend.ZAI
+
+    return None

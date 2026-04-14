@@ -251,6 +251,7 @@ class TestErrorHandling:
         # Run in environment without ZAI_API_KEY
         env = {k: v for k, v in os.environ.items() if k != "ZAI_API_KEY"}
         env["PATH"] = os.environ.get("PATH", "")
+        env["HATCH_DISABLE_SECRET_HELPER"] = "1"
 
         result = subprocess.run(
             [

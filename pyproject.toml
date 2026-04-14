@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "hatch-agent"
 version = "0.1.0"
 description = "Hatch AI agents from the swarm (Claude Code, Codex, Gemini)"
-readme = "README.md"
+readme = "AGENTS.md"
 requires-python = ">=3.11"
 license = "MIT"
 authors = [

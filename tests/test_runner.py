@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import subprocess
+import sys
 from unittest import mock
 
 import pytest
 
 from hatch.backends import Backend
-from hatch.runner import AgentResult, _run_subprocess, run, run_sync
+from hatch.runner import (
+    AgentResult,
+    _run_subprocess,
+    run,
+    run_claude_stream_sync,
+    run_opencode_stream_sync,
+    run_sync,
+)
 
 
 class TestAgentResult:
@@ -180,6 +188,125 @@ class TestRunSync:
         )
         assert "test" in stdout
         assert code == 0
+
+
+class TestClaudeStreamRunSync:
+    """Tests for Claude stream-json subprocess handling."""
+
+    def test_extracts_final_result_and_progress(self):
+        """Parses stream-json lines and keeps only the final result."""
+        script = "\n".join([
+            "import sys, time",
+            'print(\'{\"type\":\"system\",\"subtype\":\"init\",\"model\":\"glm-5.1\",\"session_id\":\"session-1234\"}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"stream_event\",\"event\":{\"type\":\"message_start\"}}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"thinking\"}}}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"tool-slack\",\"name\":\"mcp__claude_ai_Slack__authenticate\",\"input\":{}}]}}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"tool-1\",\"name\":\"Bash\",\"input\":{\"command\":\"pwd\",\"description\":\"Print working directory\"}}]}}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"result\",\"result\":\"Done.\",\"duration_ms\":42}\', flush=True)',
+        ])
+
+        progress: list[str] = []
+        result = run_claude_stream_sync(
+            cmd=[sys.executable, "-c", script],
+            stdin_data=None,
+            env={},
+            cwd=None,
+            timeout_s=10,
+            progress_handler=progress.append,
+            heartbeat_s=1,
+        )
+
+        assert result.return_code == 0
+        assert result.timed_out is False
+        assert result.final_output == "Done."
+        assert '"type":"result"' in result.stdout
+        assert progress == [
+            "[hatch] Claude started (glm-5.1, session session-)",
+            "[hatch] Claude thinking",
+            "[hatch] Bash: Print working directory (pwd)",
+            "[hatch] Claude completed in 0.0s",
+        ]
+
+    def test_falls_back_to_last_text_when_result_line_missing(self):
+        """Uses the last assistant text when Claude omits the result envelope."""
+        script = "\n".join([
+            'print(\'{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"Fallback text\"}]}}\', flush=True)',
+        ])
+
+        result = run_claude_stream_sync(
+            cmd=[sys.executable, "-c", script],
+            stdin_data=None,
+            env={},
+            cwd=None,
+            timeout_s=10,
+        )
+
+        assert result.return_code == 0
+        assert result.final_output == "Fallback text"
+
+
+class TestOpenCodeStreamRunSync:
+    """Tests for OpenCode JSON event stream handling."""
+
+    def test_extracts_final_text_and_progress(self):
+        """Parses JSONL tool events and keeps only the final text."""
+        script = "\n".join([
+            "import time",
+            'print(\'{\"type\":\"step_start\",\"sessionID\":\"ses_12345678\"}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"tool_use\",\"part\":{\"tool\":\"bash\",\"callID\":\"call-1\",\"state\":{\"input\":{\"command\":\"git diff\",\"description\":\"Show uncommitted changes\"}}}}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"text\",\"part\":{\"text\":\"Checking now.\",\"metadata\":{\"openai\":{\"phase\":\"commentary\"}}}}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"text\",\"part\":{\"text\":\"Findings go here.\",\"metadata\":{\"openai\":{\"phase\":\"final_answer\"}}}}\', flush=True)',
+            "time.sleep(0.01)",
+            'print(\'{\"type\":\"step_finish\",\"part\":{\"reason\":\"stop\"}}\', flush=True)',
+        ])
+
+        progress: list[str] = []
+        result = run_opencode_stream_sync(
+            cmd=[sys.executable, "-c", script],
+            stdin_data=None,
+            env={},
+            cwd=None,
+            timeout_s=10,
+            progress_label="Codex",
+            progress_handler=progress.append,
+            heartbeat_s=1,
+        )
+
+        assert result.return_code == 0
+        assert result.timed_out is False
+        assert result.final_output == "Findings go here."
+        assert '"type":"text"' in result.stdout
+        assert progress == [
+            "[hatch] Codex started (session ses_1234)",
+            "[hatch] bash: Show uncommitted changes (git diff)",
+            "[hatch] Codex completed",
+        ]
+
+    def test_extracts_structured_error_message(self):
+        """Captures OpenCode error events for clearer CLI reporting."""
+        script = "\n".join([
+            'print(\'{\"type\":\"error\",\"error\":{\"name\":\"UnknownError\",\"data\":{\"message\":\"AWS session expired\"}}}\', flush=True)',
+        ])
+
+        result = run_opencode_stream_sync(
+            cmd=[sys.executable, "-c", script],
+            stdin_data=None,
+            env={},
+            cwd=None,
+            timeout_s=10,
+        )
+
+        assert result.return_code == 0
+        assert result.final_output is None
+        assert result.error_message == "AWS session expired"
 
 
 class TestAsyncRun:

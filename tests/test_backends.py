@@ -13,6 +13,7 @@ from hatch.backends import (
     configure_bedrock,
     configure_codex,
     configure_gemini,
+    configure_opencode,
     configure_zai,
     get_config,
 )
@@ -28,6 +29,7 @@ class TestBackendEnum:
         assert Backend.BEDROCK.value == "bedrock"
         assert Backend.CODEX.value == "codex"
         assert Backend.GEMINI.value == "gemini"
+        assert Backend.OPENCODE.value == "opencode"
 
     def test_backend_from_string(self):
         """Backend can be created from string."""
@@ -35,6 +37,7 @@ class TestBackendEnum:
         assert Backend("bedrock") == Backend.BEDROCK
         assert Backend("codex") == Backend.CODEX
         assert Backend("gemini") == Backend.GEMINI
+        assert Backend("opencode") == Backend.OPENCODE
 
     def test_invalid_backend(self):
         """Invalid backend string raises ValueError."""
@@ -140,6 +143,7 @@ class TestConfigureZai:
         )
         assert config.cmd == [
             "claude",
+            "--verbose",
             "--print",
             "-",
             "--output-format",
@@ -160,7 +164,7 @@ class TestConfigureZai:
         config = configure_zai("test prompt", laptop_context)
         assert config.env["ANTHROPIC_BASE_URL"] == "https://api.z.ai/api/anthropic"
         assert config.env["ANTHROPIC_AUTH_TOKEN"] == mock_zai_key
-        assert config.env["ANTHROPIC_MODEL"] == "glm-5"
+        assert config.env["ANTHROPIC_MODEL"] == "glm-5.1"
 
     def test_unsets_bedrock_vars(self, mock_zai_key, laptop_context):
         """Unsets CLAUDE_CODE_USE_BEDROCK and ANTHROPIC_API_KEY."""
@@ -228,6 +232,7 @@ class TestConfigureBedrock:
         )
         assert config.cmd == [
             "claude",
+            "--verbose",
             "--print",
             "-",
             "--output-format",
@@ -249,7 +254,7 @@ class TestConfigureBedrock:
         assert config.env["CLAUDE_CODE_USE_BEDROCK"] == "1"
         assert config.env["AWS_PROFILE"] == "zh-qa-engineer"
         assert config.env["AWS_REGION"] == "us-east-1"
-        assert "claude-haiku" in config.env["ANTHROPIC_MODEL"]
+        assert config.env["ANTHROPIC_MODEL"] == "us.anthropic.claude-sonnet-4-6"
 
     def test_custom_aws_profile(self, laptop_context):
         """Custom AWS profile can be specified."""
@@ -266,15 +271,100 @@ class TestConfigureBedrock:
         config = configure_bedrock("test", laptop_context, model="anthropic.claude-v2")
         assert config.env["ANTHROPIC_MODEL"] == "anthropic.claude-v2"
 
+
+class TestConfigureOpenCode:
+    """Tests for OpenCode backend configuration."""
+
+    def test_requires_explicit_model(self, laptop_context):
+        """OpenCode needs a concrete provider/model target."""
+        with pytest.raises(ValueError, match="requires an explicit model"):
+            configure_opencode("test prompt", laptop_context)
+
+    def test_command_structure_for_openai(self, laptop_context):
+        """OpenCode command uses JSON event mode and pure runtime."""
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="openai/gpt-5.4",
+            api_key="sk-test",
+        )
+        assert config.cmd == [
+            "opencode",
+            "run",
+            "--pure",
+            "--format",
+            "json",
+            "-m",
+            "openai/gpt-5.4",
+            "test prompt",
+        ]
+        assert config.env["OPENAI_API_KEY"] == "sk-test"
+        assert config.stdin_data is None
+
+    def test_reasoning_effort_maps_to_variant(self, laptop_context):
+        """OpenAI reasoning effort maps onto OpenCode variants."""
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="openai/gpt-5.4",
+            reasoning_effort="xhigh",
+        )
+        assert config.cmd == [
+            "opencode",
+            "run",
+            "--pure",
+            "--format",
+            "json",
+            "-m",
+            "openai/gpt-5.4",
+            "--variant",
+            "high",
+            "test prompt",
+        ]
+
+    def test_agent_flag_is_forwarded(self, laptop_context):
+        """Named OpenCode agents are forwarded."""
+        config = configure_opencode(
+            "review this",
+            laptop_context,
+            model="openai/gpt-5.4-mini",
+            agent="review",
+        )
+        assert "--agent" in config.cmd
+        assert "review" in config.cmd
+
+    def test_bedrock_defaults(self, laptop_context):
+        """Bedrock-backed OpenCode models preserve the existing defaults."""
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="amazon-bedrock/us.anthropic.claude-sonnet-4-6",
+        )
+        assert config.env["AWS_PROFILE"] == "zh-qa-engineer"
+        assert config.env["AWS_REGION"] == "us-east-1"
+
+    def test_container_readonly_sets_home(self, container_readonly_context):
+        """OpenCode uses the effective writable home in read-only containers."""
+        config = configure_opencode(
+            "test prompt",
+            container_readonly_context,
+            model="openai/gpt-5.4",
+        )
+        assert config.env["HOME"] == container_readonly_context.effective_home
+
     def test_prompt_via_stdin(self, laptop_context):
         """Prompt passed via stdin_data."""
         config = configure_bedrock("my bedrock prompt", laptop_context)
         assert config.stdin_data == b"my bedrock prompt"
 
-    def test_no_env_unset(self, laptop_context):
-        """No environment variables need to be unset."""
+    def test_unsets_incompatible_anthropic_vars(self, laptop_context):
+        """Clears incompatible Anthropic/z.ai env when using Bedrock."""
         config = configure_bedrock("test", laptop_context)
-        assert config.env_unset == []
+        assert config.env_unset == [
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_BASE_URL",
+        ]
 
     def test_container_readonly_sets_home(self, container_readonly_context):
         """Sets HOME=/tmp in container with read-only home."""
@@ -404,6 +494,11 @@ class TestGetConfig:
         config = get_config(Backend.GEMINI, "test", laptop_context)
         assert "gemini" in config.cmd
 
+    def test_dispatches_to_opencode(self, laptop_context):
+        """Dispatches to configure_opencode for OPENCODE backend."""
+        config = get_config(Backend.OPENCODE, "test", laptop_context, model="openai/gpt-5.4")
+        assert config.cmd[0] == "opencode"
+
     def test_passes_kwargs(self, mock_zai_key, laptop_context):
         """Passes kwargs to configure function."""
         config = get_config(Backend.ZAI, "test", laptop_context, model="custom")
@@ -430,6 +525,12 @@ class TestUnicodePrompts:
         prompt = "Explain \u03c0 calculation"
         config = configure_gemini(prompt, laptop_context)
         assert config.stdin_data == prompt.encode("utf-8")
+
+    def test_opencode_unicode_prompt(self, laptop_context):
+        """OpenCode keeps unicode prompts intact in argv."""
+        prompt = "Review 日本語 and 🚀 usage"
+        config = configure_opencode(prompt, laptop_context, model="openai/gpt-5.4")
+        assert config.cmd[-1] == prompt
 
 
 class TestLargePrompts:

@@ -18,7 +18,9 @@ from hatch.cli import (
     EXIT_TIMEOUT,
     create_parser,
     get_prompt,
+    infer_machine_defaults,
     main,
+    normalize_argv,
     result_to_exit_code,
 )
 from hatch.runner import AgentResult
@@ -58,11 +60,11 @@ class TestCreateParser:
             args = parser.parse_args(["-b", backend, "test"])
             assert args.backend == backend
 
-    def test_invalid_backend_rejected(self):
-        """Invalid backend raises error."""
+    def test_invalid_backend_reaches_main_validation(self):
+        """Parser leaves backend validation to main()."""
         parser = create_parser()
-        with pytest.raises(SystemExit):
-            parser.parse_args(["-b", "invalid", "test"])
+        args = parser.parse_args(["-b", "invalid", "test"])
+        assert args.backend == "invalid"
 
     def test_timeout_default(self):
         """Default timeout is 900."""
@@ -146,25 +148,25 @@ class TestCreateParser:
         """Prompt is captured from positional argument."""
         parser = create_parser()
         args = parser.parse_args(["my test prompt"])
-        assert args.prompt == "my test prompt"
+        assert args.prompt == ["my test prompt"]
 
     def test_prompt_with_spaces(self):
         """Prompt with spaces works."""
         parser = create_parser()
-        args = parser.parse_args(["fix the bug in auth.py"])
-        assert args.prompt == "fix the bug in auth.py"
+        args = parser.parse_args(["fix", "the", "bug", "in", "auth.py"])
+        assert args.prompt == ["fix", "the", "bug", "in", "auth.py"]
 
     def test_prompt_optional(self):
         """Prompt is optional (can read from stdin)."""
         parser = create_parser()
         args = parser.parse_args([])
-        assert args.prompt is None
+        assert args.prompt == []
 
     def test_dash_means_stdin(self):
         """'-' as prompt means read from stdin."""
         parser = create_parser()
         args = parser.parse_args(["-"])
-        assert args.prompt == "-"
+        assert args.prompt == ["-"]
 
     def test_version_flag(self):
         """--version exits cleanly."""
@@ -180,6 +182,35 @@ class TestCreateParser:
             parser.parse_args(["--help"])
         assert exc_info.value.code == 0
 
+    def test_help_text_shows_surfaced_usage(self, capsys):
+        """Help should teach the surfaced Claude/Codex forms first."""
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--help"])
+        captured = capsys.readouterr()
+        assert 'hatch claude <haiku|sonnet|opus>' in captured.out
+        assert 'hatch codex <nano|mini|max>' in captured.out
+
+    def test_help_text_hides_advanced_flags(self, capsys):
+        """Hidden power-user flags should stay out of the default help surface."""
+        parser = create_parser()
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--help"])
+        captured = capsys.readouterr()
+        assert "--model" not in captured.out
+        assert "--api-key" not in captured.out
+        assert "--automation" not in captured.out
+
+    def test_advanced_help_text_shows_advanced_flags(self, capsys):
+        """Advanced help should expose the raw escape-hatch flags on demand."""
+        parser = create_parser(show_advanced=True)
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--help"])
+        captured = capsys.readouterr()
+        assert "--model" in captured.out
+        assert "--api-key" in captured.out
+        assert "--automation" in captured.out
+
 
 class TestGetPrompt:
     """Tests for get_prompt function."""
@@ -187,7 +218,7 @@ class TestGetPrompt:
     def test_prompt_from_args(self):
         """Returns prompt from args."""
         parser = create_parser()
-        args = parser.parse_args(["test prompt"])
+        args = parser.parse_args(["test", "prompt"])
         assert get_prompt(args) == "test prompt"
 
     def test_stdin_on_dash(self):
@@ -249,6 +280,167 @@ class TestResultToExitCode:
         assert result_to_exit_code(result) == EXIT_AGENT_ERROR
 
 
+class TestNormalizeArgv:
+    """Tests for surfaced provider aliases."""
+
+    def test_leaves_plain_prompt_unchanged(self):
+        """Plain prompts still use the existing default path."""
+        argv = ["review", "this"]
+        assert normalize_argv(argv) == argv
+
+    def test_empty_argv_stays_empty(self):
+        """No args means parse defaults and then read stdin."""
+        assert normalize_argv([]) == []
+
+    def test_codex_requires_explicit_model(self):
+        """'hatch codex ...' must name nano, mini, or max explicitly."""
+        with pytest.raises(ValueError, match="codex requires an explicit model"):
+            normalize_argv(["codex"])
+
+    def test_codex_model_aliases_work(self):
+        """Codex shorthand models map to the surfaced family."""
+        assert normalize_argv(["codex", "nano", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openai/gpt-5.4-nano",
+            "review",
+        ]
+
+    def test_claude_model_aliases_work(self):
+        """Claude shorthand models map to Bedrock model IDs."""
+        assert normalize_argv(["claude", "haiku", "summarize"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "summarize",
+        ]
+
+    def test_explicit_backend_wins(self):
+        """Raw backend flags bypass the surfaced alias layer."""
+        assert normalize_argv(["-b", "zai", "codex", "review"]) == [
+            "-b",
+            "zai",
+            "codex",
+            "review",
+        ]
+
+    def test_explicit_model_wins(self):
+        """Existing --model overrides the surfaced default."""
+        assert normalize_argv(["codex", "--model", "openai/gpt-5.4", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openai/gpt-5.4",
+            "review",
+        ]
+
+    def test_all_surfaced_aliases_map_correctly(self):
+        """The public alias surface maps to the expected real model names."""
+        assert normalize_argv(["codex", "mini", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openai/gpt-5.4-mini",
+            "review",
+        ]
+        assert normalize_argv(["codex", "max", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openai/gpt-5.4",
+            "review",
+        ]
+        assert normalize_argv(["claude", "sonnet", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
+            "review",
+        ]
+        assert normalize_argv(["claude", "opus", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "amazon-bedrock/us.anthropic.claude-opus-4-6-v1",
+            "review",
+        ]
+
+    def test_surfaced_codex_preserves_reasoning_effort_flag(self):
+        """Surfaced Codex syntax should still forward Codex-only flags."""
+        assert normalize_argv(["codex", "max", "--reasoning-effort", "high", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openai/gpt-5.4",
+            "--reasoning-effort",
+            "high",
+            "review",
+        ]
+
+    def test_invalid_surfaced_model_is_rejected(self):
+        """Surfaced providers reject unknown model names."""
+        with pytest.raises(ValueError, match="invalid codex model 'full'"):
+            normalize_argv(["codex", "full", "review"])
+        with pytest.raises(ValueError, match="invalid claude model '4.6'"):
+            normalize_argv(["claude", "4.6", "review"])
+
+    def test_option_value_named_like_provider_is_not_rewritten(self):
+        """Provider aliases inside option values do not trigger routing."""
+        assert normalize_argv(["--cwd", "claude", "review"]) == [
+            "--cwd",
+            "claude",
+            "review",
+        ]
+        assert normalize_argv(["--model", "claude", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "claude",
+            "review",
+        ]
+
+    def test_double_dash_forces_literal_prompt(self):
+        """'--' disables provider alias rewriting for prompt text."""
+        assert normalize_argv(["--", "claude", "review", "this"]) == [
+            "--",
+            "claude",
+            "review",
+            "this",
+        ]
+
+    def test_help_flags_bypass_surfaced_alias_errors(self):
+        """Surfaced providers should allow help without forcing a model first."""
+        assert normalize_argv(["codex", "--help"]) == ["codex", "--help"]
+        assert normalize_argv(["claude", "--advanced-help"]) == ["claude", "--advanced-help"]
+
+
+class TestInferMachineDefaults:
+    """Tests for inferred machine-friendly defaults."""
+
+    def test_non_tty_defaults_to_json_and_automation(self):
+        """Real non-interactive callers should not need to remember these flags."""
+        assert infer_machine_defaults(["codex", "mini", "review"], stdout_is_tty=False) == (
+            True,
+            True,
+        )
+
+    def test_tty_keeps_human_defaults(self):
+        """Terminal users still get plain text and no sidechain marker by default."""
+        assert infer_machine_defaults(["codex", "mini", "review"], stdout_is_tty=True) == (
+            False,
+            False,
+        )
+
+    def test_explicit_json_and_automation_are_respected(self):
+        """Explicit flags still win."""
+        assert infer_machine_defaults(["--json", "--automation", "review"], stdout_is_tty=True) == (
+            True,
+            True,
+        )
+
+
 class TestMain:
     """Tests for main function."""
 
@@ -257,6 +449,36 @@ class TestMain:
         """Mock run_sync to avoid actual subprocess calls."""
         with mock.patch("hatch.cli.run_sync") as m:
             m.return_value = ("output", "", 0, False)
+            yield m
+
+    @pytest.fixture
+    def mock_run_claude_stream_sync(self):
+        """Mock Claude stream runner to avoid real subprocess calls."""
+        from hatch.runner import ClaudeStreamRunResult
+
+        with mock.patch("hatch.cli.run_claude_stream_sync") as m:
+            m.return_value = ClaudeStreamRunResult(
+                stdout='{"type":"result","result":"output"}\n',
+                stderr="",
+                return_code=0,
+                timed_out=False,
+                final_output="output",
+            )
+            yield m
+
+    @pytest.fixture
+    def mock_run_opencode_stream_sync(self):
+        """Mock OpenCode stream runner to avoid real subprocess calls."""
+        from hatch.runner import OpenCodeStreamRunResult
+
+        with mock.patch("hatch.cli.run_opencode_stream_sync") as m:
+            m.return_value = OpenCodeStreamRunResult(
+                stdout='{"type":"text","part":{"text":"output"}}\n',
+                stderr="",
+                return_code=0,
+                timed_out=False,
+                final_output="output",
+            )
             yield m
 
     @pytest.fixture
@@ -286,10 +508,24 @@ class TestMain:
             yield ctx
 
     def test_success_output(
-        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
+        self,
+        mock_run_claude_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        mock_zai_key,
+        capsys,
     ):
         """Successful run outputs result."""
-        mock_run_sync.return_value = ("Hello World", "", 0, False)
+        from hatch.runner import ClaudeStreamRunResult
+
+        mock_run_claude_stream_sync.return_value = ClaudeStreamRunResult(
+            stdout='{"type":"result","result":"Hello World"}\n',
+            stderr="",
+            return_code=0,
+            timed_out=False,
+            final_output="Hello World",
+        )
 
         exit_code = main(["test prompt"])
 
@@ -298,10 +534,24 @@ class TestMain:
         assert "Hello World" in captured.out
 
     def test_json_output(
-        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
+        self,
+        mock_run_claude_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        mock_zai_key,
+        capsys,
     ):
         """JSON output mode works."""
-        mock_run_sync.return_value = ("output text", "", 0, False)
+        from hatch.runner import ClaudeStreamRunResult
+
+        mock_run_claude_stream_sync.return_value = ClaudeStreamRunResult(
+            stdout='{"type":"result","result":"output text"}\n',
+            stderr="",
+            return_code=0,
+            timed_out=False,
+            final_output="output text",
+        )
 
         exit_code = main(["--json", "test prompt"])
 
@@ -312,10 +562,24 @@ class TestMain:
         assert data["output"] == "output text"
 
     def test_error_to_stderr(
-        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
+        self,
+        mock_run_claude_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        mock_zai_key,
+        capsys,
     ):
         """Errors go to stderr."""
-        mock_run_sync.return_value = ("", "error msg", 1, False)
+        from hatch.runner import ClaudeStreamRunResult
+
+        mock_run_claude_stream_sync.return_value = ClaudeStreamRunResult(
+            stdout='{"type":"assistant","message":{"content":[{"type":"text","text":"partial"}]}}\n',
+            stderr="error msg",
+            return_code=1,
+            timed_out=False,
+            final_output=None,
+        )
 
         exit_code = main(["test prompt"])
 
@@ -324,10 +588,24 @@ class TestMain:
         assert "Error" in captured.err
 
     def test_json_error(
-        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
+        self,
+        mock_run_claude_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        mock_zai_key,
+        capsys,
     ):
         """JSON mode includes errors."""
-        mock_run_sync.return_value = ("", "error msg", 1, False)
+        from hatch.runner import ClaudeStreamRunResult
+
+        mock_run_claude_stream_sync.return_value = ClaudeStreamRunResult(
+            stdout='{"type":"assistant","message":{"content":[{"type":"text","text":"partial"}]}}\n',
+            stderr="error msg",
+            return_code=1,
+            timed_out=False,
+            final_output=None,
+        )
 
         exit_code = main(["--json", "test prompt"])
 
@@ -337,11 +615,52 @@ class TestMain:
         assert data["ok"] is False
         assert data["error"] is not None
 
+    def test_opencode_structured_error_surfaces_in_json(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        capsys,
+    ):
+        """OpenCode error events become the top-level hatch error."""
+        from hatch.runner import OpenCodeStreamRunResult
+
+        mock_run_opencode_stream_sync.return_value = OpenCodeStreamRunResult(
+            stdout='{"type":"error"}\n',
+            stderr="",
+            return_code=0,
+            timed_out=False,
+            final_output=None,
+            error_message="AWS session expired",
+        )
+
+        exit_code = main(["--json", "codex", "mini", "test prompt"])
+
+        assert exit_code == EXIT_AGENT_ERROR
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["ok"] is False
+        assert data["error"] == "AWS session expired"
+
     def test_timeout_exit_code(
-        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
+        self,
+        mock_run_claude_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        mock_zai_key,
     ):
         """Timeout returns correct exit code."""
-        mock_run_sync.return_value = ("", "", -1, True)
+        from hatch.runner import ClaudeStreamRunResult
+
+        mock_run_claude_stream_sync.return_value = ClaudeStreamRunResult(
+            stdout="",
+            stderr="",
+            return_code=-1,
+            timed_out=True,
+            final_output=None,
+        )
 
         exit_code = main(["test prompt"])
 
@@ -378,7 +697,7 @@ class TestMain:
     ):
         """CLI not found returns correct exit code."""
         with mock.patch(
-            "hatch.cli.run_sync",
+            "hatch.cli.run_claude_stream_sync",
             side_effect=FileNotFoundError("claude not found"),
         ):
             exit_code = main(["test prompt"])
@@ -386,10 +705,9 @@ class TestMain:
         assert exit_code == EXIT_NOT_FOUND
 
     def test_backend_passed_correctly(
-        self, mock_run_sync, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
+        self, mock_run_claude_stream_sync, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
         """Backend is passed to get_config."""
-        mock_run_sync.return_value = ("output", "", 0, False)
 
         with mock.patch("hatch.cli.get_config") as mock_config:
             from hatch.backends import BackendConfig, Backend
@@ -404,12 +722,31 @@ class TestMain:
             args = mock_config.call_args[0]
             assert args[0] == Backend.BEDROCK
 
+    def test_explicit_model_routes_to_opencode_backend(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+    ):
+        """Explicit models without a raw backend flag should use the surfaced runtime."""
+        with mock.patch("hatch.cli.get_config") as mock_config:
+            from hatch.backends import BackendConfig, Backend
+
+            mock_config.return_value = BackendConfig(
+                cmd=["test"], env={}, stdin_data=b"test"
+            )
+
+            main(["--model", "openai/gpt-5.4-mini", "test prompt"])
+
+            args = mock_config.call_args[0]
+            kwargs = mock_config.call_args[1]
+            assert args[0] == Backend.OPENCODE
+            assert kwargs["model"] == "openai/gpt-5.4-mini"
+
     def test_model_kwarg_passed(
-        self, mock_run_sync, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
+        self, mock_run_opencode_stream_sync, mock_hydrate_backend_kwargs, mock_detect_context
     ):
         """Model is passed as kwarg."""
-        mock_run_sync.return_value = ("output", "", 0, False)
-
         with mock.patch("hatch.cli.get_config") as mock_config:
             from hatch.backends import BackendConfig
 
@@ -423,11 +760,9 @@ class TestMain:
             assert kwargs.get("model") == "custom-model"
 
     def test_api_key_kwarg_passed(
-        self, mock_run_sync, mock_detect_context
+        self, mock_run_claude_stream_sync, mock_detect_context
     ):
         """API key is passed into credential hydration."""
-        mock_run_sync.return_value = ("output", "", 0, False)
-
         with mock.patch("hatch.cli.get_config") as mock_config:
             from hatch.backends import BackendConfig
 
@@ -450,7 +785,7 @@ class TestMain:
         """Timeout is passed to run_sync."""
         mock_run_sync.return_value = ("output", "", 0, False)
 
-        main(["-t", "60", "test prompt"])
+        main(["-b", "codex", "-t", "60", "test prompt"])
 
         call_args = mock_run_sync.call_args[0]
         assert call_args[4] == 60  # timeout_s is 5th positional arg
@@ -471,6 +806,43 @@ class TestMain:
         assert data["ok"] is False
         assert "timeout" in data["error"].lower()
 
+    def test_invalid_backend(self, capsys):
+        """Unknown backends return a config error."""
+        exit_code = main(["-b", "invalid", "test prompt"])
+        assert exit_code == EXIT_CONFIG_ERROR
+        captured = capsys.readouterr()
+        assert "invalid backend" in captured.err.lower()
+
+    def test_invalid_backend_json(self, capsys):
+        """Unknown backends return structured config errors in JSON mode."""
+        exit_code = main(["--json", "-b", "invalid", "test prompt"])
+        assert exit_code == EXIT_CONFIG_ERROR
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["ok"] is False
+        assert "invalid backend" in data["error"].lower()
+
+    def test_skip_git_repo_check_rejected_for_surfaced_codex(self, capsys):
+        """Surfaced Codex should reject raw-Codex-only flags instead of silently ignoring them."""
+        exit_code = main(["codex", "mini", "--skip-git-repo-check", "test prompt"])
+        assert exit_code == EXIT_CONFIG_ERROR
+        captured = capsys.readouterr()
+        assert "not supported for surfaced providers" in captured.err
+
+    def test_reasoning_effort_rejected_for_claude(self, capsys):
+        """Reasoning effort should fail loudly when used on unsupported model families."""
+        exit_code = main(["claude", "sonnet", "--reasoning-effort", "high", "test prompt"])
+        assert exit_code == EXIT_CONFIG_ERROR
+        captured = capsys.readouterr()
+        assert "only works with codex models" in captured.err.lower()
+
+    def test_zai_model_rejected_on_shared_runtime(self, capsys):
+        """z.ai should stay on the stable plain-hatch path until the surfaced runtime is reliable."""
+        exit_code = main(["--model", "zai/glm-5.1", "test prompt"])
+        assert exit_code == EXIT_CONFIG_ERROR
+        captured = capsys.readouterr()
+        assert "only available through plain hatch" in captured.err.lower()
+
     def test_cwd_passed(
         self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
@@ -478,10 +850,36 @@ class TestMain:
         mock_run_sync.return_value = ("output", "", 0, False)
 
         # Use /tmp which exists on all systems
-        main(["--cwd", "/tmp", "test prompt"])
+        main(["-b", "codex", "--cwd", "/tmp", "test prompt"])
 
         call_args = mock_run_sync.call_args[0]
         assert call_args[3] == "/tmp"  # cwd is 4th positional arg
+
+    def test_surfaced_codex_timeout_passed_to_opencode_runner(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+    ):
+        """Surfaced Codex should pass timeout through the OpenCode runner."""
+        main(["codex", "mini", "-t", "60", "test prompt"])
+
+        call_args = mock_run_opencode_stream_sync.call_args[0]
+        assert call_args[4] == 60
+
+    def test_surfaced_codex_cwd_passed_to_opencode_runner(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+    ):
+        """Surfaced Codex should pass cwd through the OpenCode runner."""
+        main(["codex", "mini", "--cwd", "/tmp", "test prompt"])
+
+        call_args = mock_run_opencode_stream_sync.call_args[0]
+        assert call_args[3] == "/tmp"
 
     def test_invalid_cwd(self, capsys):
         """Invalid cwd returns config error."""
@@ -499,17 +897,64 @@ class TestMain:
         assert data["ok"] is False
         assert "cwd" in data["error"].lower()
 
+    def test_missing_surfaced_model_returns_config_error(self, capsys):
+        """Provider aliases without a model are rejected cleanly."""
+        exit_code = main(["codex"])
+        assert exit_code == EXIT_CONFIG_ERROR
+        captured = capsys.readouterr()
+        assert "explicit model" in captured.err.lower()
+
+    def test_missing_surfaced_model_json_returns_config_error(self, capsys):
+        """Machine callers get structured alias parse errors."""
+        exit_code = main(["--json", "claude"])
+        assert exit_code == EXIT_CONFIG_ERROR
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["ok"] is False
+        assert "explicit model" in data["error"].lower()
+
     def test_strips_trailing_whitespace(
-        self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
+        self,
+        mock_run_claude_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        mock_zai_key,
+        capsys,
     ):
         """Output trailing whitespace is stripped."""
-        mock_run_sync.return_value = ("output\n\n\n", "", 0, False)
+        from hatch.runner import ClaudeStreamRunResult
+
+        mock_run_claude_stream_sync.return_value = ClaudeStreamRunResult(
+            stdout='{"type":"result","result":"output\\n\\n\\n"}\n',
+            stderr="",
+            return_code=0,
+            timed_out=False,
+            final_output="output\n\n\n",
+        )
 
         main(["test prompt"])
 
         captured = capsys.readouterr()
         # Should have exactly one newline (from print)
         assert captured.out == "output\n"
+
+    def test_raw_zai_defaults_to_internal_stream_json(
+        self, mock_run_claude_stream_sync, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
+    ):
+        """Raw Claude backends should use stream-json transport internally."""
+        with mock.patch("hatch.cli.get_config") as mock_config:
+            from hatch.backends import BackendConfig
+
+            mock_config.return_value = BackendConfig(
+                cmd=["test"], env={}, stdin_data=b"test"
+            )
+
+            main(["-b", "zai", "test prompt"])
+
+            kwargs = mock_config.call_args[1]
+            assert kwargs["output_format"] == "stream-json"
+            assert kwargs["include_partial_messages"] is True
 
     def test_hydrated_kwargs_passed_to_get_config(
         self, mock_run_sync, mock_detect_context, mock_zai_key
@@ -534,6 +979,27 @@ class TestMain:
             assert kwargs["api_key"] == "resolved-key"
             assert kwargs["model"] == "custom"
 
+    def test_uses_sys_argv_when_no_argv_provided(
+        self,
+        mock_run_sync,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        mock_zai_key,
+        capsys,
+    ):
+        """Real CLI invocations still read arguments from sys.argv."""
+        mock_run_sync.return_value = ("Hello", "", 0, False)
+        mock_run_opencode_stream_sync.return_value.final_output = "Hello"
+
+        with mock.patch.object(sys, "argv", ["hatch", "codex", "mini", "review", "this"]):
+            exit_code = main()
+
+        assert exit_code == EXIT_SUCCESS
+        captured = capsys.readouterr()
+        assert "Hello" in captured.out
+
 
 class TestMainWithStdin:
     """Tests for main with stdin input."""
@@ -542,8 +1008,16 @@ class TestMainWithStdin:
         """Reads prompt from stdin when not provided."""
         with mock.patch.object(sys, "stdin", io.StringIO("stdin prompt")):
             with mock.patch.object(sys.stdin, "isatty", return_value=False):
-                with mock.patch("hatch.cli.run_sync") as mock_run:
-                    mock_run.return_value = ("output", "", 0, False)
+                from hatch.runner import ClaudeStreamRunResult
+
+                with mock.patch("hatch.cli.run_claude_stream_sync") as mock_run:
+                    mock_run.return_value = ClaudeStreamRunResult(
+                        stdout='{"type":"result","result":"output"}\n',
+                        stderr="",
+                        return_code=0,
+                        timed_out=False,
+                        final_output="output",
+                    )
 
                     with mock.patch("hatch.cli.get_config") as mock_config:
                         from hatch.backends import BackendConfig

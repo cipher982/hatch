@@ -13,8 +13,11 @@ from hatch import __version__
 from hatch.backends import Backend
 from hatch.backends import get_config
 from hatch.context import detect_context
+from hatch.credentials import credential_backend_for
 from hatch.credentials import hydrate_backend_kwargs
 from hatch.runner import AgentResult
+from hatch.runner import run_claude_stream_sync
+from hatch.runner import run_opencode_stream_sync
 from hatch.runner import run_sync
 
 # Exit codes
@@ -23,47 +26,204 @@ EXIT_AGENT_ERROR = 1
 EXIT_TIMEOUT = 2
 EXIT_NOT_FOUND = 3
 EXIT_CONFIG_ERROR = 4
+RAW_BACKEND_NAMES = ("zai", "bedrock", "codex", "gemini")
+CLAUDE_BACKENDS = {Backend.ZAI, Backend.BEDROCK}
+OPENCODE_BACKENDS = {Backend.OPENCODE}
+
+SURFACED_PROVIDERS = {
+    "codex": {
+        "backend": "opencode",
+        "models": {
+            "nano": "openai/gpt-5.4-nano",
+            "mini": "openai/gpt-5.4-mini",
+            "max": "openai/gpt-5.4",
+        },
+    },
+    "claude": {
+        "backend": "opencode",
+        "models": {
+            "haiku": "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "sonnet": "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
+            "opus": "amazon-bedrock/us.anthropic.claude-opus-4-6-v1",
+        },
+    },
+}
+
+FLAGS_WITH_VALUE = {
+    "-b",
+    "--backend",
+    "-t",
+    "--timeout",
+    "-C",
+    "--cwd",
+    "--model",
+    "--reasoning-effort",
+    "--output-format",
+    "--api-key",
+    "-r",
+    "--resume",
+}
+HELP_FLAGS = {"-h", "--help", "--advanced-help"}
 
 
-def create_parser() -> argparse.ArgumentParser:
+def _has_explicit_flag(argv: Sequence[str], *names: str) -> bool:
+    """Return True when argv already sets one of the named flags."""
+    long_names = [name for name in names if name.startswith("--")]
+    for token in argv:
+        if token in names:
+            return True
+        if any(token.startswith(f"{name}=") for name in long_names):
+            return True
+    return False
+
+
+def _find_alias_candidate_index(argv: Sequence[str]) -> int | None:
+    """Find the first positional token that isn't an option value."""
+    expecting_value = False
+    for index, token in enumerate(argv):
+        if expecting_value:
+            expecting_value = False
+            continue
+        if token == "--":
+            return None
+        if token in FLAGS_WITH_VALUE:
+            expecting_value = True
+            continue
+        if token.startswith("--"):
+            if "=" in token:
+                continue
+            if token in FLAGS_WITH_VALUE:
+                expecting_value = True
+                continue
+            continue
+        if token.startswith("-") and token != "-":
+            continue
+        return index
+    return None
+
+
+def infer_machine_defaults(argv: Sequence[str], stdout_is_tty: bool) -> tuple[bool, bool]:
+    """Infer json/automation defaults for real non-interactive CLI calls."""
+    json_output = _has_explicit_flag(argv, "--json")
+    automation = _has_explicit_flag(argv, "--automation")
+
+    if stdout_is_tty:
+        return json_output, automation
+
+    return True, True
+
+
+def opencode_progress_label(model_name: str) -> str:
+    """Map shared-runtime models to user-facing progress labels."""
+    if model_name.startswith("openai/"):
+        return "Codex"
+    if model_name.startswith("amazon-bedrock/") or model_name.startswith("anthropic/"):
+        return "Claude"
+    if model_name.startswith("google/") or model_name.startswith("gemini/"):
+        return "Gemini"
+    return "Agent"
+
+
+def normalize_argv(argv: Sequence[str] | None) -> list[str]:
+    """Map surfaced provider/model aliases onto the existing backend flags."""
+    normalized = list(argv or [])
+
+    if _has_explicit_flag(normalized, "-b", "--backend"):
+        return normalized
+
+    has_explicit_model = _has_explicit_flag(normalized, "--model")
+
+    first_positional = _find_alias_candidate_index(normalized)
+    if first_positional is None:
+        if has_explicit_model:
+            return ["--backend", "opencode", *normalized]
+        return normalized
+
+    provider = normalized[first_positional]
+    provider_spec = SURFACED_PROVIDERS.get(provider)
+    if not provider_spec:
+        if has_explicit_model:
+            return ["--backend", "opencode", *normalized]
+        return normalized
+
+    before = normalized[:first_positional]
+    after = normalized[first_positional + 1:]
+
+    if not after:
+        choices = ", ".join(provider_spec["models"].keys())
+        raise ValueError(f"{provider} requires an explicit model: {choices}")
+
+    if after[0].startswith("-"):
+        if after[0] in HELP_FLAGS:
+            return normalized
+        if has_explicit_model:
+            return [*before, "--backend", provider_spec["backend"], *after]
+        choices = ", ".join(provider_spec["models"].keys())
+        raise ValueError(f"{provider} requires an explicit model: {choices}")
+
+    model_alias = after[0]
+    resolved_model = provider_spec["models"].get(model_alias)
+    if not resolved_model:
+        choices = ", ".join(provider_spec["models"].keys())
+        raise ValueError(f"invalid {provider} model '{model_alias}'. Choose one of: {choices}")
+    after = after[1:]
+
+    rewritten = [*before, "--backend", provider_spec["backend"]]
+    if not has_explicit_model:
+        rewritten.extend(["--model", resolved_model])
+    rewritten.extend(after)
+    return rewritten
+
+
+def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
     """Create the argument parser."""
+    advanced_help = None if show_advanced else argparse.SUPPRESS
     parser = argparse.ArgumentParser(
         prog="hatch",
-        description="Run AI coding agents headlessly (Claude Code, Codex, Gemini)",
+        usage=(
+            'hatch [OPTIONS] "prompt"\n'
+            '       hatch claude <haiku|sonnet|opus> [OPTIONS] "prompt"\n'
+            '       hatch codex <nano|mini|max> [OPTIONS] "prompt"'
+        ),
+        description="One headless CLI for Claude, Codex, z.ai, and Gemini",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
-Examples:
+Start Here:
   hatch "What is 2+2?"
-  hatch -b codex --reasoning-effort low "Write unit tests"
-  hatch -b bedrock --cwd /path/to/project "Fix the bug"
-  hatch --json "Analyze this" | jq .output
+  hatch codex mini "Review this branch"
+  hatch claude sonnet "Review this diff"
 
-Backends:
-  zai      Claude Code CLI with z.ai/GLM-4.7 (default)
-  bedrock  Claude Code CLI with AWS Bedrock
-  codex    OpenAI Codex CLI
-  gemini   Google Gemini CLI
+Default:
+  hatch "..."     z.ai
+  codex tiers     nano, mini, max
+  claude tiers    haiku, sonnet, opus
+
+Advanced:
+  hatch codex max --reasoning-effort low "Write unit tests"
+  hatch -b gemini "Summarize this image"
+  hatch --json "Analyze this" | jq .output
+  hatch --advanced-help   # show raw/backend-specific flags
 
 Environment Variables:
   ZAI_API_KEY     API key for zai backend
   OPENAI_API_KEY  API key for codex backend
-  AWS_PROFILE     AWS profile for bedrock backend (default: zh-qa-engineer)
-  AWS_REGION      AWS region for bedrock backend (default: us-east-1)
+  AWS_PROFILE     AWS profile for bedrock backend
+  AWS_REGION      AWS region for bedrock backend
 """,
     )
 
     parser.add_argument(
         "prompt",
-        nargs="?",
-        help="Prompt to send to the agent (reads from stdin if '-' or omitted)",
+        nargs="*",
+        metavar="PROMPT",
+        help="Prompt text (reads from stdin if '-' or omitted)",
     )
 
     parser.add_argument(
         "-b",
         "--backend",
-        choices=["zai", "bedrock", "codex", "gemini"],
         default="zai",
-        help="Backend to use (default: zai)",
+        help="Advanced backend escape hatch",
     )
 
     parser.add_argument(
@@ -85,45 +245,45 @@ Environment Variables:
     parser.add_argument(
         "--model",
         metavar="MODEL",
-        help="Model override (backend-specific)",
+        help=advanced_help,
     )
 
     parser.add_argument(
         "--reasoning-effort",
         choices=["low", "medium", "high", "xhigh"],
-        help="Codex reasoning effort level (codex backend only)",
+        help="Optional reasoning effort for Codex/OpenAI models",
     )
 
     parser.add_argument(
         "--skip-git-repo-check",
         action="store_true",
-        help="Allow Codex to run outside a Git repository (codex backend only)",
+        help=advanced_help,
     )
 
     parser.add_argument(
         "--output-format",
         choices=["text", "json", "stream-json"],
         default="text",
-        help="Claude output format (Claude backends only)",
+        help=advanced_help,
     )
 
     parser.add_argument(
         "--include-partial-messages",
         action="store_true",
-        help="Include partial messages in Claude output (Claude backends only)",
+        help=advanced_help,
     )
 
     parser.add_argument(
         "--api-key",
         metavar="KEY",
-        help="API key override (otherwise from environment)",
+        help=advanced_help,
     )
 
     parser.add_argument(
         "-r",
         "--resume",
         metavar="SESSION_ID",
-        help="Resume a previous Claude Code session by ID (Claude backends only)",
+        help=advanced_help,
     )
 
     parser.add_argument(
@@ -136,7 +296,13 @@ Environment Variables:
     parser.add_argument(
         "--automation",
         action="store_true",
-        help="Mark session as automation (hidden from Longhouse timeline by default, still searchable)",
+        help=advanced_help,
+    )
+
+    parser.add_argument(
+        "--advanced-help",
+        action="store_true",
+        help="Show raw/backend-specific flags",
     )
 
     parser.add_argument(
@@ -151,7 +317,7 @@ Environment Variables:
 
 def get_prompt(args: argparse.Namespace) -> str:
     """Get prompt from args or stdin."""
-    if args.prompt is None or args.prompt == "-":
+    if not args.prompt or args.prompt == ["-"]:
         # Read from stdin
         if sys.stdin.isatty():
             print("Reading prompt from stdin (Ctrl+D to end):", file=sys.stderr)
@@ -160,7 +326,7 @@ def get_prompt(args: argparse.Namespace) -> str:
             print("Error: Empty prompt", file=sys.stderr)
             sys.exit(EXIT_CONFIG_ERROR)
         return prompt
-    return args.prompt
+    return " ".join(args.prompt)
 
 
 def result_to_exit_code(result: AgentResult) -> int:
@@ -183,8 +349,40 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         Exit code (0 for success, non-zero for errors)
     """
-    parser = create_parser()
-    args = parser.parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    parser = create_parser(show_advanced=_has_explicit_flag(raw_argv, "--advanced-help"))
+    try:
+        normalized_argv = normalize_argv(raw_argv)
+    except ValueError as e:
+        json_output = (
+            infer_machine_defaults(raw_argv, stdout_is_tty=sys.stdout.isatty())[0]
+            if argv is None
+            else _has_explicit_flag(raw_argv, "--json")
+        )
+        if json_output:
+            print(json.dumps({
+                "ok": False,
+                "status": "config_error",
+                "output": "",
+                "exit_code": EXIT_CONFIG_ERROR,
+                "duration_ms": 0,
+                "error": str(e),
+                "stderr": None,
+            }))
+        else:
+            print(f"Error: {e}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+
+    args = parser.parse_args(normalized_argv)
+    if args.advanced_help:
+        parser.print_help()
+        return EXIT_SUCCESS
+
+    if argv is None:
+        args.json_output, args.automation = infer_machine_defaults(
+            raw_argv,
+            stdout_is_tty=sys.stdout.isatty(),
+        )
 
     # Get prompt
     prompt = get_prompt(args)
@@ -236,8 +434,81 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         backend = Backend(args.backend)
     except ValueError:
-        print(f"Error: Invalid backend '{args.backend}'", file=sys.stderr)
+        msg = (
+            f"invalid backend '{args.backend}'. "
+            f"Choose one of: {', '.join(RAW_BACKEND_NAMES)}"
+        )
+        if args.json_output:
+            print(json.dumps({
+                "ok": False,
+                "status": "config_error",
+                "output": "",
+                "exit_code": EXIT_CONFIG_ERROR,
+                "duration_ms": 0,
+                "error": msg,
+                "stderr": None,
+            }))
+        else:
+            print(f"Error: {msg}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
+
+    if backend in OPENCODE_BACKENDS and args.skip_git_repo_check:
+        msg = "--skip-git-repo-check is not supported for surfaced providers"
+        if args.json_output:
+            print(json.dumps({
+                "ok": False,
+                "status": "config_error",
+                "output": "",
+                "exit_code": EXIT_CONFIG_ERROR,
+                "duration_ms": 0,
+                "error": msg,
+                "stderr": None,
+            }))
+        else:
+            print(f"Error: {msg}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+
+    model_name = str(args.model or "")
+    if backend in OPENCODE_BACKENDS and (
+        model_name.startswith("zai/")
+        or model_name.startswith("z.ai/")
+        or model_name.startswith("zai-coding-plan/")
+    ):
+        msg = 'z.ai models are only available through plain hatch; use `hatch "..."`'
+        if args.json_output:
+            print(json.dumps({
+                "ok": False,
+                "status": "config_error",
+                "output": "",
+                "exit_code": EXIT_CONFIG_ERROR,
+                "duration_ms": 0,
+                "error": msg,
+                "stderr": None,
+            }))
+        else:
+            print(f"Error: {msg}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+
+    if args.reasoning_effort:
+        reasoning_supported = (
+            backend == Backend.CODEX
+            or (backend == Backend.OPENCODE and model_name.startswith("openai/"))
+        )
+        if not reasoning_supported:
+            msg = "--reasoning-effort only works with Codex models"
+            if args.json_output:
+                print(json.dumps({
+                    "ok": False,
+                    "status": "config_error",
+                    "output": "",
+                    "exit_code": EXIT_CONFIG_ERROR,
+                    "duration_ms": 0,
+                    "error": msg,
+                    "stderr": None,
+                }))
+            else:
+                print(f"Error: {msg}", file=sys.stderr)
+            return EXIT_CONFIG_ERROR
 
     # Build backend kwargs
     backend_kwargs: dict = {}
@@ -251,7 +522,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         backend_kwargs["skip_git_repo_check"] = True
     if args.resume:
         backend_kwargs["resume"] = args.resume
-    if args.output_format:
+    use_internal_claude_stream = backend in CLAUDE_BACKENDS and args.output_format == "text"
+    use_internal_opencode_stream = backend in OPENCODE_BACKENDS
+    if use_internal_claude_stream:
+        backend_kwargs["output_format"] = "stream-json"
+        backend_kwargs["include_partial_messages"] = True
+    elif args.output_format:
         backend_kwargs["output_format"] = args.output_format
     if args.include_partial_messages:
         backend_kwargs["include_partial_messages"] = True
@@ -259,7 +535,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Resolve credentials before building backend config.
     try:
         ctx = detect_context()
-        resolved_backend_kwargs = hydrate_backend_kwargs(backend, backend_kwargs)
+        credential_backend = credential_backend_for(backend, backend_kwargs)
+        if credential_backend is None:
+            resolved_backend_kwargs = dict(backend_kwargs)
+        else:
+            resolved_backend_kwargs = hydrate_backend_kwargs(credential_backend, backend_kwargs)
         config = get_config(backend, prompt, ctx, **resolved_backend_kwargs)
     except ValueError as e:
         if args.json_output:
@@ -285,15 +565,50 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Run the agent
     start = time.monotonic()
+    opencode_error: str | None = None
 
     try:
-        stdout, stderr, return_code, timed_out = run_sync(
-            config.cmd,
-            config.stdin_data,
-            env,
-            cwd,
-            args.timeout,
-        )
+        if use_internal_claude_stream:
+            stream_result = run_claude_stream_sync(
+                config.cmd,
+                config.stdin_data,
+                env,
+                cwd,
+                args.timeout,
+                progress_handler=lambda message: print(message, file=sys.stderr, flush=True),
+            )
+            stdout = stream_result.final_output or ""
+            raw_stdout = stream_result.stdout
+            stderr = stream_result.stderr
+            return_code = stream_result.return_code
+            timed_out = stream_result.timed_out
+        elif use_internal_opencode_stream:
+            stream_result = run_opencode_stream_sync(
+                config.cmd,
+                config.stdin_data,
+                env,
+                cwd,
+                args.timeout,
+                progress_label=opencode_progress_label(model_name),
+                progress_handler=(lambda message: print(message, file=sys.stderr, flush=True))
+                if not args.json_output
+                else None,
+            )
+            stdout = stream_result.final_output or ""
+            raw_stdout = stream_result.stdout
+            stderr = stream_result.stderr
+            return_code = stream_result.return_code
+            timed_out = stream_result.timed_out
+            opencode_error = stream_result.error_message
+        else:
+            raw_stdout = ""
+            stdout, stderr, return_code, timed_out = run_sync(
+                config.cmd,
+                config.stdin_data,
+                env,
+                cwd,
+                args.timeout,
+            )
     except FileNotFoundError as e:
         duration_ms = int((time.monotonic() - start) * 1000)
         result = AgentResult(
@@ -337,10 +652,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif return_code != 0:
         result = AgentResult(
             ok=False,
-            output=stdout,
+            output=raw_stdout or stdout,
             exit_code=return_code,
             duration_ms=duration_ms,
             error=stderr or f"Exit code {return_code}",
+            stderr=stderr,
+        )
+    elif use_internal_opencode_stream and opencode_error:
+        result = AgentResult(
+            ok=False,
+            output=raw_stdout,
+            exit_code=0,
+            duration_ms=duration_ms,
+            error=opencode_error,
+            stderr=stderr,
+        )
+    elif (use_internal_claude_stream or use_internal_opencode_stream) and not stdout.strip() and raw_stdout.strip():
+        result = AgentResult(
+            ok=False,
+            output=raw_stdout,
+            exit_code=0,
+            duration_ms=duration_ms,
+            error="Agent stream completed without a final result",
             stderr=stderr,
         )
     elif not stdout.strip():
