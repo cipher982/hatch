@@ -11,6 +11,7 @@ from hatch.mcp.runtime import _build_server_env
 from hatch.mcp.runtime import build_run_command
 from hatch.mcp.runtime import doctor
 from hatch.mcp.runtime import run_surface
+from hatch.mcp.server import _run_with_progress
 
 
 def test_build_run_command_default():
@@ -155,3 +156,36 @@ def test_call_tool_missing_cwd_fails_fast():
     )
     assert result["ok"] is False
     assert "cwd" in result["error"]
+
+
+def test_run_with_progress_forwards_runtime_heartbeats():
+    ctx = mock.AsyncMock()
+    fake_result = {"ok": True, "status": "ok", "output": "DONE"}
+
+    def fake_run_surface(**kwargs):
+        kwargs["progress_handler"]("[hatch] Claude started")
+        kwargs["progress_handler"]("[hatch] still running (30s)")
+        return fake_result
+
+    with mock.patch("hatch.mcp.server.run_surface", side_effect=fake_run_surface):
+        result = asyncio.run(
+            _run_with_progress(
+                tool_name="hatch_claude",
+                prompt="review",
+                model="sonnet",
+                cwd="/tmp",
+                timeout_s=900,
+                ctx=ctx,
+            )
+        )
+
+    assert result == fake_result
+
+    progress_calls = ctx.report_progress.await_args_list
+    assert progress_calls[0].kwargs == {"progress": 0, "total": 1}
+    assert any(call.kwargs.get("message") == "[hatch] Claude started" for call in progress_calls)
+    assert any(call.kwargs.get("message") == "[hatch] still running (30s)" for call in progress_calls)
+    assert progress_calls[-1].kwargs == {"progress": 1, "total": 1}
+
+    info_calls = [call.args[0] for call in ctx.info.await_args_list]
+    assert info_calls == ["[hatch] Claude started", "[hatch] still running (30s)"]

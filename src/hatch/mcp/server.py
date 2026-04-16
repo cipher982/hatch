@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from typing import Annotated
 from typing import Literal
 
@@ -49,21 +50,59 @@ async def _run_with_progress(
     reasoning_effort: str | None = None,
     ctx: Context | None = None,
 ) -> dict:
-    if ctx is not None:
-        await ctx.report_progress(progress=0, total=1)
+    if ctx is None:
+        return await asyncio.to_thread(
+            run_surface,
+            tool_name=tool_name,
+            prompt=prompt,
+            model=model,
+            cwd=cwd,
+            timeout_s=timeout_s,
+            reasoning_effort=reasoning_effort,
+        )
 
-    result = await asyncio.to_thread(
-        run_surface,
-        tool_name=tool_name,
-        prompt=prompt,
-        model=model,
-        cwd=cwd,
-        timeout_s=timeout_s,
-        reasoning_effort=reasoning_effort,
-    )
+    loop = asyncio.get_running_loop()
+    progress_queue: asyncio.Queue[str | None] = asyncio.Queue()
 
-    if ctx is not None:
-        await ctx.report_progress(progress=1, total=1)
+    def progress_handler(message: str) -> None:
+        loop.call_soon_threadsafe(progress_queue.put_nowait, message)
+
+    def run_surface_with_progress() -> dict:
+        try:
+            return run_surface(
+                tool_name=tool_name,
+                prompt=prompt,
+                model=model,
+                cwd=cwd,
+                timeout_s=timeout_s,
+                reasoning_effort=reasoning_effort,
+                progress_handler=progress_handler,
+            )
+        finally:
+            loop.call_soon_threadsafe(progress_queue.put_nowait, None)
+
+    async def forward_progress() -> None:
+        while True:
+            message = await progress_queue.get()
+            if message is None:
+                return
+            await ctx.info(message)
+            await ctx.report_progress(progress=0, total=1, message=message)
+
+    progress_task = asyncio.create_task(forward_progress())
+    run_task = asyncio.create_task(asyncio.to_thread(run_surface_with_progress))
+
+    await ctx.report_progress(progress=0, total=1)
+    try:
+        result = await run_task
+        await progress_task
+    finally:
+        if not progress_task.done():
+            progress_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await progress_task
+
+    await ctx.report_progress(progress=1, total=1)
     return result
 
 
@@ -168,4 +207,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
