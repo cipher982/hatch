@@ -371,7 +371,7 @@ class TestNormalizeArgv:
             "--backend",
             "opencode",
             "--model",
-            "openai/gpt-5.4",
+            "openai/gpt-5.5",
             "review",
         ]
         assert normalize_argv(["claude", "sonnet", "review"]) == [
@@ -385,7 +385,7 @@ class TestNormalizeArgv:
             "--backend",
             "opencode",
             "--model",
-            "amazon-bedrock/us.anthropic.claude-opus-4-6-v1",
+            "amazon-bedrock/us.anthropic.claude-opus-4-7",
             "review",
         ]
 
@@ -395,7 +395,7 @@ class TestNormalizeArgv:
             "--backend",
             "opencode",
             "--model",
-            "openai/gpt-5.4",
+            "openai/gpt-5.5",
             "--reasoning-effort",
             "high",
             "review",

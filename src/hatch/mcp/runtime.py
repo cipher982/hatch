@@ -41,12 +41,12 @@ SURFACED_MODELS = {
     "hatch_codex": {
         "nano": "openai/gpt-5.4-nano",
         "mini": "openai/gpt-5.4-mini",
-        "max": "openai/gpt-5.4",
+        "max": "openai/gpt-5.5",
     },
     "hatch_claude": {
         "haiku": "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
         "sonnet": "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
-        "opus": "amazon-bedrock/us.anthropic.claude-opus-4-6-v1",
+        "opus": "amazon-bedrock/us.anthropic.claude-opus-4-7",
     },
 }
 
@@ -645,4 +645,3 @@ def run_surface(
         "attach_url": attach_url,
         "cmd": cmd[:-1],
     }
-

@@ -42,6 +42,24 @@ def test_build_run_command_codex_with_reasoning_and_dir():
     assert cmd[cmd.index("--variant") + 1] == "high"
 
 
+def test_build_run_command_uses_latest_frontier_aliases():
+    codex_cmd = build_run_command(
+        tool_name="hatch_codex",
+        model="max",
+        prompt="review",
+        attach_url="http://127.0.0.1:4196",
+    )
+    claude_cmd = build_run_command(
+        tool_name="hatch_claude",
+        model="opus",
+        prompt="review",
+        attach_url="http://127.0.0.1:4196",
+    )
+
+    assert codex_cmd[codex_cmd.index("-m") + 1] == "openai/gpt-5.5"
+    assert claude_cmd[claude_cmd.index("-m") + 1] == "amazon-bedrock/us.anthropic.claude-opus-4-7"
+
+
 def test_doctor_surfaces_opencode_binary():
     with mock.patch("hatch.mcp.runtime.shutil.which", return_value="/opt/homebrew/bin/opencode"):
         result = doctor()

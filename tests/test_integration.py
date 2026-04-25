@@ -294,7 +294,9 @@ class TestErrorHandling:
         )
 
         assert result.returncode != 0
-        assert "invalid choice" in result.stderr.lower()
+        data = json.loads(result.stdout)
+        assert data["ok"] is False
+        assert "invalid backend" in data["error"].lower()
 
 
 class TestCLIFlags:
