@@ -29,6 +29,7 @@ EXIT_CONFIG_ERROR = 4
 RAW_BACKEND_NAMES = ("zai", "bedrock", "codex", "gemini")
 CLAUDE_BACKENDS = {Backend.ZAI, Backend.BEDROCK}
 OPENCODE_BACKENDS = {Backend.OPENCODE}
+OPENROUTER_DEEPSEEK_V4_PRO = "openrouter/deepseek/deepseek-v4-pro"
 
 SURFACED_PROVIDERS = {
     "codex": {
@@ -45,6 +46,12 @@ SURFACED_PROVIDERS = {
             "haiku": "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
             "sonnet": "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
             "opus": "amazon-bedrock/us.anthropic.claude-opus-4-7",
+        },
+    },
+    "openrouter": {
+        "backend": "opencode",
+        "models": {
+            "deepseek-v4-pro": OPENROUTER_DEEPSEEK_V4_PRO,
         },
     },
 }
@@ -156,6 +163,8 @@ def opencode_progress_label(model_name: str) -> str:
         return "Claude"
     if model_name.startswith("google/") or model_name.startswith("gemini/"):
         return "Gemini"
+    if model_name.startswith("openrouter/"):
+        return "OpenRouter"
     return "Agent"
 
 
@@ -218,20 +227,23 @@ def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
         usage=(
             'hatch [OPTIONS] "prompt"\n'
             '       hatch claude <haiku|sonnet|opus> [OPTIONS] "prompt"\n'
-            '       hatch codex <nano|mini|max> [OPTIONS] "prompt"'
+            '       hatch codex <nano|mini|max> [OPTIONS] "prompt"\n'
+            '       hatch openrouter <deepseek-v4-pro> [OPTIONS] "prompt"'
         ),
-        description="One headless CLI for Claude, Codex, z.ai, and Gemini",
+        description="One headless CLI for Claude, Codex, z.ai, Gemini, and OpenRouter",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Start Here:
   hatch "What is 2+2?"
   hatch codex mini "Review this branch"
   hatch claude sonnet "Review this diff"
+  hatch openrouter deepseek-v4-pro "Review this branch"
 
 Default:
   hatch "..."     z.ai
   codex tiers     nano, mini, max
   claude tiers    haiku, sonnet, opus
+  openrouter      deepseek-v4-pro
 
 Advanced:
   hatch codex max --reasoning-effort low "Write unit tests"
@@ -241,10 +253,11 @@ Advanced:
   hatch --advanced-help   # show raw/backend-specific flags
 
 Environment Variables:
-  ZAI_API_KEY     API key for zai backend
-  OPENAI_API_KEY  API key for codex backend
-  AWS_PROFILE     AWS profile for bedrock backend
-  AWS_REGION      AWS region for bedrock backend
+  ZAI_API_KEY         API key for zai backend
+  OPENAI_API_KEY      API key for codex backend
+  OPENROUTER_API_KEY  API key for OpenRouter models
+  AWS_PROFILE         AWS profile for bedrock backend
+  AWS_REGION          AWS region for bedrock backend
 """,
     )
 

@@ -60,6 +60,16 @@ def test_build_run_command_uses_latest_frontier_aliases():
     assert claude_cmd[claude_cmd.index("-m") + 1] == "amazon-bedrock/us.anthropic.claude-opus-4-7"
 
 
+def test_build_run_command_openrouter_deepseek_alias():
+    cmd = build_run_command(
+        tool_name="hatch_openrouter",
+        model="deepseek-v4-pro",
+        prompt="review",
+        attach_url="http://127.0.0.1:4196",
+    )
+    assert cmd[cmd.index("-m") + 1] == "openrouter/deepseek/deepseek-v4-pro"
+
+
 def test_doctor_surfaces_opencode_binary():
     with mock.patch("hatch.mcp.runtime.shutil.which", return_value="/opt/homebrew/bin/opencode"):
         result = doctor()
@@ -82,6 +92,18 @@ def test_runtime_env_uses_isolated_xdg_paths_and_repo_config(monkeypatch, tmp_pa
     assert env["XDG_CACHE_HOME"] == str(runtime_root / "cache")
     assert env["OPENCODE_CONFIG"].endswith("hatch/mcp/opencode.json")
     assert "OPENCODE_CONFIG_CONTENT" not in env
+
+
+def test_runtime_env_loads_openrouter_secret(monkeypatch, tmp_path):
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    with mock.patch("hatch.mcp.runtime._maybe_load_secret") as loader:
+        loader.side_effect = lambda backend: "sk-or-helper" if backend == "openrouter" else None
+        env = _build_server_env()
+
+    assert env["OPENROUTER_API_KEY"] == "sk-or-helper"
 
 
 def test_configured_attach_url_shuts_down_managed_server(monkeypatch):
@@ -162,6 +184,7 @@ def test_doctor_lists_expected_tools():
     assert "hatch_default" in result.tools
     assert "hatch_codex" in result.tools
     assert "hatch_claude" in result.tools
+    assert "hatch_openrouter" in result.tools
 
 
 def test_call_tool_missing_cwd_fails_fast():

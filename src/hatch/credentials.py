@@ -15,6 +15,7 @@ from hatch.backends import Backend
 
 _INFISICAL_HELPER = os.path.expanduser("~/git/me/scripts/infisical-get.py")
 _PERSONAL_PROJECT = "personal-shell"
+OPENROUTER_CREDENTIAL = "openrouter"
 
 
 @dataclass(frozen=True)
@@ -25,9 +26,10 @@ class SecretSpec:
     project: str = _PERSONAL_PROJECT
 
 
-SECRET_SPECS: dict[Backend, SecretSpec] = {
+SECRET_SPECS: dict[Backend | str, SecretSpec] = {
     Backend.ZAI: SecretSpec(env_var="ZAI_API_KEY"),
     Backend.CODEX: SecretSpec(env_var="OPENAI_API_KEY"),
+    OPENROUTER_CREDENTIAL: SecretSpec(env_var="OPENROUTER_API_KEY"),
 }
 
 
@@ -63,7 +65,7 @@ def _load_secret_from_helper(spec: SecretSpec) -> str | None:
 
 
 def hydrate_backend_kwargs(
-    backend: Backend,
+    backend: Backend | str,
     backend_kwargs: dict,
 ) -> dict:
     """Return backend kwargs with canonical credentials populated when needed."""
@@ -95,7 +97,7 @@ def hydrate_backend_kwargs(
 def credential_backend_for(
     backend: Backend,
     backend_kwargs: dict,
-) -> Backend | None:
+) -> Backend | str | None:
     """Choose which credential policy applies for a backend/model combination."""
     if backend != Backend.OPENCODE:
         return backend
@@ -103,6 +105,8 @@ def credential_backend_for(
     model = str(backend_kwargs.get("model") or "")
     if model.startswith("openai/"):
         return Backend.CODEX
+    if model.startswith("openrouter/"):
+        return OPENROUTER_CREDENTIAL
     if model.startswith("z.ai/") or model.startswith("zai/"):
         return Backend.ZAI
 

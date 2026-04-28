@@ -8,6 +8,8 @@ from unittest import mock
 import pytest
 
 from hatch.backends import Backend
+from hatch.credentials import OPENROUTER_CREDENTIAL
+from hatch.credentials import credential_backend_for
 from hatch.credentials import hydrate_backend_kwargs
 
 
@@ -46,3 +48,15 @@ class TestHydrateBackendKwargs:
             with mock.patch("hatch.credentials._load_secret_from_helper", return_value=None):
                 with pytest.raises(ValueError, match="infisical-get.py"):
                     hydrate_backend_kwargs(Backend.ZAI, {})
+
+    def test_openrouter_uses_openrouter_env(self):
+        """OpenRouter models use the OpenRouter credential policy."""
+        backend = credential_backend_for(
+            Backend.OPENCODE,
+            {"model": "openrouter/deepseek/deepseek-v4-pro"},
+        )
+        assert backend == OPENROUTER_CREDENTIAL
+
+        with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-env"}, clear=False):
+            kwargs = hydrate_backend_kwargs(backend, {})
+        assert kwargs["api_key"] == "sk-or-env"

@@ -24,12 +24,14 @@ Use this when you want the simple hatch contract without shell syntax:
 - hatch_default(prompt, cwd?, timeout_s?) -> default z.ai path
 - hatch_claude(model, prompt, cwd, timeout_s?) -> Claude via Bedrock
 - hatch_codex(model, prompt, cwd, timeout_s?, reasoning_effort?) -> GPT-5 via OpenAI
+- hatch_openrouter(model, prompt, cwd, timeout_s?) -> OpenRouter models
 - hatch_gemini(prompt, cwd?, timeout_s?) -> Gemini path
 - hatch_doctor() -> verify the underlying OpenCode runtime is reachable
 
 Recommended defaults:
 - Codex: model="mini"
 - Claude: model="sonnet"
+- OpenRouter: model="deepseek-v4-pro"
 
 Pass cwd for repo work. Omit cwd for one-off prompts.
 Tool results preserve a stable hatch-style JSON envelope with status, output,
@@ -177,6 +179,25 @@ async def hatch_gemini(
     return await _run_with_progress(
         tool_name="hatch_gemini",
         prompt=prompt,
+        cwd=cwd,
+        timeout_s=timeout_s,
+        ctx=ctx,
+    )
+
+
+@mcp.tool()
+async def hatch_openrouter(
+    model: Annotated[Literal["deepseek-v4-pro"], "OpenRouter model. Start with deepseek-v4-pro."],
+    prompt: Annotated[str, "Prompt to send to the selected OpenRouter model via hatch."],
+    cwd: Annotated[str, "Absolute repo path. Required for repo work."],
+    timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
+    ctx: Context | None = None,
+) -> dict:
+    """Run `hatch openrouter <model> "prompt"`."""
+    return await _run_with_progress(
+        tool_name="hatch_openrouter",
+        prompt=prompt,
+        model=model,
         cwd=cwd,
         timeout_s=timeout_s,
         ctx=ctx,

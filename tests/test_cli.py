@@ -388,6 +388,13 @@ class TestNormalizeArgv:
             "amazon-bedrock/us.anthropic.claude-opus-4-7",
             "review",
         ]
+        assert normalize_argv(["openrouter", "deepseek-v4-pro", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openrouter/deepseek/deepseek-v4-pro",
+            "review",
+        ]
 
     def test_surfaced_codex_preserves_reasoning_effort_flag(self):
         """Surfaced Codex syntax should still forward Codex-only flags."""
@@ -407,6 +414,8 @@ class TestNormalizeArgv:
             normalize_argv(["codex", "full", "review"])
         with pytest.raises(ValueError, match="invalid claude model '4.6'"):
             normalize_argv(["claude", "4.6", "review"])
+        with pytest.raises(ValueError, match="invalid openrouter model 'deepseek'"):
+            normalize_argv(["openrouter", "deepseek", "review"])
 
     def test_option_value_named_like_provider_is_not_rewritten(self):
         """Provider aliases inside option values do not trigger routing."""

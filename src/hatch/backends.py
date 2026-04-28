@@ -320,6 +320,9 @@ def configure_opencode(
     if model.startswith("openai/") and api_key:
         env["OPENAI_API_KEY"] = api_key
 
+    if model.startswith("openrouter/") and api_key:
+        env["OPENROUTER_API_KEY"] = api_key
+
     if model.startswith("amazon-bedrock/"):
         env["AWS_PROFILE"] = aws_profile or os.environ.get("AWS_PROFILE", "zh-qa-engineer")
         env["AWS_REGION"] = aws_region or os.environ.get("AWS_REGION", "us-east-1")

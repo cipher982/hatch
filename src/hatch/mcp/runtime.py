@@ -20,6 +20,7 @@ from typing import Callable
 
 from hatch.backends import Backend
 from hatch.credentials import SECRET_SPECS
+from hatch.credentials import OPENROUTER_CREDENTIAL
 from hatch.credentials import _load_secret_from_helper
 
 
@@ -36,6 +37,7 @@ DEFAULT_GEMINI_MODEL = os.environ.get(
 SERVER_START_TIMEOUT_S = 15.0
 DEFAULT_OPENCODE_ROOT = Path.home() / ".local" / "share" / "hatch" / "mcp-runtime"
 DEFAULT_OPENCODE_CONFIG = Path(__file__).with_name("opencode.json")
+OPENROUTER_DEEPSEEK_V4_PRO = "openrouter/deepseek/deepseek-v4-pro"
 
 SURFACED_MODELS = {
     "hatch_codex": {
@@ -48,6 +50,9 @@ SURFACED_MODELS = {
         "sonnet": "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
         "opus": "amazon-bedrock/us.anthropic.claude-opus-4-7",
     },
+    "hatch_openrouter": {
+        "deepseek-v4-pro": OPENROUTER_DEEPSEEK_V4_PRO,
+    },
 }
 
 SURFACE_LABELS = {
@@ -55,6 +60,7 @@ SURFACE_LABELS = {
     "hatch_claude": "Claude",
     "hatch_codex": "Codex",
     "hatch_gemini": "Gemini",
+    "hatch_openrouter": "OpenRouter",
 }
 
 SURFACE_NAMES = {
@@ -62,6 +68,7 @@ SURFACE_NAMES = {
     "hatch_claude": "hatch claude",
     "hatch_codex": "hatch codex",
     "hatch_gemini": "hatch -b gemini",
+    "hatch_openrouter": "hatch openrouter",
 }
 
 
@@ -130,6 +137,11 @@ def _build_server_env() -> dict[str, str]:
         secret = _maybe_load_secret(Backend.CODEX)
         if secret:
             env["OPENAI_API_KEY"] = secret
+
+    if not env.get("OPENROUTER_API_KEY"):
+        secret = _maybe_load_secret(OPENROUTER_CREDENTIAL)
+        if secret:
+            env["OPENROUTER_API_KEY"] = secret
 
     env.setdefault("AWS_PROFILE", os.environ.get("AWS_PROFILE", "zh-qa-engineer"))
     env.setdefault("AWS_REGION", os.environ.get("AWS_REGION", "us-east-1"))

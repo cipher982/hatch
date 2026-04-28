@@ -301,6 +301,17 @@ class TestConfigureOpenCode:
         assert config.env["OPENAI_API_KEY"] == "sk-test"
         assert config.stdin_data is None
 
+    def test_command_structure_for_openrouter(self, laptop_context):
+        """OpenRouter-backed OpenCode models receive the OpenRouter API key."""
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="openrouter/deepseek/deepseek-v4-pro",
+            api_key="sk-or-test",
+        )
+        assert config.cmd[config.cmd.index("-m") + 1] == "openrouter/deepseek/deepseek-v4-pro"
+        assert config.env["OPENROUTER_API_KEY"] == "sk-or-test"
+
     def test_reasoning_effort_maps_to_variant(self, laptop_context):
         """OpenAI reasoning effort maps onto OpenCode variants."""
         config = configure_opencode(

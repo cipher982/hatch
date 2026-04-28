@@ -10,6 +10,13 @@
       "options": {
         "baseURL": "https://api.z.ai/api/coding/paas/v4"
       }
+    },
+    "openrouter": {
+      "models": {
+        "deepseek/deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro"
+        }
+      }
     }
   }
 }
