@@ -12,6 +12,7 @@ from hatch.mcp.runtime import build_run_command
 from hatch.mcp.runtime import doctor
 from hatch.mcp.runtime import run_surface
 from hatch.mcp.server import _run_with_progress
+from hatch.mcp.server import TOOLS
 
 
 def test_build_run_command_default():
@@ -185,6 +186,10 @@ def test_doctor_lists_expected_tools():
     assert "hatch_codex" in result.tools
     assert "hatch_claude" in result.tools
     assert "hatch_openrouter" in result.tools
+
+
+def test_batch_tool_map_includes_openrouter():
+    assert "hatch_openrouter" in TOOLS
 
 
 def test_call_tool_missing_cwd_fails_fast():

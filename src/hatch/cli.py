@@ -15,6 +15,10 @@ from hatch.backends import get_config
 from hatch.context import detect_context
 from hatch.credentials import credential_backend_for
 from hatch.credentials import hydrate_backend_kwargs
+from hatch.models import SURFACED_PROVIDERS
+from hatch.models import model_choices
+from hatch.models import opencode_progress_label
+from hatch.models import resolve_provider_model
 from hatch.runner import AgentResult
 from hatch.runner import run_claude_stream_sync
 from hatch.runner import run_opencode_stream_sync
@@ -29,32 +33,6 @@ EXIT_CONFIG_ERROR = 4
 RAW_BACKEND_NAMES = ("zai", "bedrock", "codex", "gemini")
 CLAUDE_BACKENDS = {Backend.ZAI, Backend.BEDROCK}
 OPENCODE_BACKENDS = {Backend.OPENCODE}
-OPENROUTER_DEEPSEEK_V4_PRO = "openrouter/deepseek/deepseek-v4-pro"
-
-SURFACED_PROVIDERS = {
-    "codex": {
-        "backend": "opencode",
-        "models": {
-            "nano": "openai/gpt-5.4-nano",
-            "mini": "openai/gpt-5.4-mini",
-            "max": "openai/gpt-5.5",
-        },
-    },
-    "claude": {
-        "backend": "opencode",
-        "models": {
-            "haiku": "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-            "sonnet": "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
-            "opus": "amazon-bedrock/us.anthropic.claude-opus-4-7",
-        },
-    },
-    "openrouter": {
-        "backend": "opencode",
-        "models": {
-            "deepseek-v4-pro": OPENROUTER_DEEPSEEK_V4_PRO,
-        },
-    },
-}
 
 FLAGS_WITH_VALUE = {
     "-b",
@@ -155,19 +133,6 @@ def _dispatch_special_command(raw_argv: Sequence[str]) -> int | None:
     return EXIT_CONFIG_ERROR
 
 
-def opencode_progress_label(model_name: str) -> str:
-    """Map shared-runtime models to user-facing progress labels."""
-    if model_name.startswith("openai/"):
-        return "Codex"
-    if model_name.startswith("amazon-bedrock/") or model_name.startswith("anthropic/"):
-        return "Claude"
-    if model_name.startswith("google/") or model_name.startswith("gemini/"):
-        return "Gemini"
-    if model_name.startswith("openrouter/"):
-        return "OpenRouter"
-    return "Agent"
-
-
 def normalize_argv(argv: Sequence[str] | None) -> list[str]:
     """Map surfaced provider/model aliases onto the existing backend flags."""
     normalized = list(argv or [])
@@ -194,25 +159,25 @@ def normalize_argv(argv: Sequence[str] | None) -> list[str]:
     after = normalized[first_positional + 1:]
 
     if not after:
-        choices = ", ".join(provider_spec["models"].keys())
+        choices = model_choices(provider)
         raise ValueError(f"{provider} requires an explicit model: {choices}")
 
     if after[0].startswith("-"):
         if after[0] in HELP_FLAGS:
             return normalized
         if has_explicit_model:
-            return [*before, "--backend", provider_spec["backend"], *after]
-        choices = ", ".join(provider_spec["models"].keys())
+            return [*before, "--backend", provider_spec.backend, *after]
+        choices = model_choices(provider)
         raise ValueError(f"{provider} requires an explicit model: {choices}")
 
     model_alias = after[0]
-    resolved_model = provider_spec["models"].get(model_alias)
+    resolved_model = resolve_provider_model(provider, model_alias)
     if not resolved_model:
-        choices = ", ".join(provider_spec["models"].keys())
+        choices = model_choices(provider)
         raise ValueError(f"invalid {provider} model '{model_alias}'. Choose one of: {choices}")
     after = after[1:]
 
-    rewritten = [*before, "--backend", provider_spec["backend"]]
+    rewritten = [*before, "--backend", provider_spec.backend]
     if not has_explicit_model:
         rewritten.extend(["--model", resolved_model])
     rewritten.extend(after)

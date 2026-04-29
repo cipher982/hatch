@@ -22,6 +22,11 @@ from hatch.backends import Backend
 from hatch.credentials import SECRET_SPECS
 from hatch.credentials import OPENROUTER_CREDENTIAL
 from hatch.credentials import _load_secret_from_helper
+from hatch.models import SURFACE_LABELS
+from hatch.models import SURFACE_NAMES
+from hatch.models import TOOL_TO_PROVIDER
+from hatch.models import resolve_tool_model
+from hatch.models import tool_model_choices
 
 
 OPENCODE_BIN = os.environ.get("HATCH_MCP_OPENCODE_BIN", "opencode")
@@ -37,39 +42,6 @@ DEFAULT_GEMINI_MODEL = os.environ.get(
 SERVER_START_TIMEOUT_S = 15.0
 DEFAULT_OPENCODE_ROOT = Path.home() / ".local" / "share" / "hatch" / "mcp-runtime"
 DEFAULT_OPENCODE_CONFIG = Path(__file__).with_name("opencode.json")
-OPENROUTER_DEEPSEEK_V4_PRO = "openrouter/deepseek/deepseek-v4-pro"
-
-SURFACED_MODELS = {
-    "hatch_codex": {
-        "nano": "openai/gpt-5.4-nano",
-        "mini": "openai/gpt-5.4-mini",
-        "max": "openai/gpt-5.5",
-    },
-    "hatch_claude": {
-        "haiku": "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "sonnet": "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
-        "opus": "amazon-bedrock/us.anthropic.claude-opus-4-7",
-    },
-    "hatch_openrouter": {
-        "deepseek-v4-pro": OPENROUTER_DEEPSEEK_V4_PRO,
-    },
-}
-
-SURFACE_LABELS = {
-    "hatch_default": "Agent",
-    "hatch_claude": "Claude",
-    "hatch_codex": "Codex",
-    "hatch_gemini": "Gemini",
-    "hatch_openrouter": "OpenRouter",
-}
-
-SURFACE_NAMES = {
-    "hatch_default": "hatch",
-    "hatch_claude": "hatch claude",
-    "hatch_codex": "hatch codex",
-    "hatch_gemini": "hatch -b gemini",
-    "hatch_openrouter": "hatch openrouter",
-}
 
 
 @dataclass
@@ -117,7 +89,7 @@ def _ensure_runtime_paths() -> dict[str, Path]:
     return runtime_paths
 
 
-def _maybe_load_secret(backend: Backend) -> str | None:
+def _maybe_load_secret(backend: Backend | str) -> str | None:
     spec = SECRET_SPECS.get(backend)
     if not spec:
         return None
@@ -158,15 +130,14 @@ def _resolve_model(tool_name: str, model: str | None) -> str:
     if tool_name == "hatch_gemini":
         return DEFAULT_GEMINI_MODEL
 
-    surfaced = SURFACED_MODELS.get(tool_name)
-    if surfaced is None:
+    if tool_name not in TOOL_TO_PROVIDER:
         raise HatchMcpRuntimeError(f"Unknown hatch MCP tool: {tool_name}")
     if not model:
         raise HatchMcpRuntimeError(f"{tool_name} requires an explicit surfaced model")
 
-    resolved = surfaced.get(model)
+    resolved = resolve_tool_model(tool_name, model)
     if not resolved:
-        choices = ", ".join(sorted(surfaced))
+        choices = tool_model_choices(tool_name)
         raise HatchMcpRuntimeError(f"Invalid model '{model}'. Choose one of: {choices}")
     return resolved
 

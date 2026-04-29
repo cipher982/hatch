@@ -13,6 +13,9 @@ from fastmcp import FastMCP
 from hatch.mcp.batch import add_batch_support
 from hatch.mcp.runtime import doctor
 from hatch.mcp.runtime import run_surface
+from hatch.models import ClaudeModelAlias
+from hatch.models import CodexModelAlias
+from hatch.models import OpenRouterModelAlias
 
 
 mcp = FastMCP(
@@ -127,7 +130,7 @@ async def hatch_default(
 
 @mcp.tool()
 async def hatch_claude(
-    model: Annotated[Literal["haiku", "sonnet", "opus"], "Claude tier. Start with sonnet."],
+    model: Annotated[ClaudeModelAlias, "Claude tier. Start with sonnet."],
     prompt: Annotated[str, "Prompt to send to Claude via the surfaced hatch path."],
     cwd: Annotated[str, "Absolute repo path. Required for Claude repo work."],
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
@@ -146,7 +149,7 @@ async def hatch_claude(
 
 @mcp.tool()
 async def hatch_codex(
-    model: Annotated[Literal["nano", "mini", "max"], "Codex tier. Start with mini."],
+    model: Annotated[CodexModelAlias, "Codex tier. Start with mini."],
     prompt: Annotated[str, "Prompt to send to Codex via the surfaced hatch path."],
     cwd: Annotated[str, "Absolute repo path. Required for Codex repo work."],
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
@@ -187,7 +190,7 @@ async def hatch_gemini(
 
 @mcp.tool()
 async def hatch_openrouter(
-    model: Annotated[Literal["deepseek-v4-pro"], "OpenRouter model. Start with deepseek-v4-pro."],
+    model: Annotated[OpenRouterModelAlias, "OpenRouter model. Start with deepseek-v4-pro."],
     prompt: Annotated[str, "Prompt to send to the selected OpenRouter model via hatch."],
     cwd: Annotated[str, "Absolute repo path. Required for repo work."],
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
@@ -215,6 +218,7 @@ TOOLS = {
     "hatch_claude": hatch_claude,
     "hatch_codex": hatch_codex,
     "hatch_gemini": hatch_gemini,
+    "hatch_openrouter": hatch_openrouter,
     "hatch_doctor": hatch_doctor,
 }
 

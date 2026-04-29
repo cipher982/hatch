@@ -85,7 +85,14 @@ async def check_mcp_server_tools(timeout_s: int = 5) -> McpCheck:
             return McpCheck(ok=False, tools=[], error=f"tools/list failed: {tools_resp}")
 
         tools = [tool["name"] for tool in tools_resp["result"]["tools"]]
-        required = {"hatch_default", "hatch_claude", "hatch_codex", "hatch_gemini", "hatch_doctor"}
+        required = {
+            "hatch_default",
+            "hatch_claude",
+            "hatch_codex",
+            "hatch_gemini",
+            "hatch_openrouter",
+            "hatch_doctor",
+        }
         missing = sorted(required - set(tools))
         if missing:
             return McpCheck(ok=False, tools=tools, error=f"missing tools: {missing}")

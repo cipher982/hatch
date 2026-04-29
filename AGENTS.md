@@ -123,3 +123,4 @@ print(result.output if result.ok else result.error)
 - (2026-04-13) [ux] Do not expose raw OpenCode agent names in the public hatch contract; keep the common path to plain `hatch claude ...` / `hatch codex ...` commands.
 - (2026-04-14) [architecture] `hatch` owns both the CLI and the MCP server; personal config repos should only register `hatch mcp`, not carry a second wrapper implementation.
 - (2026-04-16) [mcp] Long-running hatch MCP tools must forward runtime heartbeats/progress over the MCP context; increasing client `tool_timeout_sec` alone does not prevent 120s idle transport timeouts.
+- (2026-04-28) [mcp] When adding an MCP tool, update both the `@mcp.tool()` function and the `TOOLS` map used by `batch()`, then include it in `hatch mcp doctor tools`.
