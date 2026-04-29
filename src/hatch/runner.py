@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import queue
+import shlex
 import subprocess
 import threading
 import time
@@ -270,21 +271,48 @@ def _summarize_opencode_tool_use(part: dict[str, Any]) -> str:
     name = part.get("tool") or "tool"
     state = part.get("state") or {}
     input_data = state.get("input") or {}
+    title = part.get("title")
+    time_range = part.get("time") or {}
+    elapsed_ms = time_range.get("end") - time_range.get("start") if time_range.get("end") else None
+    suffix = f" ({int(elapsed_ms / 1000)}s)" if isinstance(elapsed_ms, int | float) and elapsed_ms >= 1000 else ""
+
+    if title:
+        return f"[hatch] {name}: {title}{suffix}"
 
     if name == "bash":
         command = input_data.get("command")
         description = input_data.get("description")
         if command and description:
-            return f"[hatch] bash: {description} ({command})"
+            return f"[hatch] bash: {description} ({_compact_shell(command)}){suffix}"
         if command:
-            return f"[hatch] bash: {command}"
+            return f"[hatch] bash: {_compact_shell(command)}{suffix}"
 
-    for key in ("filePath", "path", "pattern"):
+    for key in ("filePath", "path", "pattern", "query"):
         value = input_data.get(key)
         if value:
-            return f"[hatch] {name}: {value}"
+            return f"[hatch] {name}: {_compact_text(str(value))}{suffix}"
 
-    return f"[hatch] {name}"
+    description = input_data.get("description")
+    if description:
+        return f"[hatch] {name}: {_compact_text(str(description))}{suffix}"
+
+    return f"[hatch] {name}{suffix}"
+
+
+def _compact_shell(command: str, max_len: int = 180) -> str:
+    """Keep shell progress readable without losing the command shape."""
+    try:
+        command = " ".join(shlex.split(command))
+    except ValueError:
+        command = " ".join(command.split())
+    return _compact_text(command, max_len=max_len)
+
+
+def _compact_text(text: str, max_len: int = 180) -> str:
+    text = " ".join(text.split())
+    if len(text) <= max_len:
+        return text
+    return f"{text[: max_len - 1]}..."
 
 
 def _run_subprocess(

@@ -290,6 +290,26 @@ class TestOpenCodeStreamRunSync:
             "[hatch] Codex completed",
         ]
 
+    def test_open_code_progress_prefers_tool_title_and_elapsed_time(self):
+        """Tool progress should use OpenCode titles when available."""
+        script = "\n".join([
+            'print(\'{\"type\":\"tool_use\",\"part\":{\"tool\":\"grep\",\"title\":\"Search git diff for SSE handlers\",\"callID\":\"call-1\",\"time\":{\"start\":1000,\"end\":4500},\"state\":{\"input\":{\"pattern\":\"stream\"}}}}\', flush=True)',
+        ])
+
+        progress: list[str] = []
+        result = run_opencode_stream_sync(
+            cmd=[sys.executable, "-c", script],
+            stdin_data=None,
+            env={},
+            cwd=None,
+            timeout_s=10,
+            progress_label="OpenRouter",
+            progress_handler=progress.append,
+        )
+
+        assert result.return_code == 0
+        assert progress == ["[hatch] grep: Search git diff for SSE handlers (3s)"]
+
     def test_extracts_structured_error_message(self):
         """Captures OpenCode error events for clearer CLI reporting."""
         script = "\n".join([

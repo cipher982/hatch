@@ -643,9 +643,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cwd,
                 args.timeout,
                 progress_label=opencode_progress_label(model_name),
-                progress_handler=(lambda message: print(message, file=sys.stderr, flush=True))
-                if not args.json_output
-                else None,
+                progress_handler=lambda message: print(message, file=sys.stderr, flush=True),
             )
             stdout = stream_result.final_output or ""
             raw_stdout = stream_result.stdout

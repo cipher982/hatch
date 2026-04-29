@@ -905,6 +905,18 @@ class TestMain:
         call_args = mock_run_opencode_stream_sync.call_args[0]
         assert call_args[3] == "/tmp"
 
+    def test_surfaced_codex_json_still_passes_progress_handler(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+    ):
+        """JSON stdout should not suppress OpenCode progress on stderr."""
+        main(["codex", "mini", "--json", "test prompt"])
+
+        assert mock_run_opencode_stream_sync.call_args.kwargs["progress_handler"] is not None
+
     def test_invalid_cwd(self, capsys):
         """Invalid cwd returns config error."""
         exit_code = main(["--cwd", "/does/not/exist", "test prompt"])
