@@ -10,6 +10,9 @@ from typing import Literal
 from fastmcp import Context
 from fastmcp import FastMCP
 
+from hatch.expert import DEFAULT_EXPERT_MODEL
+from hatch.expert import ExpertReasoningEffort
+from hatch.expert import run_expert_sync
 from hatch.mcp.batch import add_batch_support
 from hatch.mcp.runtime import doctor
 from hatch.mcp.runtime import run_surface
@@ -28,16 +31,20 @@ Use this when you want the simple hatch contract without shell syntax:
 - hatch_codex(model, prompt, cwd, timeout_s?, reasoning_effort?) -> GPT-5 via OpenAI
 - hatch_openrouter(model, prompt, cwd, timeout_s?) -> OpenRouter models
 - hatch_gemini(prompt, cwd?, timeout_s?) -> Gemini path
+- hatch_expert(prompt, reasoning_effort?, web_search?, timeout_s?) -> one slow synchronous expert consultation
 - hatch_doctor() -> verify the underlying OpenCode runtime is reachable
 
 Recommended defaults:
 - Codex: model="mini"
 - Claude: model="sonnet"
 - OpenRouter: model="deepseek-v4-pro"
+- Expert: reasoning_effort="medium"; use high/xhigh only for harder questions
 
 Pass cwd for repo work. Omit cwd for one-off prompts.
-Tool results preserve a stable hatch-style JSON envelope with status, output,
-stderr, exit_code, duration, surface, resolved_model, and attach_url.
+Agent tool results preserve a stable hatch-style JSON envelope with status,
+output, stderr, exit_code, duration, surface, resolved_model, and attach_url.
+Expert results return status, output, duration, model, reasoning_effort,
+web_search, usage, response_id, and citations.
 
 Use batch() when you need multiple independent hatch calls from this server.
 """,
@@ -108,6 +115,59 @@ async def _run_with_progress(
 
     await ctx.report_progress(progress=1, total=1)
     return result
+
+
+async def _run_expert_with_progress(
+    *,
+    prompt: str,
+    model: str = DEFAULT_EXPERT_MODEL,
+    reasoning_effort: ExpertReasoningEffort = "medium",
+    web_search: bool = False,
+    timeout_s: int = 900,
+    ctx: Context | None = None,
+) -> dict:
+    if ctx is None:
+        result = await asyncio.to_thread(
+            run_expert_sync,
+            prompt=prompt,
+            model=model,
+            reasoning_effort=reasoning_effort,
+            web_search=web_search,
+            timeout_s=timeout_s,
+        )
+        return result.to_dict()
+
+    start = asyncio.get_running_loop().time()
+    await ctx.report_progress(progress=0, total=1)
+    await ctx.info(
+        f"[hatch] expert call started: model={model} "
+        f"reasoning={reasoning_effort} web_search={str(web_search).lower()}"
+    )
+
+    run_task = asyncio.create_task(
+        asyncio.to_thread(
+            run_expert_sync,
+            prompt=prompt,
+            model=model,
+            reasoning_effort=reasoning_effort,
+            web_search=web_search,
+            timeout_s=timeout_s,
+        )
+    )
+    while not run_task.done():
+        try:
+            result = await asyncio.wait_for(asyncio.shield(run_task), timeout=30)
+            await ctx.report_progress(progress=1, total=1)
+            return result.to_dict()
+        except asyncio.TimeoutError:
+            elapsed = int(asyncio.get_running_loop().time() - start)
+            message = f"[hatch] expert call still running ({elapsed}s)"
+            await ctx.info(message)
+            await ctx.report_progress(progress=0, total=1, message=message)
+
+    result = await run_task
+    await ctx.report_progress(progress=1, total=1)
+    return result.to_dict()
 
 
 @mcp.tool()
@@ -190,6 +250,33 @@ async def hatch_openrouter(
 
 
 @mcp.tool()
+async def hatch_expert(
+    prompt: Annotated[
+        str,
+        "Question/context for a single slow expert consultation. Include all needed local context.",
+    ],
+    reasoning_effort: Annotated[
+        ExpertReasoningEffort,
+        "medium is fastest/cheapest valid; high and xhigh spend more time for harder reasoning.",
+    ] = "medium",
+    web_search: Annotated[
+        bool,
+        "Allow OpenAI web search for current external facts. Leave false for repo/local reasoning.",
+    ] = False,
+    timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
+    ctx: Context | None = None,
+) -> dict:
+    """Ask one synchronous expert question. This does not run an agent or expose polling."""
+    return await _run_expert_with_progress(
+        prompt=prompt,
+        reasoning_effort=reasoning_effort,
+        web_search=web_search,
+        timeout_s=timeout_s,
+        ctx=ctx,
+    )
+
+
+@mcp.tool()
 async def hatch_doctor() -> dict:
     """Verify the underlying OpenCode runtime path is reachable."""
     return await asyncio.to_thread(doctor)
@@ -198,6 +285,7 @@ async def hatch_doctor() -> dict:
 TOOLS = {
     "hatch_claude": hatch_claude,
     "hatch_codex": hatch_codex,
+    "hatch_expert": hatch_expert,
     "hatch_gemini": hatch_gemini,
     "hatch_openrouter": hatch_openrouter,
     "hatch_doctor": hatch_doctor,

@@ -101,6 +101,7 @@ async def check_mcp_server_tools(timeout_s: int = 5) -> McpCheck:
         required = {
             "hatch_claude",
             "hatch_codex",
+            "hatch_expert",
             "hatch_gemini",
             "hatch_openrouter",
             "hatch_doctor",

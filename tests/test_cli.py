@@ -233,6 +233,24 @@ class TestSpecialCommands:
         assert "unknown hatch mcp subcommand" in captured.err
         assert exit_code == EXIT_CONFIG_ERROR
 
+    def test_expert_dispatches_single_call(self, capsys):
+        fake_result = mock.Mock()
+        fake_result.ok = True
+        fake_result.output = "answer"
+        fake_result.to_dict.return_value = {"ok": True, "output": "answer"}
+
+        with mock.patch("hatch.cli.run_expert_sync", return_value=fake_result) as run_expert:
+            exit_code = main(["expert", "--reasoning-effort", "high", "--web-search", "question"])
+
+        assert exit_code == EXIT_SUCCESS
+        run_expert.assert_called_once()
+        assert run_expert.call_args.kwargs["prompt"] == "question"
+        assert run_expert.call_args.kwargs["reasoning_effort"] == "high"
+        assert run_expert.call_args.kwargs["web_search"] is True
+        captured = capsys.readouterr()
+        assert "answer" in captured.out
+        assert "expert call started" in captured.err
+
 
 class TestGetPrompt:
     """Tests for get_prompt function."""

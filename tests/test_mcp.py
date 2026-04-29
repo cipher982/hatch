@@ -13,6 +13,7 @@ from hatch.mcp.runtime import build_run_command
 from hatch.mcp.runtime import doctor
 from hatch.mcp.runtime import run_surface
 from hatch.mcp.server import _run_with_progress
+from hatch.mcp.server import _run_expert_with_progress
 from hatch.mcp.server import TOOLS
 
 
@@ -197,11 +198,13 @@ def test_doctor_lists_expected_tools():
     assert result.ok is True
     assert "hatch_codex" in result.tools
     assert "hatch_claude" in result.tools
+    assert "hatch_expert" in result.tools
     assert "hatch_openrouter" in result.tools
 
 
 def test_batch_tool_map_includes_openrouter():
     assert "hatch_openrouter" in TOOLS
+    assert "hatch_expert" in TOOLS
 
 
 def test_build_run_command_omits_dir_when_cwd_missing():
@@ -245,3 +248,33 @@ def test_run_with_progress_forwards_runtime_heartbeats():
 
     info_calls = [call.args[0] for call in ctx.info.await_args_list]
     assert info_calls == ["[hatch] Claude started", "[hatch] still running (30s)"]
+
+
+def test_run_expert_with_progress_forwards_heartbeats(monkeypatch):
+    ctx = mock.AsyncMock()
+    fake_result = mock.Mock()
+    fake_result.to_dict.return_value = {"ok": True, "status": "ok", "output": "DONE"}
+
+    async def fake_to_thread(*args, **kwargs):
+        await asyncio.sleep(0.01)
+        return fake_result
+
+    monkeypatch.setattr("hatch.mcp.server.asyncio.to_thread", fake_to_thread)
+
+    result = asyncio.run(
+        _run_expert_with_progress(
+            prompt="hard question",
+            reasoning_effort="medium",
+            web_search=False,
+            timeout_s=900,
+            ctx=ctx,
+        )
+    )
+
+    assert result == {"ok": True, "status": "ok", "output": "DONE"}
+    assert ctx.report_progress.await_args_list[0].kwargs == {"progress": 0, "total": 1}
+    assert ctx.report_progress.await_args_list[-1].kwargs == {"progress": 1, "total": 1}
+    info_calls = [call.args[0] for call in ctx.info.await_args_list]
+    assert info_calls == [
+        "[hatch] expert call started: model=gpt-5.5-pro reasoning=medium web_search=false"
+    ]

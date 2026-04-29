@@ -16,6 +16,7 @@ Public surface:
 - `hatch claude <haiku|sonnet|opus>` → Claude on Amazon Bedrock
 - `hatch codex <nano|mini|max>` → GPT-5 on OpenAI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
+- `hatch expert` → one synchronous GPT pro Responses API consultation, not an agent
 - `hatch mcp` → run the MCP server over stdio
 - Raw `-b bedrock` / `-b codex` / `-b gemini` still invoke the underlying CLIs directly as escape hatches
 
@@ -34,6 +35,7 @@ hatch openrouter deepseek-v4-pro "Review this branch"
 hatch codex max --reasoning-effort low "Write unit tests"
 hatch claude sonnet "Review this diff"
 hatch codex nano "What is 2+2?"
+hatch expert --reasoning-effort medium "Is this refactor direction sound?"
 hatch codex mini --json "Analyze this" | jq .output
 ```
 
@@ -80,6 +82,7 @@ cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude
 | `backends.py` | Env vars + cmd building per backend |
 | `runner.py` | Async subprocess wrapper + timeout |
 | `mcp/` | Built-in MCP server + persistent OpenCode runtime |
+| `expert.py` | Direct single-call Responses API expert mode |
 | `context.py` | Container/filesystem detection |
 | `cli.py` | Argument parsing + main() |
 
@@ -132,3 +135,4 @@ print(result.output if result.ok else result.error)
 - (2026-04-16) [mcp] Long-running hatch MCP tools must forward runtime heartbeats/progress over the MCP context; increasing client `tool_timeout_sec` alone does not prevent 120s idle transport timeouts.
 - (2026-04-28) [mcp] When adding an MCP tool, update both the `@mcp.tool()` function and the `TOOLS` map used by `batch()`, then include it in `hatch mcp doctor tools`.
 - (2026-04-28) [runtime] Disable z.ai/GLM-5.1 while the coding plan is inactive; bare `hatch "..."` should fail fast instead of falling back to an implicit paid/provider default.
+- (2026-04-29) [mcp] Keep `hatch_expert` synchronous and single-shot; do not add status/polling tools because agent callers loop on async progress.

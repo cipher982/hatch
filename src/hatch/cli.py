@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -15,6 +16,8 @@ from hatch.backends import get_config
 from hatch.context import detect_context
 from hatch.credentials import credential_backend_for
 from hatch.credentials import hydrate_backend_kwargs
+from hatch.expert import DEFAULT_EXPERT_MODEL
+from hatch.expert import run_expert_sync
 from hatch.models import SURFACED_PROVIDERS
 from hatch.models import model_choices
 from hatch.models import opencode_progress_label
@@ -118,8 +121,104 @@ def _print_mcp_help() -> None:
     )
 
 
+def create_expert_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hatch expert",
+        description="Ask one slow synchronous expert question using the Responses API",
+    )
+    parser.add_argument("prompt", nargs="*", metavar="PROMPT")
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=["medium", "high", "xhigh"],
+        default="medium",
+        help="Reasoning effort: medium is fastest/cheapest valid, xhigh is slowest/deepest",
+    )
+    parser.add_argument(
+        "--web-search",
+        action="store_true",
+        help="Allow the model to use OpenAI web search during the single call",
+    )
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        default=900,
+        metavar="SECONDS",
+        help="Timeout in seconds (default: 900)",
+    )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("HATCH_EXPERT_MODEL", DEFAULT_EXPERT_MODEL),
+        help=f"Responses API model (default: {DEFAULT_EXPERT_MODEL})",
+    )
+    parser.add_argument(
+        "--api-key",
+        metavar="KEY",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Output JSON result instead of plain text",
+    )
+    return parser
+
+
+def _dispatch_expert(raw_argv: Sequence[str]) -> int:
+    parser = create_expert_parser()
+    args = parser.parse_args(raw_argv[1:])
+    if args.timeout <= 0:
+        msg = "timeout must be > 0"
+        if args.json_output:
+            print(json.dumps({
+                "ok": False,
+                "status": "config_error",
+                "output": "",
+                "duration_ms": 0,
+                "error": msg,
+            }))
+        else:
+            print(f"Error: {msg}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+
+    prompt = get_prompt(args)
+    print(
+        f"[hatch] expert call started: model={args.model} "
+        f"reasoning={args.reasoning_effort} web_search={str(args.web_search).lower()}",
+        file=sys.stderr,
+        flush=True,
+    )
+    result = run_expert_sync(
+        prompt=prompt,
+        model=args.model,
+        reasoning_effort=args.reasoning_effort,
+        web_search=args.web_search,
+        timeout_s=args.timeout,
+        api_key=args.api_key,
+    )
+    if args.json_output:
+        print(json.dumps(result.to_dict()))
+    else:
+        if result.ok:
+            print(result.output.rstrip())
+        else:
+            print(f"Error: {result.error}", file=sys.stderr)
+    if result.ok:
+        return EXIT_SUCCESS
+    if result.status == "timeout":
+        return EXIT_TIMEOUT
+    return EXIT_AGENT_ERROR
+
+
 def _dispatch_special_command(raw_argv: Sequence[str]) -> int | None:
-    if not raw_argv or raw_argv[0] != "mcp":
+    if not raw_argv:
+        return None
+
+    if raw_argv[0] == "expert":
+        return _dispatch_expert(raw_argv)
+
+    if raw_argv[0] != "mcp":
         return None
 
     if len(raw_argv) == 1:
@@ -202,23 +301,27 @@ def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
         usage=(
             'hatch claude <haiku|sonnet|opus> [OPTIONS] "prompt"\n'
             '       hatch codex <nano|mini|max> [OPTIONS] "prompt"\n'
-            '       hatch openrouter <deepseek-v4-pro> [OPTIONS] "prompt"'
+            '       hatch openrouter <deepseek-v4-pro> [OPTIONS] "prompt"\n'
+            '       hatch expert [OPTIONS] "prompt"'
         ),
-        description="One headless CLI for Claude, Codex, Gemini, and OpenRouter",
+        description="One headless CLI for Claude, Codex, Gemini, OpenRouter, and expert calls",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Start Here:
   hatch codex mini "Review this branch"
   hatch claude sonnet "Review this diff"
   hatch openrouter deepseek-v4-pro "Review this branch"
+  hatch expert "Is this refactor direction sound?"
 
 Surfaces:
   codex tiers     nano, mini, max
   claude tiers    haiku, sonnet, opus
   openrouter      deepseek-v4-pro
+  expert          one synchronous GPT pro Responses API call
 
 Advanced:
   hatch codex max --reasoning-effort low "Write unit tests"
+  hatch expert --reasoning-effort xhigh --web-search "Evaluate this design"
   hatch -b gemini "Summarize this image"
   hatch mcp              # run the MCP server
   hatch codex mini --json "Analyze this" | jq .output
