@@ -255,11 +255,12 @@ def test_run_expert_with_progress_forwards_heartbeats(monkeypatch):
     fake_result = mock.Mock()
     fake_result.to_dict.return_value = {"ok": True, "status": "ok", "output": "DONE"}
 
-    async def fake_to_thread(*args, **kwargs):
-        await asyncio.sleep(0.01)
+    def fake_run_expert_sync(**kwargs):
+        kwargs["progress_handler"]("[hatch] expert response resp_123 status=queued")
+        kwargs["progress_handler"]("[hatch] expert response resp_123 status=completed (15s)")
         return fake_result
 
-    monkeypatch.setattr("hatch.mcp.server.asyncio.to_thread", fake_to_thread)
+    monkeypatch.setattr("hatch.mcp.server.run_expert_sync", fake_run_expert_sync)
 
     result = asyncio.run(
         _run_expert_with_progress(
@@ -276,5 +277,7 @@ def test_run_expert_with_progress_forwards_heartbeats(monkeypatch):
     assert ctx.report_progress.await_args_list[-1].kwargs == {"progress": 1, "total": 1}
     info_calls = [call.args[0] for call in ctx.info.await_args_list]
     assert info_calls == [
-        "[hatch] expert call started: model=gpt-5.5-pro reasoning=medium web_search=false"
+        "[hatch] expert call started: model=gpt-5.5-pro reasoning=medium web_search=false",
+        "[hatch] expert response resp_123 status=queued",
+        "[hatch] expert response resp_123 status=completed (15s)",
     ]

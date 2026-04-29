@@ -204,6 +204,7 @@ def _dispatch_expert(raw_argv: Sequence[str]) -> int:
         web_search=args.web_search,
         timeout_s=args.timeout,
         api_key=args.api_key,
+        progress_handler=lambda message: print(message, file=sys.stderr, flush=True),
     )
     if args.json_output:
         print(json.dumps(result.to_dict()))

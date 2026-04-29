@@ -137,35 +137,50 @@ async def _run_expert_with_progress(
         )
         return result.to_dict()
 
-    start = asyncio.get_running_loop().time()
     await ctx.report_progress(progress=0, total=1)
     await ctx.info(
         f"[hatch] expert call started: model={model} "
         f"reasoning={reasoning_effort} web_search={str(web_search).lower()}"
     )
 
-    run_task = asyncio.create_task(
-        asyncio.to_thread(
-            run_expert_sync,
-            prompt=prompt,
-            model=model,
-            reasoning_effort=reasoning_effort,
-            web_search=web_search,
-            timeout_s=timeout_s,
-        )
-    )
-    while not run_task.done():
+    loop = asyncio.get_running_loop()
+    progress_queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    def progress_handler(message: str) -> None:
+        loop.call_soon_threadsafe(progress_queue.put_nowait, message)
+
+    def run_expert_with_progress():
         try:
-            result = await asyncio.wait_for(asyncio.shield(run_task), timeout=30)
-            await ctx.report_progress(progress=1, total=1)
-            return result.to_dict()
-        except asyncio.TimeoutError:
-            elapsed = int(asyncio.get_running_loop().time() - start)
-            message = f"[hatch] expert call still running ({elapsed}s)"
+            return run_expert_sync(
+                prompt=prompt,
+                model=model,
+                reasoning_effort=reasoning_effort,
+                web_search=web_search,
+                timeout_s=timeout_s,
+                progress_handler=progress_handler,
+            )
+        finally:
+            loop.call_soon_threadsafe(progress_queue.put_nowait, None)
+
+    async def forward_progress() -> None:
+        while True:
+            message = await progress_queue.get()
+            if message is None:
+                return
             await ctx.info(message)
             await ctx.report_progress(progress=0, total=1, message=message)
 
-    result = await run_task
+    progress_task = asyncio.create_task(forward_progress())
+    run_task = asyncio.create_task(asyncio.to_thread(run_expert_with_progress))
+    try:
+        result = await run_task
+        await progress_task
+    finally:
+        if not progress_task.done():
+            progress_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await progress_task
+
     await ctx.report_progress(progress=1, total=1)
     return result.to_dict()
 

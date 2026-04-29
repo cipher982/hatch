@@ -28,13 +28,14 @@ def test_build_payload_keeps_expert_sync_and_enables_web_search_by_default():
         model=DEFAULT_EXPERT_MODEL,
         reasoning_effort="medium",
         web_search=True,
+        background=True,
     )
 
     assert payload["model"] == "gpt-5.5-pro"
     assert payload["reasoning"] == {"effort": "medium"}
-    assert payload["store"] is False
+    assert payload["background"] is True
+    assert payload["store"] is True
     assert payload["tools"] == [{"type": "web_search"}]
-    assert "background" not in payload
 
 
 def test_build_payload_can_disable_web_search():
@@ -43,13 +44,27 @@ def test_build_payload_can_disable_web_search():
         model=DEFAULT_EXPERT_MODEL,
         reasoning_effort="medium",
         web_search=False,
+        background=True,
     )
 
     assert payload["model"] == "gpt-5.5-pro"
     assert payload["reasoning"] == {"effort": "medium"}
-    assert payload["store"] is False
+    assert payload["background"] is True
+    assert payload["store"] is True
     assert "tools" not in payload
-    assert "background" not in payload
+
+
+def test_build_payload_can_disable_background_storage():
+    payload = _build_payload(
+        prompt="Should we refactor this?",
+        model=DEFAULT_EXPERT_MODEL,
+        reasoning_effort="medium",
+        web_search=False,
+        background=False,
+    )
+
+    assert payload["background"] is False
+    assert payload["store"] is False
 
 
 def test_build_payload_can_enable_web_search():
@@ -58,6 +73,7 @@ def test_build_payload_can_enable_web_search():
         model=DEFAULT_EXPERT_MODEL,
         reasoning_effort="high",
         web_search=True,
+        background=True,
     )
 
     assert payload["tools"] == [{"type": "web_search"}]
@@ -129,3 +145,44 @@ def test_run_expert_sync_returns_output_and_metadata():
             "title": "Example source",
         }
     ]
+
+
+def test_run_expert_sync_polls_background_response():
+    create_payload = {
+        "id": "resp_123",
+        "status": "queued",
+        "model": "gpt-5.5-pro",
+    }
+    completed_payload = {
+        "id": "resp_123",
+        "status": "completed",
+        "model": "gpt-5.5-pro-2026-04-23",
+        "output": [
+            {
+                "type": "message",
+                "content": [{"type": "output_text", "text": "done"}],
+            }
+        ],
+    }
+    progress: list[str] = []
+
+    with (
+        mock.patch("hatch.expert.hydrate_backend_kwargs", return_value={"api_key": "sk-test"}),
+        mock.patch(
+            "hatch.expert.urllib.request.urlopen",
+            side_effect=[_FakeResponse(create_payload), _FakeResponse(completed_payload)],
+        ) as urlopen,
+        mock.patch("hatch.expert.time.sleep"),
+    ):
+        result = run_expert_sync(
+            prompt="question",
+            web_search=False,
+            progress_handler=progress.append,
+        )
+
+    assert result.ok is True
+    assert result.output == "done"
+    assert result.response_id == "resp_123"
+    assert urlopen.call_count == 2
+    assert progress[0] == "[hatch] expert response resp_123 status=queued"
+    assert progress[1].startswith("[hatch] expert response resp_123 status=completed")
