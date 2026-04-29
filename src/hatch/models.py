@@ -63,13 +63,11 @@ TOOL_TO_PROVIDER = {
 }
 
 SURFACE_LABELS = {
-    "hatch_default": "Agent",
     "hatch_gemini": "Gemini",
     **{spec.tool_name: spec.label for spec in SURFACED_PROVIDERS.values()},
 }
 
 SURFACE_NAMES = {
-    "hatch_default": "hatch",
     "hatch_gemini": "hatch -b gemini",
     **{spec.tool_name: spec.surface_name for spec in SURFACED_PROVIDERS.values()},
 }

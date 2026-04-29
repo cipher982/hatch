@@ -15,19 +15,6 @@ from hatch.mcp.server import _run_with_progress
 from hatch.mcp.server import TOOLS
 
 
-def test_build_run_command_default():
-    cmd = build_run_command(
-        tool_name="hatch_default",
-        prompt="hello",
-        attach_url="http://127.0.0.1:4196",
-    )
-    assert cmd[-1] == "hello"
-    assert "--attach" in cmd
-    assert "--format" in cmd
-    assert "--pure" in cmd
-    assert "-m" in cmd
-
-
 def test_build_run_command_codex_with_reasoning_and_dir():
     cmd = build_run_command(
         tool_name="hatch_codex",
@@ -162,7 +149,7 @@ def test_run_surface_empty_output_is_transport_error():
         final_output=None,
         error_message=None,
         attach_url="http://127.0.0.1:4196",
-        model="zai/glm-5.1",
+        model="openai/gpt-5.4-mini",
     )
 
     with (
@@ -170,8 +157,9 @@ def test_run_surface_empty_output_is_transport_error():
         mock.patch("hatch.mcp.runtime.run_attached_command", return_value=fake_result),
     ):
         result = run_surface(
-            tool_name="hatch_default",
+            tool_name="hatch_codex",
             prompt="hello",
+            model="mini",
             timeout_s=30,
         )
 
@@ -182,7 +170,6 @@ def test_run_surface_empty_output_is_transport_error():
 def test_doctor_lists_expected_tools():
     result = asyncio.run(check_mcp_server_tools(timeout_s=5))
     assert result.ok is True
-    assert "hatch_default" in result.tools
     assert "hatch_codex" in result.tools
     assert "hatch_claude" in result.tools
     assert "hatch_openrouter" in result.tools

@@ -483,7 +483,7 @@ class TestAsyncRun:
                 "hatch.runner.hydrate_backend_kwargs",
                 return_value={"api_key": "resolved-key", "model": "custom-model"},
             ):
-                await run("test", Backend.ZAI, model="custom-model")
+                await run("test", Backend.CODEX, model="custom-model")
 
             mock_config.assert_called_once()
             kwargs = mock_config.call_args[1]

@@ -27,7 +27,6 @@ class SecretSpec:
 
 
 SECRET_SPECS: dict[Backend | str, SecretSpec] = {
-    Backend.ZAI: SecretSpec(env_var="ZAI_API_KEY"),
     Backend.CODEX: SecretSpec(env_var="OPENAI_API_KEY"),
     OPENROUTER_CREDENTIAL: SecretSpec(env_var="OPENROUTER_API_KEY"),
 }
@@ -51,7 +50,7 @@ def _load_secret_from_helper(spec: SecretSpec) -> str | None:
             ],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=30,
             check=False,
         )
     except Exception:
@@ -99,6 +98,9 @@ def credential_backend_for(
     backend_kwargs: dict,
 ) -> Backend | str | None:
     """Choose which credential policy applies for a backend/model combination."""
+    if backend == Backend.ZAI:
+        return None
+
     if backend != Backend.OPENCODE:
         return backend
 
@@ -107,7 +109,4 @@ def credential_backend_for(
         return Backend.CODEX
     if model.startswith("openrouter/"):
         return OPENROUTER_CREDENTIAL
-    if model.startswith("z.ai/") or model.startswith("zai/"):
-        return Backend.ZAI
-
     return None

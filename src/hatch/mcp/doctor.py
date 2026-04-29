@@ -86,7 +86,6 @@ async def check_mcp_server_tools(timeout_s: int = 5) -> McpCheck:
 
         tools = [tool["name"] for tool in tools_resp["result"]["tools"]]
         required = {
-            "hatch_default",
             "hatch_claude",
             "hatch_codex",
             "hatch_gemini",
@@ -152,7 +151,6 @@ async def call_tool(tool_name: str, arguments: dict, timeout_s: int = 180) -> di
 async def run_smoke(cwd: str, timeout_s: int = 120) -> dict[str, dict]:
     """Run a small real MCP smoke against the common hatch tools."""
     calls = {
-        "default": ("hatch_default", {"prompt": "Reply with just MCP_DEFAULT_OK", "cwd": cwd, "timeout_s": timeout_s}),
         "codex": ("hatch_codex", {"model": "mini", "prompt": "Reply with just MCP_CODEX_OK", "cwd": cwd, "timeout_s": timeout_s}),
         "claude": ("hatch_claude", {"model": "sonnet", "prompt": "Reply with just MCP_CLAUDE_OK", "cwd": cwd, "timeout_s": timeout_s}),
     }

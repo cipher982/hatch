@@ -4,7 +4,6 @@ These tests are slow and require actual credentials.
 Run with: pytest -v -m integration
 
 Required credentials:
-- ZAI_API_KEY for zai tests
 - OPENAI_API_KEY for codex tests
 - AWS profile for bedrock tests
 - gemini CLI OAuth for gemini tests
@@ -26,7 +25,6 @@ from conftest import (
     has_codex_cli,
     has_gemini_cli,
     has_openai_credentials,
-    has_zai_credentials,
 )
 
 
@@ -34,12 +32,13 @@ from conftest import (
 pytestmark = pytest.mark.integration
 
 
+@pytest.mark.skip(reason="z.ai backend is disabled while the coding plan is inactive")
 class TestZaiIntegration:
     """Integration tests for z.ai backend."""
 
     @pytest.mark.skipif(
-        not has_zai_credentials() or not has_claude_cli(),
-        reason="ZAI_API_KEY not set or claude CLI not installed",
+        True,
+        reason="z.ai backend is disabled while the coding plan is inactive",
     )
     def test_simple_math_question(self):
         """Test simple math question returns sensible answer."""
@@ -65,8 +64,8 @@ class TestZaiIntegration:
         assert "4" in data["output"]
 
     @pytest.mark.skipif(
-        not has_zai_credentials() or not has_claude_cli(),
-        reason="ZAI_API_KEY not set or claude CLI not installed",
+        True,
+        reason="z.ai backend is disabled while the coding plan is inactive",
     )
     def test_plain_text_output(self):
         """Test plain text output (not JSON)."""
@@ -89,8 +88,8 @@ class TestZaiIntegration:
         assert "Paris" in result.stdout
 
     @pytest.mark.skipif(
-        not has_zai_credentials() or not has_claude_cli(),
-        reason="ZAI_API_KEY not set or claude CLI not installed",
+        True,
+        reason="z.ai backend is disabled while the coding plan is inactive",
     )
     def test_stdin_input(self):
         """Test reading prompt from stdin."""
@@ -109,8 +108,8 @@ class TestZaiIntegration:
         assert "6" in data["output"]
 
     @pytest.mark.skipif(
-        not has_zai_credentials() or not has_claude_cli(),
-        reason="ZAI_API_KEY not set or claude CLI not installed",
+        True,
+        reason="z.ai backend is disabled while the coding plan is inactive",
     )
     def test_working_directory(self, tmp_path):
         """Test --cwd option changes working directory."""
@@ -273,7 +272,7 @@ class TestErrorHandling:
         assert result.returncode != 0
         data = json.loads(result.stdout)
         assert data["ok"] is False
-        assert "ZAI_API_KEY" in data["error"]
+        assert "disabled" in data["error"]
 
     def test_invalid_backend_in_code(self):
         """Test invalid backend argument."""
@@ -329,7 +328,6 @@ class TestCLIFlags:
         assert "hatch" in result.stdout
         assert "--backend" in result.stdout
         assert "--timeout" in result.stdout
-        assert "zai" in result.stdout
         assert "codex" in result.stdout
 
     def test_empty_prompt_error(self):
@@ -351,8 +349,8 @@ class TestTimeout:
     """Integration tests for timeout behavior."""
 
     @pytest.mark.skipif(
-        not has_zai_credentials() or not has_claude_cli(),
-        reason="ZAI_API_KEY not set or claude CLI not installed",
+        True,
+        reason="z.ai backend is disabled while the coding plan is inactive",
     )
     def test_short_timeout(self):
         """Test that very short timeout causes failure."""
@@ -385,8 +383,8 @@ class TestDurationTracking:
     """Integration tests for duration tracking."""
 
     @pytest.mark.skipif(
-        not has_zai_credentials() or not has_claude_cli(),
-        reason="ZAI_API_KEY not set or claude CLI not installed",
+        True,
+        reason="z.ai backend is disabled while the coding plan is inactive",
     )
     def test_duration_reported(self):
         """Test that duration_ms is reported in JSON output."""
@@ -417,8 +415,8 @@ class TestLargePrompts:
     """Integration tests for large prompts."""
 
     @pytest.mark.skipif(
-        not has_zai_credentials() or not has_claude_cli(),
-        reason="ZAI_API_KEY not set or claude CLI not installed",
+        True,
+        reason="z.ai backend is disabled while the coding plan is inactive",
     )
     def test_large_prompt_via_stdin(self):
         """Test that large prompts work via stdin (ARG_MAX bypass)."""
@@ -471,8 +469,8 @@ class TestUvxInstallation:
         assert "--backend" in result.stdout
 
     @pytest.mark.skipif(
-        not has_zai_credentials() or not has_claude_cli(),
-        reason="ZAI_API_KEY not set or claude CLI not installed",
+        True,
+        reason="z.ai backend is disabled while the coding plan is inactive",
     )
     def test_uvx_hatch_execution(self):
         """Test that installed hatch actually works."""

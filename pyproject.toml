@@ -12,7 +12,7 @@ license = "MIT"
 authors = [
     { name = "David Rose", email = "david010@gmail.com" }
 ]
-keywords = ["ai", "agent", "cli", "claude", "codex", "gemini", "zai"]
+keywords = ["ai", "agent", "cli", "claude", "codex", "gemini", "openrouter"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",

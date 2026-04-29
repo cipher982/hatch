@@ -30,9 +30,19 @@ EXIT_AGENT_ERROR = 1
 EXIT_TIMEOUT = 2
 EXIT_NOT_FOUND = 3
 EXIT_CONFIG_ERROR = 4
-RAW_BACKEND_NAMES = ("zai", "bedrock", "codex", "gemini")
-CLAUDE_BACKENDS = {Backend.ZAI, Backend.BEDROCK}
+RAW_BACKEND_NAMES = ("bedrock", "codex", "gemini")
+CLAUDE_BACKENDS = {Backend.BEDROCK}
 OPENCODE_BACKENDS = {Backend.OPENCODE}
+EXPLICIT_PROVIDER_MSG = (
+    "No default model is configured. Choose one of: "
+    "hatch codex <nano|mini|max>, "
+    "hatch claude <haiku|sonnet|opus>, "
+    "hatch openrouter deepseek-v4-pro"
+)
+ZAI_DISABLED_MSG = (
+    "z.ai/GLM-5.1 is disabled because the coding plan has no active resource package; "
+    "choose codex, claude, or openrouter instead"
+)
 
 FLAGS_WITH_VALUE = {
     "-b",
@@ -190,22 +200,19 @@ def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hatch",
         usage=(
-            'hatch [OPTIONS] "prompt"\n'
-            '       hatch claude <haiku|sonnet|opus> [OPTIONS] "prompt"\n'
+            'hatch claude <haiku|sonnet|opus> [OPTIONS] "prompt"\n'
             '       hatch codex <nano|mini|max> [OPTIONS] "prompt"\n'
             '       hatch openrouter <deepseek-v4-pro> [OPTIONS] "prompt"'
         ),
-        description="One headless CLI for Claude, Codex, z.ai, Gemini, and OpenRouter",
+        description="One headless CLI for Claude, Codex, Gemini, and OpenRouter",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Start Here:
-  hatch "What is 2+2?"
   hatch codex mini "Review this branch"
   hatch claude sonnet "Review this diff"
   hatch openrouter deepseek-v4-pro "Review this branch"
 
-Default:
-  hatch "..."     z.ai
+Surfaces:
   codex tiers     nano, mini, max
   claude tiers    haiku, sonnet, opus
   openrouter      deepseek-v4-pro
@@ -214,11 +221,10 @@ Advanced:
   hatch codex max --reasoning-effort low "Write unit tests"
   hatch -b gemini "Summarize this image"
   hatch mcp              # run the MCP server
-  hatch --json "Analyze this" | jq .output
+  hatch codex mini --json "Analyze this" | jq .output
   hatch --advanced-help   # show raw/backend-specific flags
 
 Environment Variables:
-  ZAI_API_KEY         API key for zai backend
   OPENAI_API_KEY      API key for codex backend
   OPENROUTER_API_KEY  API key for OpenRouter models
   AWS_PROFILE         AWS profile for bedrock backend
@@ -236,7 +242,7 @@ Environment Variables:
     parser.add_argument(
         "-b",
         "--backend",
-        default="zai",
+        default=None,
         help="Advanced backend escape hatch",
     )
 
@@ -447,6 +453,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"Error: {msg}", file=sys.stderr)
             return EXIT_CONFIG_ERROR
 
+    if args.backend is None:
+        if args.json_output:
+            print(json.dumps({
+                "ok": False,
+                "status": "config_error",
+                "output": "",
+                "exit_code": EXIT_CONFIG_ERROR,
+                "duration_ms": 0,
+                "error": EXPLICIT_PROVIDER_MSG,
+                "stderr": None,
+            }))
+        else:
+            print(f"Error: {EXPLICIT_PROVIDER_MSG}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+
     # Parse backend
     try:
         backend = Backend(args.backend)
@@ -467,6 +488,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             }))
         else:
             print(f"Error: {msg}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+
+    if backend == Backend.ZAI:
+        if args.json_output:
+            print(json.dumps({
+                "ok": False,
+                "status": "config_error",
+                "output": "",
+                "exit_code": EXIT_CONFIG_ERROR,
+                "duration_ms": 0,
+                "error": ZAI_DISABLED_MSG,
+                "stderr": None,
+            }))
+        else:
+            print(f"Error: {ZAI_DISABLED_MSG}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
 
     if backend in OPENCODE_BACKENDS and args.skip_git_repo_check:
@@ -491,7 +527,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         or model_name.startswith("z.ai/")
         or model_name.startswith("zai-coding-plan/")
     ):
-        msg = 'z.ai models are only available through plain hatch; use `hatch "..."`'
+        msg = ZAI_DISABLED_MSG
         if args.json_output:
             print(json.dumps({
                 "ok": False,

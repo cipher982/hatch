@@ -595,7 +595,7 @@ async def run(
 
     Args:
         prompt: The prompt to send to the agent
-        backend: Which backend to use (zai, bedrock, codex, gemini)
+        backend: Which backend to use (bedrock, codex, gemini, opencode)
         cwd: Working directory for the agent
         timeout_s: Timeout in seconds (default 15 minutes)
         **backend_kwargs: Backend-specific options (api_key, model, etc.)

@@ -349,7 +349,6 @@ def configure_opencode(
 
 # Backend to configure function mapping
 BACKEND_CONFIGURATORS = {
-    Backend.ZAI: configure_zai,
     Backend.BEDROCK: configure_bedrock,
     Backend.CODEX: configure_codex,
     Backend.GEMINI: configure_gemini,
@@ -364,5 +363,7 @@ def get_config(
     **kwargs: Any,
 ) -> BackendConfig:
     """Get configuration for a backend."""
+    if backend == Backend.ZAI:
+        raise ValueError("z.ai/GLM-5.1 is disabled; choose OpenAI, Anthropic, or OpenRouter models")
     configurator = BACKEND_CONFIGURATORS[backend]
     return configurator(prompt, ctx, **kwargs)

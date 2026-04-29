@@ -34,7 +34,6 @@ ATTACH_URL_ENV = "HATCH_MCP_OPENCODE_ATTACH_URL"
 OPENCODE_PORT_ENV = "HATCH_MCP_OPENCODE_PORT"
 OPENCODE_ROOT_ENV = "HATCH_MCP_OPENCODE_ROOT"
 OPENCODE_CONFIG_ENV = "HATCH_MCP_OPENCODE_CONFIG"
-DEFAULT_ZAI_MODEL = os.environ.get("HATCH_MCP_DEFAULT_MODEL", "zai/glm-5.1")
 DEFAULT_GEMINI_MODEL = os.environ.get(
     "HATCH_MCP_GEMINI_MODEL",
     "google/gemini-3-flash-preview",
@@ -100,11 +99,6 @@ def _build_server_env() -> dict[str, str]:
     env = dict(os.environ)
     runtime_paths = _runtime_paths()
 
-    if not env.get("ZAI_API_KEY"):
-        secret = _maybe_load_secret(Backend.ZAI)
-        if secret:
-            env["ZAI_API_KEY"] = secret
-
     if not env.get("OPENAI_API_KEY"):
         secret = _maybe_load_secret(Backend.CODEX)
         if secret:
@@ -125,8 +119,6 @@ def _build_server_env() -> dict[str, str]:
 
 
 def _resolve_model(tool_name: str, model: str | None) -> str:
-    if tool_name == "hatch_default":
-        return DEFAULT_ZAI_MODEL
     if tool_name == "hatch_gemini":
         return DEFAULT_GEMINI_MODEL
 
@@ -522,7 +514,6 @@ def doctor() -> dict[str, Any]:
         "opencode_path": opencode_path,
         "attach_url": attach_url,
         "attach_url_healthy": bool(attach_url and _healthcheck(attach_url)),
-        "default_model": DEFAULT_ZAI_MODEL,
         "gemini_model": DEFAULT_GEMINI_MODEL,
         "opencode_root": str(_runtime_root()),
         "opencode_config": str(_runtime_config_path()),

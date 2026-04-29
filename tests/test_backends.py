@@ -483,11 +483,10 @@ class TestConfigureGemini:
 class TestGetConfig:
     """Tests for the get_config dispatcher."""
 
-    def test_dispatches_to_zai(self, mock_zai_key, laptop_context):
-        """Dispatches to configure_zai for ZAI backend."""
-        config = get_config(Backend.ZAI, "test", laptop_context)
-        assert "claude" in config.cmd
-        assert "ANTHROPIC_AUTH_TOKEN" in config.env
+    def test_zai_backend_is_disabled(self, mock_zai_key, laptop_context):
+        """ZAI remains defined for compatibility but is no longer dispatchable."""
+        with pytest.raises(ValueError, match="disabled"):
+            get_config(Backend.ZAI, "test", laptop_context)
 
     def test_dispatches_to_bedrock(self, laptop_context):
         """Dispatches to configure_bedrock for BEDROCK backend."""
@@ -512,8 +511,15 @@ class TestGetConfig:
 
     def test_passes_kwargs(self, mock_zai_key, laptop_context):
         """Passes kwargs to configure function."""
-        config = get_config(Backend.ZAI, "test", laptop_context, model="custom")
-        assert config.env["ANTHROPIC_MODEL"] == "custom"
+        config = get_config(
+            Backend.OPENCODE,
+            "test",
+            laptop_context,
+            model="openai/gpt-5.4-mini",
+            agent="review",
+        )
+        assert config.cmd[config.cmd.index("-m") + 1] == "openai/gpt-5.4-mini"
+        assert config.cmd[config.cmd.index("--agent") + 1] == "review"
 
 
 class TestUnicodePrompts:

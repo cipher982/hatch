@@ -24,7 +24,6 @@ mcp = FastMCP(
 Stable MCP front door for hatch.
 
 Use this when you want the simple hatch contract without shell syntax:
-- hatch_default(prompt, cwd?, timeout_s?) -> default z.ai path
 - hatch_claude(model, prompt, cwd, timeout_s?) -> Claude via Bedrock
 - hatch_codex(model, prompt, cwd, timeout_s?, reasoning_effort?) -> GPT-5 via OpenAI
 - hatch_openrouter(model, prompt, cwd, timeout_s?) -> OpenRouter models
@@ -109,23 +108,6 @@ async def _run_with_progress(
 
     await ctx.report_progress(progress=1, total=1)
     return result
-
-
-@mcp.tool()
-async def hatch_default(
-    prompt: Annotated[str, "Prompt to send to the default z.ai hatch path."],
-    cwd: Annotated[str | None, "Absolute repo path for repo-aware work. Omit for one-off prompts."] = None,
-    timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
-    ctx: Context | None = None,
-) -> dict:
-    """Run the default bare `hatch "prompt"` path."""
-    return await _run_with_progress(
-        tool_name="hatch_default",
-        prompt=prompt,
-        cwd=cwd,
-        timeout_s=timeout_s,
-        ctx=ctx,
-    )
 
 
 @mcp.tool()
@@ -214,7 +196,6 @@ async def hatch_doctor() -> dict:
 
 
 TOOLS = {
-    "hatch_default": hatch_default,
     "hatch_claude": hatch_claude,
     "hatch_codex": hatch_codex,
     "hatch_gemini": hatch_gemini,

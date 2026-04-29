@@ -8,7 +8,8 @@ Usage:
 
     result = await run(
         prompt="Fix the bug",
-        backend=Backend.ZAI,
+        backend=Backend.OPENCODE,
+        model="openai/gpt-5.4-mini",
         cwd="/path/to/workspace",
         timeout_s=300,
     )

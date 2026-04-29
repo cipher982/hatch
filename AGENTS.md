@@ -1,6 +1,6 @@
 # hatch
 
-Headless runner with a simple Claude/Codex/z.ai surface plus a built-in MCP server for agent callers.
+Headless runner with a simple Claude/Codex/OpenRouter surface plus a built-in MCP server for agent callers.
 
 **Owner**: david010@gmail.com
 
@@ -15,7 +15,7 @@ uv tool install -e ~/git/hatch
 Public surface:
 - `hatch claude <haiku|sonnet|opus>` → Claude on Amazon Bedrock
 - `hatch codex <nano|mini|max>` → GPT-5 on OpenAI
-- `hatch "prompt"` → z.ai default path
+- `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
 - `hatch mcp` → run the MCP server over stdio
 - Raw `-b bedrock` / `-b codex` / `-b gemini` still invoke the underlying CLIs directly as escape hatches
 
@@ -23,17 +23,18 @@ Default tiers:
 - Start with `sonnet` for Claude and `mini` for Codex
 - Drop to `haiku` / `nano` for faster cheaper work
 - Rise to `opus` / `max` when depth matters
+- Use `openrouter deepseek-v4-pro` as the non-OpenAI/non-Anthropic third option
 
 Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
 
 ```bash
-hatch "What is 2+2?"
 hatch codex mini "Review this branch"
 hatch claude haiku "Summarize this file"
+hatch openrouter deepseek-v4-pro "Review this branch"
 hatch codex max --reasoning-effort low "Write unit tests"
 hatch claude sonnet "Review this diff"
 hatch codex nano "What is 2+2?"
-hatch --json "Analyze this" | jq .output
+hatch codex mini --json "Analyze this" | jq .output
 ```
 
 Use the same surfaced commands for normal build/edit work and review prompts.
@@ -52,7 +53,7 @@ uv run hatch mcp doctor tools          # Check MCP server tool surface
 Credentials are resolved explicitly before backend launch:
 - CLI `--api-key` override wins
 - Existing shell env wins next
-- Personal backends (`zai`, `codex`) then use the configured local secret helper
+- Credentialed backends (`codex`, `openrouter`) then use the configured local secret helper
 
 Machine callers:
 - non-interactive CLI runs default to JSON output and automation mode automatically
@@ -69,7 +70,9 @@ cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude
     context.py (container detection)
 ```
 
-**5 Backends:** `zai` (default), `bedrock`, `codex`, `gemini`, `opencode`
+**Active backends:** `bedrock`, `codex`, `gemini`, `opencode`
+
+`zai` / GLM-5.1 is intentionally disabled until the z.ai coding plan/resource package is active again. Bare `hatch "prompt"` has no default model; use an explicit surfaced provider.
 
 **Key files:**
 | File | Purpose |
@@ -94,13 +97,17 @@ cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude
 ```python
 from hatch import run, Backend
 
-result = await run(prompt="Fix the bug", backend=Backend.ZAI)
+result = await run(
+    prompt="Fix the bug",
+    backend=Backend.OPENCODE,
+    model="openai/gpt-5.4-mini",
+)
 print(result.output if result.ok else result.error)
 ```
 
 ## Gotchas
 
-1. **z.ai uses `ANTHROPIC_AUTH_TOKEN`** not `ANTHROPIC_API_KEY` - and must unset `CLAUDE_CODE_USE_BEDROCK`
+1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, or `hatch openrouter ...`; z.ai/GLM is disabled for now
 2. **Tests mock subprocess** - no real CLI calls except `integration` marked tests
 3. **Core deps should stay minimal** - `fastmcp` is in core because `hatch` now owns the MCP server; avoid growing beyond that without a strong reason
 4. **Credential loading lives in `credentials.py`** - do not fetch secrets inside backend config builders
@@ -124,3 +131,4 @@ print(result.output if result.ok else result.error)
 - (2026-04-14) [architecture] `hatch` owns both the CLI and the MCP server; personal config repos should only register `hatch mcp`, not carry a second wrapper implementation.
 - (2026-04-16) [mcp] Long-running hatch MCP tools must forward runtime heartbeats/progress over the MCP context; increasing client `tool_timeout_sec` alone does not prevent 120s idle transport timeouts.
 - (2026-04-28) [mcp] When adding an MCP tool, update both the `@mcp.tool()` function and the `TOOLS` map used by `batch()`, then include it in `hatch mcp doctor tools`.
+- (2026-04-28) [runtime] Disable z.ai/GLM-5.1 while the coding plan is inactive; bare `hatch "..."` should fail fast instead of falling back to an implicit paid/provider default.

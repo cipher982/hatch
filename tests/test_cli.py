@@ -35,11 +35,11 @@ class TestCreateParser:
         assert parser is not None
         assert parser.prog == "hatch"
 
-    def test_default_backend(self):
-        """Default backend is zai."""
+    def test_default_backend_requires_explicit_surface(self):
+        """Bare prompts no longer default to a model provider."""
         parser = create_parser()
         args = parser.parse_args(["test prompt"])
-        assert args.backend == "zai"
+        assert args.backend is None
 
     def test_backend_short_flag(self):
         """Short -b flag works."""
@@ -56,7 +56,7 @@ class TestCreateParser:
     def test_all_backends_valid(self):
         """All backend choices are valid."""
         parser = create_parser()
-        for backend in ["zai", "bedrock", "codex", "gemini"]:
+        for backend in ["bedrock", "codex", "gemini"]:
             args = parser.parse_args(["-b", backend, "test"])
             assert args.backend == backend
 
@@ -558,7 +558,7 @@ class TestMain:
             final_output="Hello World",
         )
 
-        exit_code = main(["test prompt"])
+        exit_code = main(["-b", "bedrock", "test prompt"])
 
         assert exit_code == EXIT_SUCCESS
         captured = capsys.readouterr()
@@ -584,7 +584,7 @@ class TestMain:
             final_output="output text",
         )
 
-        exit_code = main(["--json", "test prompt"])
+        exit_code = main(["--json", "-b", "bedrock", "test prompt"])
 
         assert exit_code == EXIT_SUCCESS
         captured = capsys.readouterr()
@@ -612,7 +612,7 @@ class TestMain:
             final_output=None,
         )
 
-        exit_code = main(["test prompt"])
+        exit_code = main(["-b", "bedrock", "test prompt"])
 
         assert exit_code == EXIT_AGENT_ERROR
         captured = capsys.readouterr()
@@ -638,7 +638,7 @@ class TestMain:
             final_output=None,
         )
 
-        exit_code = main(["--json", "test prompt"])
+        exit_code = main(["--json", "-b", "bedrock", "test prompt"])
 
         assert exit_code == EXIT_AGENT_ERROR
         captured = capsys.readouterr()
@@ -693,35 +693,27 @@ class TestMain:
             final_output=None,
         )
 
-        exit_code = main(["test prompt"])
+        exit_code = main(["-b", "bedrock", "test prompt"])
 
         assert exit_code == EXIT_TIMEOUT
 
     def test_missing_api_key(self, clean_env, mock_detect_context, capsys):
-        """Missing API key returns config error."""
-        with mock.patch(
-            "hatch.cli.hydrate_backend_kwargs",
-            side_effect=ValueError("ZAI_API_KEY not set"),
-        ):
-            exit_code = main(["-b", "zai", "test prompt"])
+        """z.ai is disabled before credential loading."""
+        exit_code = main(["-b", "zai", "test prompt"])
 
         assert exit_code == EXIT_CONFIG_ERROR
         captured = capsys.readouterr()
-        assert "ZAI_API_KEY" in captured.err or "Error" in captured.err
+        assert "disabled" in captured.err
 
     def test_missing_api_key_json(self, clean_env, mock_detect_context, capsys):
-        """Missing API key in JSON mode."""
-        with mock.patch(
-            "hatch.cli.hydrate_backend_kwargs",
-            side_effect=ValueError("ZAI_API_KEY not set"),
-        ):
-            exit_code = main(["--json", "-b", "zai", "test prompt"])
+        """z.ai disabled error is structured in JSON mode."""
+        exit_code = main(["--json", "-b", "zai", "test prompt"])
 
         assert exit_code == EXIT_CONFIG_ERROR
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert data["ok"] is False
-        assert "ZAI_API_KEY" in data["error"]
+        assert "disabled" in data["error"]
 
     def test_cli_not_found(
         self, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key, capsys
@@ -731,7 +723,7 @@ class TestMain:
             "hatch.cli.run_claude_stream_sync",
             side_effect=FileNotFoundError("claude not found"),
         ):
-            exit_code = main(["test prompt"])
+            exit_code = main(["-b", "bedrock", "test prompt"])
 
         assert exit_code == EXIT_NOT_FOUND
 
@@ -805,7 +797,8 @@ class TestMain:
                 "hatch.cli.hydrate_backend_kwargs",
                 side_effect=lambda backend, kwargs: dict(kwargs),
             ) as mock_hydrate:
-                main(["--api-key", "sk-test", "-b", "zai", "test"])
+                with mock.patch("hatch.cli.run_sync", return_value=("", "", 0, False)):
+                    main(["--api-key", "sk-test", "-b", "codex", "test"])
 
             hydrated_kwargs = mock_hydrate.call_args[0][1]
             assert hydrated_kwargs.get("api_key") == "sk-test"
@@ -868,11 +861,11 @@ class TestMain:
         assert "only works with codex models" in captured.err.lower()
 
     def test_zai_model_rejected_on_shared_runtime(self, capsys):
-        """z.ai should stay on the stable plain-hatch path until the surfaced runtime is reliable."""
+        """z.ai models are disabled on the shared runtime too."""
         exit_code = main(["--model", "zai/glm-5.1", "test prompt"])
         assert exit_code == EXIT_CONFIG_ERROR
         captured = capsys.readouterr()
-        assert "only available through plain hatch" in captured.err.lower()
+        assert "disabled" in captured.err.lower()
 
     def test_cwd_passed(
         self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
@@ -964,13 +957,13 @@ class TestMain:
             final_output="output\n\n\n",
         )
 
-        main(["test prompt"])
+        main(["-b", "bedrock", "test prompt"])
 
         captured = capsys.readouterr()
         # Should have exactly one newline (from print)
         assert captured.out == "output\n"
 
-    def test_raw_zai_defaults_to_internal_stream_json(
+    def test_raw_bedrock_defaults_to_internal_stream_json(
         self, mock_run_claude_stream_sync, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
         """Raw Claude backends should use stream-json transport internally."""
@@ -981,7 +974,7 @@ class TestMain:
                 cmd=["test"], env={}, stdin_data=b"test"
             )
 
-            main(["-b", "zai", "test prompt"])
+            main(["-b", "bedrock", "test prompt"])
 
             kwargs = mock_config.call_args[1]
             assert kwargs["output_format"] == "stream-json"
@@ -1062,7 +1055,7 @@ class TestMainWithStdin:
                             side_effect=lambda backend, kwargs: dict(kwargs),
                         ):
                             with mock.patch("hatch.cli.detect_context"):
-                                main([])
+                                main(["-b", "bedrock", "-"])
 
                     # Verify get_config was called with stdin prompt
                     call_args = mock_config.call_args[0]

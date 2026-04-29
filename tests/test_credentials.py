@@ -44,10 +44,10 @@ class TestHydrateBackendKwargs:
     def test_raises_clear_error_when_secret_unavailable(self):
         """Failure message points at the canonical helper path."""
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("ZAI_API_KEY", None)
+            os.environ.pop("OPENAI_API_KEY", None)
             with mock.patch("hatch.credentials._load_secret_from_helper", return_value=None):
                 with pytest.raises(ValueError, match="infisical-get.py"):
-                    hydrate_backend_kwargs(Backend.ZAI, {})
+                    hydrate_backend_kwargs(Backend.CODEX, {})
 
     def test_openrouter_uses_openrouter_env(self):
         """OpenRouter models use the OpenRouter credential policy."""
