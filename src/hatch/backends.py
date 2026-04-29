@@ -98,12 +98,16 @@ def configure_zai(
     include_partial_messages: bool = False,
     **_: Any,
 ) -> BackendConfig:
-    """Configure z.ai backend (Claude Code CLI with GLM-5.1).
+    """Configure dormant z.ai backend (Claude Code CLI with GLM-5.1).
 
     Key insight: z.ai uses ANTHROPIC_AUTH_TOKEN (not ANTHROPIC_API_KEY),
     and requires CLAUDE_CODE_USE_BEDROCK to be unset.
 
     Prompt passed via stdin to avoid ARG_MAX limits on large prompts.
+
+    The public CLI and get_config() intentionally disable this backend while
+    the z.ai coding plan is inactive. Keep the builder tested so re-enabling is
+    a small routing change instead of a rediscovery exercise.
     """
     ctx = ctx or detect_context()
 

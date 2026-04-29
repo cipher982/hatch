@@ -417,6 +417,11 @@ class TestNormalizeArgv:
         with pytest.raises(ValueError, match="invalid openrouter model 'deepseek'"):
             normalize_argv(["openrouter", "deepseek", "review"])
 
+    def test_openrouter_requires_explicit_model(self):
+        """OpenRouter surface should fail clearly without a model alias."""
+        with pytest.raises(ValueError, match="openrouter requires an explicit model"):
+            normalize_argv(["openrouter"])
+
     def test_option_value_named_like_provider_is_not_rewritten(self):
         """Provider aliases inside option values do not trigger routing."""
         assert normalize_argv(["--cwd", "claude", "review"]) == [
@@ -727,6 +732,14 @@ class TestMain:
 
         assert exit_code == EXIT_NOT_FOUND
 
+    def test_bare_prompt_requires_explicit_provider(self, capsys):
+        """Bare prompts fail fast now that GLM is disabled."""
+        exit_code = main(["test prompt"])
+
+        assert exit_code == EXIT_CONFIG_ERROR
+        captured = capsys.readouterr()
+        assert "No default model is configured" in captured.err
+
     def test_backend_passed_correctly(
         self, mock_run_claude_stream_sync, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key
     ):
@@ -802,6 +815,30 @@ class TestMain:
 
             hydrated_kwargs = mock_hydrate.call_args[0][1]
             assert hydrated_kwargs.get("api_key") == "sk-test"
+
+    def test_openrouter_uses_openrouter_credential_policy(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_detect_context,
+    ):
+        """Surfaced OpenRouter CLI calls hydrate the OpenRouter API key."""
+        with mock.patch("hatch.cli.get_config") as mock_config:
+            from hatch.backends import BackendConfig
+
+            mock_config.return_value = BackendConfig(
+                cmd=["test"], env={}, stdin_data=None
+            )
+
+            with mock.patch(
+                "hatch.cli.hydrate_backend_kwargs",
+                side_effect=lambda backend, kwargs: {"api_key": "or-key", **kwargs},
+            ) as mock_hydrate:
+                main(["openrouter", "deepseek-v4-pro", "test"])
+
+            assert mock_hydrate.call_args[0][0] == "openrouter"
+            kwargs = mock_config.call_args[1]
+            assert kwargs["api_key"] == "or-key"
+            assert kwargs["model"] == "openrouter/deepseek/deepseek-v4-pro"
 
     def test_timeout_passed(
         self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key

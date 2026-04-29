@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
@@ -44,6 +45,18 @@ async def _recv(proc, timeout_s: int) -> dict:
     return json.loads(line)
 
 
+async def _recv_response(proc, response_id: int, timeout_s: int) -> dict:
+    """Read until the requested JSON-RPC response, skipping notifications."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise asyncio.TimeoutError
+        msg = await _recv(proc, int(max(1, remaining)))
+        if msg.get("id") == response_id:
+            return msg
+
+
 async def _initialize(proc, timeout_s: int) -> dict:
     await _send(
         proc,
@@ -58,7 +71,7 @@ async def _initialize(proc, timeout_s: int) -> dict:
             },
         },
     )
-    return await _recv(proc, timeout_s)
+    return await _recv_response(proc, 1, timeout_s)
 
 
 async def _stop(proc) -> None:
@@ -80,7 +93,7 @@ async def check_mcp_server_tools(timeout_s: int = 5) -> McpCheck:
             return McpCheck(ok=False, tools=[], error=f"initialize failed: {init_resp}")
 
         await _send(proc, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        tools_resp = await _recv(proc, timeout_s)
+        tools_resp = await _recv_response(proc, 2, timeout_s)
         if "result" not in tools_resp:
             return McpCheck(ok=False, tools=[], error=f"tools/list failed: {tools_resp}")
 
@@ -123,7 +136,7 @@ async def call_tool(tool_name: str, arguments: dict, timeout_s: int = 180) -> di
                 "params": {"name": tool_name, "arguments": arguments},
             },
         )
-        resp = await _recv(proc, effective_timeout)
+        resp = await _recv_response(proc, 2, effective_timeout)
         result = resp.get("result") or {}
         if result.get("isError"):
             content = result.get("content") or []

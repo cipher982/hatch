@@ -114,7 +114,7 @@ async def _run_with_progress(
 async def hatch_claude(
     model: Annotated[ClaudeModelAlias, "Claude tier. Start with sonnet."],
     prompt: Annotated[str, "Prompt to send to Claude via the surfaced hatch path."],
-    cwd: Annotated[str, "Absolute repo path. Required for Claude repo work."],
+    cwd: Annotated[str | None, "Absolute repo path for repo-aware work. Omit for one-off prompts."] = None,
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     ctx: Context | None = None,
 ) -> dict:
@@ -133,7 +133,7 @@ async def hatch_claude(
 async def hatch_codex(
     model: Annotated[CodexModelAlias, "Codex tier. Start with mini."],
     prompt: Annotated[str, "Prompt to send to Codex via the surfaced hatch path."],
-    cwd: Annotated[str, "Absolute repo path. Required for Codex repo work."],
+    cwd: Annotated[str | None, "Absolute repo path for repo-aware work. Omit for one-off prompts."] = None,
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     reasoning_effort: Annotated[
         Literal["low", "medium", "high", "xhigh"] | None,
@@ -174,7 +174,7 @@ async def hatch_gemini(
 async def hatch_openrouter(
     model: Annotated[OpenRouterModelAlias, "OpenRouter model. Start with deepseek-v4-pro."],
     prompt: Annotated[str, "Prompt to send to the selected OpenRouter model via hatch."],
-    cwd: Annotated[str, "Absolute repo path. Required for repo work."],
+    cwd: Annotated[str | None, "Absolute repo path for repo-aware work. Omit for one-off prompts."] = None,
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     ctx: Context | None = None,
 ) -> dict:

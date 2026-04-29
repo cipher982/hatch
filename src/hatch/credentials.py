@@ -98,9 +98,6 @@ def credential_backend_for(
     backend_kwargs: dict,
 ) -> Backend | str | None:
     """Choose which credential policy applies for a backend/model combination."""
-    if backend == Backend.ZAI:
-        return None
-
     if backend != Backend.OPENCODE:
         return backend
 

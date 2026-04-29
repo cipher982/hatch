@@ -5,6 +5,7 @@ from unittest import mock
 
 from hatch.mcp.doctor import call_tool
 from hatch.mcp.doctor import check_mcp_server_tools
+from hatch.mcp.doctor import _recv_response
 from hatch.mcp.runtime import OpenCodeRunResult
 from hatch.mcp.runtime import OpenCodeServerManager
 from hatch.mcp.runtime import _build_server_env
@@ -13,6 +14,19 @@ from hatch.mcp.runtime import doctor
 from hatch.mcp.runtime import run_surface
 from hatch.mcp.server import _run_with_progress
 from hatch.mcp.server import TOOLS
+
+
+class _FakeStdout:
+    def __init__(self, lines: list[str]) -> None:
+        self._lines = list(lines)
+
+    async def readline(self) -> bytes:
+        return (self._lines.pop(0) if self._lines else "").encode()
+
+
+class _FakeProc:
+    def __init__(self, lines: list[str]) -> None:
+        self.stdout = _FakeStdout(lines)
 
 
 def test_build_run_command_codex_with_reasoning_and_dir():
@@ -28,6 +42,17 @@ def test_build_run_command_codex_with_reasoning_and_dir():
     assert cmd[cmd.index("--dir") + 1] == "/tmp"
     assert cmd[cmd.index("-m") + 1] == "openai/gpt-5.4-mini"
     assert cmd[cmd.index("--variant") + 1] == "high"
+
+
+def test_doctor_recv_response_skips_notifications():
+    proc = _FakeProc([
+        '{"jsonrpc":"2.0","method":"notifications/message","params":{"level":"info"}}\n',
+        '{"jsonrpc":"2.0","id":2,"result":{"ok":true}}\n',
+    ])
+
+    result = asyncio.run(_recv_response(proc, 2, timeout_s=1))
+
+    assert result["result"]["ok"] is True
 
 
 def test_build_run_command_uses_latest_frontier_aliases():
@@ -179,16 +204,14 @@ def test_batch_tool_map_includes_openrouter():
     assert "hatch_openrouter" in TOOLS
 
 
-def test_call_tool_missing_cwd_fails_fast():
-    result = asyncio.run(
-        call_tool(
-            "hatch_codex",
-            {"model": "mini", "prompt": "hi"},
-            timeout_s=10,
-        )
+def test_build_run_command_omits_dir_when_cwd_missing():
+    cmd = build_run_command(
+        tool_name="hatch_codex",
+        model="mini",
+        prompt="hi",
+        attach_url="http://127.0.0.1:4196",
     )
-    assert result["ok"] is False
-    assert "cwd" in result["error"]
+    assert "--dir" not in cmd
 
 
 def test_run_with_progress_forwards_runtime_heartbeats():
