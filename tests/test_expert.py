@@ -22,7 +22,22 @@ class _FakeResponse:
         return json.dumps(self._payload).encode("utf-8")
 
 
-def test_build_payload_keeps_expert_sync_and_toolless_by_default():
+def test_build_payload_keeps_expert_sync_and_enables_web_search_by_default():
+    payload = _build_payload(
+        prompt="Should we refactor this?",
+        model=DEFAULT_EXPERT_MODEL,
+        reasoning_effort="medium",
+        web_search=True,
+    )
+
+    assert payload["model"] == "gpt-5.5-pro"
+    assert payload["reasoning"] == {"effort": "medium"}
+    assert payload["store"] is False
+    assert payload["tools"] == [{"type": "web_search"}]
+    assert "background" not in payload
+
+
+def test_build_payload_can_disable_web_search():
     payload = _build_payload(
         prompt="Should we refactor this?",
         model=DEFAULT_EXPERT_MODEL,

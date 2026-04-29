@@ -31,14 +31,14 @@ Use this when you want the simple hatch contract without shell syntax:
 - hatch_codex(model, prompt, cwd, timeout_s?, reasoning_effort?) -> GPT-5 via OpenAI
 - hatch_openrouter(model, prompt, cwd, timeout_s?) -> OpenRouter models
 - hatch_gemini(prompt, cwd?, timeout_s?) -> Gemini path
-- hatch_expert(prompt, reasoning_effort?, web_search?, timeout_s?) -> one slow synchronous expert consultation
+- hatch_expert(prompt, reasoning_effort?, web_search?, timeout_s?) -> one slow synchronous expert consultation with web search on by default
 - hatch_doctor() -> verify the underlying OpenCode runtime is reachable
 
 Recommended defaults:
 - Codex: model="mini"
 - Claude: model="sonnet"
 - OpenRouter: model="deepseek-v4-pro"
-- Expert: reasoning_effort="medium"; use high/xhigh only for harder questions
+- Expert: reasoning_effort="medium", web_search=true; use high/xhigh only for harder questions
 
 Pass cwd for repo work. Omit cwd for one-off prompts.
 Agent tool results preserve a stable hatch-style JSON envelope with status,
@@ -122,7 +122,7 @@ async def _run_expert_with_progress(
     prompt: str,
     model: str = DEFAULT_EXPERT_MODEL,
     reasoning_effort: ExpertReasoningEffort = "medium",
-    web_search: bool = False,
+    web_search: bool = True,
     timeout_s: int = 900,
     ctx: Context | None = None,
 ) -> dict:
@@ -261,8 +261,8 @@ async def hatch_expert(
     ] = "medium",
     web_search: Annotated[
         bool,
-        "Allow OpenAI web search for current external facts. Leave false for repo/local reasoning.",
-    ] = False,
+        "Allow OpenAI web search. Defaults true; set false only for sealed local-context reasoning.",
+    ] = True,
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     ctx: Context | None = None,
 ) -> dict:

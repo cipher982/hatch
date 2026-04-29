@@ -157,7 +157,7 @@ def run_expert_sync(
     prompt: str,
     model: str = DEFAULT_EXPERT_MODEL,
     reasoning_effort: ExpertReasoningEffort = "medium",
-    web_search: bool = False,
+    web_search: bool = True,
     timeout_s: int = 900,
     api_key: str | None = None,
 ) -> ExpertResult:

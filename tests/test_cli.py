@@ -240,7 +240,7 @@ class TestSpecialCommands:
         fake_result.to_dict.return_value = {"ok": True, "output": "answer"}
 
         with mock.patch("hatch.cli.run_expert_sync", return_value=fake_result) as run_expert:
-            exit_code = main(["expert", "--reasoning-effort", "high", "--web-search", "question"])
+            exit_code = main(["expert", "--reasoning-effort", "high", "question"])
 
         assert exit_code == EXIT_SUCCESS
         run_expert.assert_called_once()
@@ -250,6 +250,18 @@ class TestSpecialCommands:
         captured = capsys.readouterr()
         assert "answer" in captured.out
         assert "expert call started" in captured.err
+
+    def test_expert_can_disable_web_search(self):
+        fake_result = mock.Mock()
+        fake_result.ok = True
+        fake_result.output = "answer"
+        fake_result.to_dict.return_value = {"ok": True, "output": "answer"}
+
+        with mock.patch("hatch.cli.run_expert_sync", return_value=fake_result) as run_expert:
+            exit_code = main(["expert", "--no-web-search", "question"])
+
+        assert exit_code == EXIT_SUCCESS
+        assert run_expert.call_args.kwargs["web_search"] is False
 
 
 class TestGetPrompt:

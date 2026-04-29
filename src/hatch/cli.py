@@ -133,10 +133,18 @@ def create_expert_parser() -> argparse.ArgumentParser:
         default="medium",
         help="Reasoning effort: medium is fastest/cheapest valid, xhigh is slowest/deepest",
     )
-    parser.add_argument(
+    search_group = parser.add_mutually_exclusive_group()
+    search_group.add_argument(
         "--web-search",
         action="store_true",
+        default=True,
         help="Allow the model to use OpenAI web search during the single call",
+    )
+    search_group.add_argument(
+        "--no-web-search",
+        action="store_false",
+        dest="web_search",
+        help="Disable OpenAI web search for this expert call",
     )
     parser.add_argument(
         "-t",
@@ -321,7 +329,7 @@ Surfaces:
 
 Advanced:
   hatch codex max --reasoning-effort low "Write unit tests"
-  hatch expert --reasoning-effort xhigh --web-search "Evaluate this design"
+  hatch expert --reasoning-effort xhigh "Evaluate this design"
   hatch -b gemini "Summarize this image"
   hatch mcp              # run the MCP server
   hatch codex mini --json "Analyze this" | jq .output

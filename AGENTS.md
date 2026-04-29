@@ -16,7 +16,7 @@ Public surface:
 - `hatch claude <haiku|sonnet|opus>` → Claude on Amazon Bedrock
 - `hatch codex <nano|mini|max>` → GPT-5 on OpenAI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
-- `hatch expert` → one synchronous GPT pro Responses API consultation, not an agent
+- `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - `hatch mcp` → run the MCP server over stdio
 - Raw `-b bedrock` / `-b codex` / `-b gemini` still invoke the underlying CLIs directly as escape hatches
 
@@ -136,3 +136,4 @@ print(result.output if result.ok else result.error)
 - (2026-04-28) [mcp] When adding an MCP tool, update both the `@mcp.tool()` function and the `TOOLS` map used by `batch()`, then include it in `hatch mcp doctor tools`.
 - (2026-04-28) [runtime] Disable z.ai/GLM-5.1 while the coding plan is inactive; bare `hatch "..."` should fail fast instead of falling back to an implicit paid/provider default.
 - (2026-04-29) [mcp] Keep `hatch_expert` synchronous and single-shot; do not add status/polling tools because agent callers loop on async progress.
+- (2026-04-29) [expert] `hatch_expert` and `hatch expert` default to web search on; only disable it explicitly for sealed local-context reasoning.
