@@ -13,6 +13,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,10 @@ class OpenCodeRunResult:
     error_message: str | None
     attach_url: str
     model: str
+    completed: bool = False
+    event_types: tuple[str, ...] = ()
+    session_id: str | None = None
+    artifact_path: str | None = None
 
 
 class HatchMcpRuntimeError(RuntimeError):
@@ -87,6 +92,12 @@ def _ensure_runtime_paths() -> dict[str, Path]:
     for path in runtime_paths.values():
         path.mkdir(parents=True, exist_ok=True)
     return runtime_paths
+
+
+def _run_artifacts_dir() -> Path:
+    path = _runtime_paths()["XDG_CACHE_HOME"] / "hatch" / "mcp-runs"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _maybe_load_secret(backend: Backend | str) -> str | None:
@@ -128,6 +139,79 @@ def _build_run_env(model: str) -> dict[str, str]:
         env.pop("OPENROUTER_API_KEY", None)
 
     return env
+
+
+def _opencode_event_summary(stdout: str) -> tuple[tuple[str, ...], str | None]:
+    event_types: list[str] = []
+    session_id: str | None = None
+
+    for line in stdout.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        payload_type = payload.get("type")
+        if isinstance(payload_type, str):
+            event_types.append(payload_type)
+        if session_id is None and isinstance(payload.get("sessionID"), str):
+            session_id = payload["sessionID"]
+
+    return tuple(event_types), session_id
+
+
+def _write_run_artifact(
+    *,
+    stdout: str,
+    stderr: str,
+    return_code: int,
+    timed_out: bool,
+    model: str,
+    attach_url: str,
+    cmd: list[str],
+    event_types: tuple[str, ...],
+    session_id: str | None,
+) -> str:
+    artifact_id = f"{time.strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:8]}"
+    path = _run_artifacts_dir() / f"{artifact_id}.json"
+    payload = {
+        "return_code": return_code,
+        "timed_out": timed_out,
+        "model": model,
+        "attach_url": attach_url,
+        "cmd": cmd[:-1],
+        "event_types": list(event_types),
+        "session_id": session_id,
+        "stdout": stdout,
+        "stderr": stderr,
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return str(path)
+
+
+def _missing_final_error(result: OpenCodeRunResult) -> tuple[str, str]:
+    if result.error_message:
+        return "opencode_error", result.error_message
+
+    if not result.stdout.strip():
+        return "opencode_protocol_error", "OpenCode exited 0 without JSON output"
+
+    event_types = result.event_types
+    if event_types == ("step_start",):
+        return (
+            "opencode_protocol_error",
+            "OpenCode exited 0 after step_start without text or step_finish",
+        )
+
+    if "text" not in event_types:
+        return (
+            "opencode_protocol_error",
+            f"OpenCode exited 0 without text output (events: {', '.join(event_types) or 'none'})",
+        )
+
+    return "opencode_protocol_error", "OpenCode exited 0 without final text"
 
 
 def _resolve_model(tool_name: str, model: str | None) -> str:
@@ -408,15 +492,22 @@ def run_attached_command(
         else:
             stderr_chunks.append(line)
 
+    stdout = "".join(stdout_chunks)
+    stderr = "".join(stderr_chunks)
+    event_types, session_id = _opencode_event_summary(stdout)
+
     return OpenCodeRunResult(
-        stdout="".join(stdout_chunks),
-        stderr="".join(stderr_chunks),
+        stdout=stdout,
+        stderr=stderr,
         return_code=-1 if timed_out else proc.returncode,
         timed_out=timed_out,
         final_output=accumulator.final_output,
         error_message=accumulator.error_message,
         attach_url=attach_url,
         model=model,
+        completed=accumulator.completed,
+        event_types=event_types,
+        session_id=session_id,
     )
 
 
@@ -431,6 +522,7 @@ def doctor() -> dict[str, Any]:
         "gemini_model": DEFAULT_GEMINI_MODEL,
         "opencode_root": str(_runtime_root()),
         "opencode_config": str(_runtime_config_path()),
+        "run_artifacts_dir": str(_run_artifacts_dir()),
     }
 
 
@@ -465,8 +557,26 @@ def run_surface(
         progress_handler=progress_handler,
     )
     duration_ms = int((time.perf_counter() - start) * 1000)
+    artifact_path: str | None = None
+
+    def ensure_artifact() -> str:
+        nonlocal artifact_path
+        if artifact_path is None:
+            artifact_path = _write_run_artifact(
+                stdout=result.stdout,
+                stderr=result.stderr,
+                return_code=result.return_code,
+                timed_out=result.timed_out,
+                model=resolved_model,
+                attach_url=attach_url,
+                cmd=cmd,
+                event_types=result.event_types,
+                session_id=result.session_id,
+            )
+        return artifact_path
 
     if result.timed_out:
+        artifact_path = ensure_artifact()
         return {
             "ok": False,
             "status": "timeout",
@@ -481,9 +591,11 @@ def run_surface(
             "cwd": cwd,
             "attach_url": attach_url,
             "cmd": cmd[:-1],
+            "artifact_path": artifact_path,
         }
 
     if result.return_code != 0:
+        artifact_path = ensure_artifact()
         return {
             "ok": False,
             "status": "error",
@@ -498,16 +610,19 @@ def run_surface(
             "cwd": cwd,
             "attach_url": attach_url,
             "cmd": cmd[:-1],
+            "artifact_path": artifact_path,
         }
 
     if not (result.final_output or "").strip():
+        status, error = _missing_final_error(result)
+        artifact_path = ensure_artifact()
         return {
             "ok": False,
-            "status": "transport_error",
+            "status": status,
             "output": "",
             "exit_code": result.return_code,
             "duration_ms": duration_ms,
-            "error": result.error_message or "OpenCode returned no final output",
+            "error": error,
             "stderr": result.stderr or None,
             "surface": SURFACE_NAMES[tool_name],
             "model": model,
@@ -516,6 +631,9 @@ def run_surface(
             "attach_url": attach_url,
             "cmd": cmd[:-1],
             "raw_stdout": result.stdout[:4000],
+            "event_types": list(result.event_types),
+            "session_id": result.session_id,
+            "artifact_path": artifact_path,
         }
 
     return {

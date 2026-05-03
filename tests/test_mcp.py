@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 from unittest import mock
 
 from hatch.mcp.doctor import call_tool
@@ -167,7 +169,8 @@ def test_run_surface_success_uses_attach_runtime():
     assert result["attach_url"] == "http://127.0.0.1:4196"
 
 
-def test_run_surface_empty_output_is_transport_error():
+def test_run_surface_empty_output_is_protocol_error(monkeypatch, tmp_path):
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(tmp_path / "runtime"))
     fake_result = OpenCodeRunResult(
         stdout="",
         stderr="",
@@ -191,7 +194,52 @@ def test_run_surface_empty_output_is_transport_error():
         )
 
     assert result["ok"] is False
-    assert result["status"] == "transport_error"
+    assert result["status"] == "opencode_protocol_error"
+    assert result["error"] == "OpenCode exited 0 without JSON output"
+    assert Path(result["artifact_path"]).exists()
+
+
+def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(tmp_path / "runtime"))
+    stdout = (
+        '{"type":"step_start","sessionID":"ses_123",'
+        '"part":{"type":"step-start","messageID":"msg_123"}}\n'
+    )
+    fake_result = OpenCodeRunResult(
+        stdout=stdout,
+        stderr="",
+        return_code=0,
+        timed_out=False,
+        final_output=None,
+        error_message=None,
+        attach_url="http://127.0.0.1:4196",
+        model="amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        event_types=("step_start",),
+        session_id="ses_123",
+    )
+
+    with (
+        mock.patch("hatch.mcp.runtime.SERVER_MANAGER.ensure_server", return_value="http://127.0.0.1:4196"),
+        mock.patch("hatch.mcp.runtime.run_attached_command", return_value=fake_result),
+    ):
+        result = run_surface(
+            tool_name="hatch_claude",
+            prompt="hello",
+            model="haiku",
+            timeout_s=30,
+        )
+
+    assert result["ok"] is False
+    assert result["status"] == "opencode_protocol_error"
+    assert result["error"] == "OpenCode exited 0 after step_start without text or step_finish"
+    assert result["event_types"] == ["step_start"]
+    assert result["session_id"] == "ses_123"
+
+    artifact = json.loads(Path(result["artifact_path"]).read_text())
+    assert artifact["stdout"] == stdout
+    assert artifact["event_types"] == ["step_start"]
+    assert artifact["session_id"] == "ses_123"
+    assert artifact["cmd"][-1] == "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
 def test_run_env_scopes_provider_credentials(monkeypatch):
