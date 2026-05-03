@@ -8,6 +8,7 @@ from hatch.mcp.doctor import check_mcp_server_tools
 from hatch.mcp.doctor import _recv_response
 from hatch.mcp.runtime import OpenCodeRunResult
 from hatch.mcp.runtime import OpenCodeServerManager
+from hatch.mcp.runtime import _build_run_env
 from hatch.mcp.runtime import _build_server_env
 from hatch.mcp.runtime import build_run_command
 from hatch.mcp.runtime import doctor
@@ -191,6 +192,23 @@ def test_run_surface_empty_output_is_transport_error():
 
     assert result["ok"] is False
     assert result["status"] == "transport_error"
+
+
+def test_run_env_scopes_provider_credentials(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+
+    claude_env = _build_run_env("amazon-bedrock/us.anthropic.claude-opus-4-7")
+    assert "OPENAI_API_KEY" not in claude_env
+    assert "OPENROUTER_API_KEY" not in claude_env
+
+    openai_env = _build_run_env("openai/gpt-5.4-mini")
+    assert openai_env["OPENAI_API_KEY"] == "openai-key"
+    assert "OPENROUTER_API_KEY" not in openai_env
+
+    openrouter_env = _build_run_env("openrouter/deepseek/deepseek-v4-pro")
+    assert openrouter_env["OPENROUTER_API_KEY"] == "openrouter-key"
+    assert "OPENAI_API_KEY" not in openrouter_env
 
 
 def test_doctor_lists_expected_tools():

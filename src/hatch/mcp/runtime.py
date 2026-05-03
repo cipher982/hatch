@@ -119,6 +119,17 @@ def _build_server_env() -> dict[str, str]:
     return env
 
 
+def _build_run_env(model: str) -> dict[str, str]:
+    env = _build_server_env()
+
+    if not model.startswith("openai/"):
+        env.pop("OPENAI_API_KEY", None)
+    if not model.startswith("openrouter/"):
+        env.pop("OPENROUTER_API_KEY", None)
+
+    return env
+
+
 def _resolve_model(tool_name: str, model: str | None) -> str:
     if tool_name == "hatch_gemini":
         return DEFAULT_GEMINI_MODEL
@@ -318,7 +329,7 @@ def run_attached_command(
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        env=_build_server_env(),
+        env=_build_run_env(model),
         text=True,
         bufsize=1,
     )
