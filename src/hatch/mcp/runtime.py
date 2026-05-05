@@ -11,6 +11,7 @@ import socket
 import subprocess
 import threading
 import time
+import urllib.parse
 import urllib.error
 import urllib.request
 import uuid
@@ -61,6 +62,12 @@ class OpenCodeRunResult:
     event_types: tuple[str, ...] = ()
     session_id: str | None = None
     artifact_path: str | None = None
+
+
+@dataclass
+class RecoveredOpenCodeOutput:
+    output: str
+    completed: bool
 
 
 class HatchMcpRuntimeError(RuntimeError):
@@ -160,6 +167,48 @@ def _opencode_event_summary(stdout: str) -> tuple[tuple[str, ...], str | None]:
             session_id = payload["sessionID"]
 
     return tuple(event_types), session_id
+
+
+def _recover_attached_session_output(attach_url: str, session_id: str) -> RecoveredOpenCodeOutput | None:
+    """Fetch final text from the attached OpenCode server when run stdout is incomplete."""
+    encoded_session_id = urllib.parse.quote(session_id, safe="")
+    url = f"{attach_url.rstrip('/')}/session/{encoded_session_id}/message"
+
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(payload, list):
+        return None
+
+    for message in reversed(payload):
+        if not isinstance(message, dict):
+            continue
+        info = message.get("info") or {}
+        if not isinstance(info, dict) or info.get("role") != "assistant":
+            continue
+
+        chunks: list[str] = []
+        completed = bool((info.get("time") or {}).get("completed")) if isinstance(info.get("time"), dict) else False
+        parts = message.get("parts") or []
+        if not isinstance(parts, list):
+            continue
+
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "text" and isinstance(part.get("text"), str):
+                chunks.append(part["text"])
+            if part.get("type") == "step-finish" and part.get("reason") == "stop":
+                completed = True
+
+        text = "".join(chunks).strip()
+        if text:
+            return RecoveredOpenCodeOutput(output=text, completed=completed)
+
+    return None
 
 
 def _write_run_artifact(
@@ -495,17 +544,25 @@ def run_attached_command(
     stdout = "".join(stdout_chunks)
     stderr = "".join(stderr_chunks)
     event_types, session_id = _opencode_event_summary(stdout)
+    final_output = accumulator.final_output
+    completed = accumulator.completed
+
+    if not final_output and session_id:
+        recovered = _recover_attached_session_output(attach_url, session_id)
+        if recovered:
+            final_output = recovered.output
+            completed = recovered.completed
 
     return OpenCodeRunResult(
         stdout=stdout,
         stderr=stderr,
         return_code=-1 if timed_out else proc.returncode,
         timed_out=timed_out,
-        final_output=accumulator.final_output,
+        final_output=final_output,
         error_message=accumulator.error_message,
         attach_url=attach_url,
         model=model,
-        completed=accumulator.completed,
+        completed=completed,
         event_types=event_types,
         session_id=session_id,
     )

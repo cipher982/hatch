@@ -12,6 +12,7 @@ from hatch.mcp.runtime import OpenCodeRunResult
 from hatch.mcp.runtime import OpenCodeServerManager
 from hatch.mcp.runtime import _build_run_env
 from hatch.mcp.runtime import _build_server_env
+from hatch.mcp.runtime import _recover_attached_session_output
 from hatch.mcp.runtime import build_run_command
 from hatch.mcp.runtime import doctor
 from hatch.mcp.runtime import run_surface
@@ -240,6 +241,36 @@ def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
     assert artifact["event_types"] == ["step_start"]
     assert artifact["session_id"] == "ses_123"
     assert artifact["cmd"][-1] == "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"
+
+
+def test_recover_attached_session_output_reads_last_assistant_message():
+    payload = [
+        {
+            "info": {"role": "user"},
+            "parts": [{"type": "text", "text": "prompt"}],
+        },
+        {
+            "info": {"role": "assistant", "time": {"completed": 1777951878001}},
+            "parts": [
+                {"type": "step-start"},
+                {"type": "text", "text": "Recovered"},
+                {"type": "text", "text": " output"},
+                {"type": "step-finish", "reason": "stop"},
+            ],
+        },
+    ]
+    response = mock.Mock()
+    response.read.return_value = json.dumps(payload).encode()
+    response.__enter__ = mock.Mock(return_value=response)
+    response.__exit__ = mock.Mock(return_value=False)
+
+    with mock.patch("hatch.mcp.runtime.urllib.request.urlopen", return_value=response) as urlopen:
+        result = _recover_attached_session_output("http://127.0.0.1:4196", "ses_123")
+
+    assert result is not None
+    assert result.output == "Recovered output"
+    assert result.completed is True
+    urlopen.assert_called_once_with("http://127.0.0.1:4196/session/ses_123/message", timeout=5)
 
 
 def test_run_env_scopes_provider_credentials(monkeypatch):
