@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from pathlib import Path
 from unittest import mock
 
@@ -12,9 +13,11 @@ from hatch.mcp.runtime import OpenCodeRunResult
 from hatch.mcp.runtime import OpenCodeServerManager
 from hatch.mcp.runtime import _build_run_env
 from hatch.mcp.runtime import _build_server_env
-from hatch.mcp.runtime import _recover_attached_session_output
+from hatch.mcp.runtime import _extract_attached_session_output
+from hatch.mcp.runtime import _fetch_attached_session_messages
 from hatch.mcp.runtime import build_run_command
 from hatch.mcp.runtime import doctor
+from hatch.mcp.runtime import run_attached_command
 from hatch.mcp.runtime import run_surface
 from hatch.mcp.server import _run_with_progress
 from hatch.mcp.server import _run_expert_with_progress
@@ -140,7 +143,8 @@ def test_configured_attach_url_shuts_down_managed_server(monkeypatch):
     fake_proc.terminate.assert_called_once()
 
 
-def test_run_surface_success_uses_attach_runtime():
+def test_run_surface_success_uses_attach_runtime(monkeypatch, tmp_path):
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(tmp_path / "runtime"))
     fake_result = OpenCodeRunResult(
         stdout='{"type":"text"}',
         stderr="",
@@ -168,6 +172,8 @@ def test_run_surface_success_uses_attach_runtime():
     assert result["surface"] == "hatch codex"
     assert result["resolved_model"] == "openai/gpt-5.4-mini"
     assert result["attach_url"] == "http://127.0.0.1:4196"
+    assert result["output_source"] == "stdout"
+    assert Path(result["artifact_path"]).exists()
 
 
 def test_run_surface_empty_output_is_protocol_error(monkeypatch, tmp_path):
@@ -243,7 +249,7 @@ def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
     assert artifact["cmd"][-1] == "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
-def test_recover_attached_session_output_reads_last_assistant_message():
+def test_fetch_attached_session_messages_reads_server_payload():
     payload = [
         {
             "info": {"role": "user"},
@@ -265,12 +271,102 @@ def test_recover_attached_session_output_reads_last_assistant_message():
     response.__exit__ = mock.Mock(return_value=False)
 
     with mock.patch("hatch.mcp.runtime.urllib.request.urlopen", return_value=response) as urlopen:
-        result = _recover_attached_session_output("http://127.0.0.1:4196", "ses_123")
+        messages, error = _fetch_attached_session_messages("http://127.0.0.1:4196", "ses_123")
+
+    assert error is None
+    assert messages == payload
+    urlopen.assert_called_once_with("http://127.0.0.1:4196/session/ses_123/message", timeout=5.0)
+
+
+def test_extract_attached_session_output_reads_last_assistant_message():
+    messages = [
+        {
+            "info": {"role": "assistant", "time": {"completed": 1}},
+            "parts": [{"type": "text", "text": "Older output"}],
+        },
+        {
+            "info": {"role": "user"},
+            "parts": [{"type": "text", "text": "prompt"}],
+        },
+        {
+            "info": {"role": "assistant", "time": {"completed": 1777951878001}},
+            "parts": [
+                {"type": "step-start"},
+                {"type": "text", "text": "Recovered"},
+                {"type": "text", "text": " output"},
+                {"type": "step-finish", "reason": "stop"},
+            ],
+        },
+    ]
+
+    result = _extract_attached_session_output(messages)
 
     assert result is not None
     assert result.output == "Recovered output"
     assert result.completed is True
-    urlopen.assert_called_once_with("http://127.0.0.1:4196/session/ses_123/message", timeout=5)
+
+
+def test_extract_attached_session_output_prefers_current_message_id():
+    messages = [
+        {
+            "info": {"id": "msg_old", "role": "assistant", "time": {"completed": 1}},
+            "parts": [{"type": "text", "text": "Older output"}],
+        },
+        {
+            "info": {"id": "msg_current", "role": "assistant", "time": {"completed": 2}},
+            "parts": [{"type": "text", "text": "Current output"}],
+        },
+        {
+            "info": {"id": "msg_newer", "role": "assistant", "time": {"completed": 3}},
+            "parts": [{"type": "text", "text": "Newer unrelated output"}],
+        },
+    ]
+
+    result = _extract_attached_session_output(messages, "msg_current")
+
+    assert result is not None
+    assert result.output == "Current output"
+
+
+def test_run_attached_command_recovers_step_start_only_from_session_api():
+    stdout = (
+        '{"type":"step_start","sessionID":"ses_123",'
+        '"part":{"type":"step-start","messageID":"msg_123"}}\n'
+    )
+    script = f"print({stdout!r}, end='')"
+    payload = [
+        {
+            "info": {"role": "user"},
+            "parts": [{"type": "text", "text": "prompt"}],
+        },
+        {
+            "info": {"id": "msg_123", "role": "assistant", "time": {"completed": 1777951878001}},
+            "parts": [
+                {"type": "step-start"},
+                {"type": "text", "text": "Recovered from session"},
+                {"type": "step-finish", "reason": "stop"},
+            ],
+        },
+    ]
+    response = mock.Mock()
+    response.read.return_value = json.dumps(payload).encode()
+    response.__enter__ = mock.Mock(return_value=response)
+    response.__exit__ = mock.Mock(return_value=False)
+
+    with mock.patch("hatch.mcp.runtime.urllib.request.urlopen", return_value=response):
+        result = run_attached_command(
+            [sys.executable, "-c", script],
+            model="openai/gpt-5.4-mini",
+            attach_url="http://127.0.0.1:4196",
+            timeout_s=10,
+            progress_label="Codex",
+        )
+
+    assert result.return_code == 0
+    assert result.final_output == "Recovered from session"
+    assert result.output_source == "session"
+    assert result.session_id == "ses_123"
+    assert result.assistant_message_id == "msg_123"
 
 
 def test_run_env_scopes_provider_credentials(monkeypatch):

@@ -138,3 +138,4 @@ print(result.output if result.ok else result.error)
 - (2026-04-29) [mcp] Keep `hatch_expert` synchronous and single-shot; do not add status/polling tools because agent callers loop on async progress.
 - (2026-04-29) [expert] `hatch_expert` and `hatch expert` default to web search on; only disable it explicitly for sealed local-context reasoning.
 - (2026-04-29) [expert] Long expert calls use background Responses internally with server-side polling, but the public CLI/MCP contract stays one blocking call.
+- (2026-05-04) [mcp] In attached OpenCode runs, treat the session API/store as authoritative for final assistant text; stdout is only a progress/debug stream and may omit final events.

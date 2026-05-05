@@ -37,6 +37,7 @@ ATTACH_URL_ENV = "HATCH_MCP_OPENCODE_ATTACH_URL"
 OPENCODE_PORT_ENV = "HATCH_MCP_OPENCODE_PORT"
 OPENCODE_ROOT_ENV = "HATCH_MCP_OPENCODE_ROOT"
 OPENCODE_CONFIG_ENV = "HATCH_MCP_OPENCODE_CONFIG"
+SESSION_FETCH_TIMEOUT_ENV = "HATCH_MCP_SESSION_FETCH_TIMEOUT_S"
 DEFAULT_GEMINI_MODEL = os.environ.get(
     "HATCH_MCP_GEMINI_MODEL",
     "google/gemini-3-flash-preview",
@@ -61,11 +62,15 @@ class OpenCodeRunResult:
     completed: bool = False
     event_types: tuple[str, ...] = ()
     session_id: str | None = None
+    assistant_message_id: str | None = None
+    output_source: str = "stdout"
+    session_messages: list[dict[str, Any]] | None = None
+    session_fetch_error: str | None = None
     artifact_path: str | None = None
 
 
 @dataclass
-class RecoveredOpenCodeOutput:
+class OpenCodeSessionSnapshot:
     output: str
     completed: bool
 
@@ -148,9 +153,10 @@ def _build_run_env(model: str) -> dict[str, str]:
     return env
 
 
-def _opencode_event_summary(stdout: str) -> tuple[tuple[str, ...], str | None]:
+def _opencode_event_summary(stdout: str) -> tuple[tuple[str, ...], str | None, str | None]:
     event_types: list[str] = []
     session_id: str | None = None
+    assistant_message_id: str | None = None
 
     for line in stdout.splitlines():
         stripped = line.strip()
@@ -165,48 +171,94 @@ def _opencode_event_summary(stdout: str) -> tuple[tuple[str, ...], str | None]:
             event_types.append(payload_type)
         if session_id is None and isinstance(payload.get("sessionID"), str):
             session_id = payload["sessionID"]
+        part = payload.get("part") or {}
+        if (
+            assistant_message_id is None
+            and payload_type == "step_start"
+            and isinstance(part, dict)
+            and isinstance(part.get("messageID"), str)
+        ):
+            assistant_message_id = part["messageID"]
 
-    return tuple(event_types), session_id
+    return tuple(event_types), session_id, assistant_message_id
 
 
-def _recover_attached_session_output(attach_url: str, session_id: str) -> RecoveredOpenCodeOutput | None:
-    """Fetch final text from the attached OpenCode server when run stdout is incomplete."""
+def _session_fetch_timeout_s() -> float:
+    configured = os.environ.get(SESSION_FETCH_TIMEOUT_ENV, "").strip()
+    if not configured:
+        return 5.0
+    try:
+        timeout = float(configured)
+    except ValueError:
+        return 5.0
+    return max(0.1, timeout)
+
+
+def _fetch_attached_session_messages(
+    attach_url: str,
+    session_id: str,
+) -> tuple[list[dict[str, Any]] | None, str | None]:
+    """Fetch the full OpenCode session message payload for an attached run."""
     encoded_session_id = urllib.parse.quote(session_id, safe="")
     url = f"{attach_url.rstrip('/')}/session/{encoded_session_id}/message"
 
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:
+        with urllib.request.urlopen(url, timeout=_session_fetch_timeout_s()) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except (OSError, urllib.error.URLError, json.JSONDecodeError):
-        return None
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        return None, str(exc)
 
     if not isinstance(payload, list):
+        return None, f"Unexpected OpenCode session payload type: {type(payload).__name__}"
+
+    messages = [message for message in payload if isinstance(message, dict)]
+    return messages, None
+
+
+def _extract_message_output(message: dict[str, Any]) -> OpenCodeSessionSnapshot | None:
+    info = message.get("info") or {}
+    if not isinstance(info, dict) or info.get("role") != "assistant":
         return None
 
-    for message in reversed(payload):
-        if not isinstance(message, dict):
+    chunks: list[str] = []
+    time_info = info.get("time")
+    completed = bool(time_info.get("completed")) if isinstance(time_info, dict) else False
+    parts = message.get("parts") or []
+    if not isinstance(parts, list):
+        return None
+
+    for part in parts:
+        if not isinstance(part, dict):
             continue
+        if part.get("type") == "text" and isinstance(part.get("text"), str):
+            chunks.append(part["text"])
+        if part.get("type") == "step-finish" and part.get("reason") == "stop":
+            completed = True
+
+    text = "".join(chunks).strip()
+    if not text:
+        return None
+    return OpenCodeSessionSnapshot(output=text, completed=completed)
+
+
+def _extract_attached_session_output(
+    messages: list[dict[str, Any]],
+    assistant_message_id: str | None = None,
+) -> OpenCodeSessionSnapshot | None:
+    """Return assistant text for this run, falling back to the last assistant message."""
+    if assistant_message_id:
+        for message in messages:
+            info = message.get("info") or {}
+            if isinstance(info, dict) and info.get("id") == assistant_message_id:
+                return _extract_message_output(message)
+
+    for message in reversed(messages):
         info = message.get("info") or {}
         if not isinstance(info, dict) or info.get("role") != "assistant":
             continue
-
-        chunks: list[str] = []
-        completed = bool((info.get("time") or {}).get("completed")) if isinstance(info.get("time"), dict) else False
-        parts = message.get("parts") or []
-        if not isinstance(parts, list):
-            continue
-
-        for part in parts:
-            if not isinstance(part, dict):
-                continue
-            if part.get("type") == "text" and isinstance(part.get("text"), str):
-                chunks.append(part["text"])
-            if part.get("type") == "step-finish" and part.get("reason") == "stop":
-                completed = True
-
-        text = "".join(chunks).strip()
-        if text:
-            return RecoveredOpenCodeOutput(output=text, completed=completed)
+        snapshot = _extract_message_output(message)
+        if snapshot:
+            return snapshot
 
     return None
 
@@ -222,6 +274,10 @@ def _write_run_artifact(
     cmd: list[str],
     event_types: tuple[str, ...],
     session_id: str | None,
+    assistant_message_id: str | None,
+    output_source: str,
+    session_messages: list[dict[str, Any]] | None,
+    session_fetch_error: str | None,
 ) -> str:
     artifact_id = f"{time.strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:8]}"
     path = _run_artifacts_dir() / f"{artifact_id}.json"
@@ -233,6 +289,10 @@ def _write_run_artifact(
         "cmd": cmd[:-1],
         "event_types": list(event_types),
         "session_id": session_id,
+        "assistant_message_id": assistant_message_id,
+        "output_source": output_source,
+        "session_messages": session_messages,
+        "session_fetch_error": session_fetch_error,
         "stdout": stdout,
         "stderr": stderr,
     }
@@ -543,15 +603,21 @@ def run_attached_command(
 
     stdout = "".join(stdout_chunks)
     stderr = "".join(stderr_chunks)
-    event_types, session_id = _opencode_event_summary(stdout)
+    event_types, session_id, assistant_message_id = _opencode_event_summary(stdout)
     final_output = accumulator.final_output
     completed = accumulator.completed
+    output_source = "stdout"
+    session_messages: list[dict[str, Any]] | None = None
+    session_fetch_error: str | None = None
 
-    if not final_output and session_id:
-        recovered = _recover_attached_session_output(attach_url, session_id)
-        if recovered:
-            final_output = recovered.output
-            completed = recovered.completed
+    if session_id:
+        session_messages, session_fetch_error = _fetch_attached_session_messages(attach_url, session_id)
+        if session_messages:
+            snapshot = _extract_attached_session_output(session_messages, assistant_message_id)
+            if snapshot:
+                final_output = snapshot.output
+                completed = snapshot.completed
+                output_source = "session"
 
     return OpenCodeRunResult(
         stdout=stdout,
@@ -565,6 +631,10 @@ def run_attached_command(
         completed=completed,
         event_types=event_types,
         session_id=session_id,
+        assistant_message_id=assistant_message_id,
+        output_source=output_source,
+        session_messages=session_messages,
+        session_fetch_error=session_fetch_error,
     )
 
 
@@ -614,26 +684,31 @@ def run_surface(
         progress_handler=progress_handler,
     )
     duration_ms = int((time.perf_counter() - start) * 1000)
-    artifact_path: str | None = None
-
-    def ensure_artifact() -> str:
-        nonlocal artifact_path
-        if artifact_path is None:
-            artifact_path = _write_run_artifact(
-                stdout=result.stdout,
-                stderr=result.stderr,
-                return_code=result.return_code,
-                timed_out=result.timed_out,
-                model=resolved_model,
-                attach_url=attach_url,
-                cmd=cmd,
-                event_types=result.event_types,
-                session_id=result.session_id,
-            )
-        return artifact_path
+    artifact_path = _write_run_artifact(
+        stdout=result.stdout,
+        stderr=result.stderr,
+        return_code=result.return_code,
+        timed_out=result.timed_out,
+        model=resolved_model,
+        attach_url=attach_url,
+        cmd=cmd,
+        event_types=result.event_types,
+        session_id=result.session_id,
+        assistant_message_id=result.assistant_message_id,
+        output_source=result.output_source,
+        session_messages=result.session_messages,
+        session_fetch_error=result.session_fetch_error,
+    )
+    run_metadata = {
+        "output_source": result.output_source,
+        "session_id": result.session_id,
+        "assistant_message_id": result.assistant_message_id,
+        "session_fetch_error": result.session_fetch_error,
+        "event_types": list(result.event_types),
+        "artifact_path": artifact_path,
+    }
 
     if result.timed_out:
-        artifact_path = ensure_artifact()
         return {
             "ok": False,
             "status": "timeout",
@@ -648,11 +723,10 @@ def run_surface(
             "cwd": cwd,
             "attach_url": attach_url,
             "cmd": cmd[:-1],
-            "artifact_path": artifact_path,
+            **run_metadata,
         }
 
     if result.return_code != 0:
-        artifact_path = ensure_artifact()
         return {
             "ok": False,
             "status": "error",
@@ -667,12 +741,11 @@ def run_surface(
             "cwd": cwd,
             "attach_url": attach_url,
             "cmd": cmd[:-1],
-            "artifact_path": artifact_path,
+            **run_metadata,
         }
 
     if not (result.final_output or "").strip():
         status, error = _missing_final_error(result)
-        artifact_path = ensure_artifact()
         return {
             "ok": False,
             "status": status,
@@ -688,9 +761,7 @@ def run_surface(
             "attach_url": attach_url,
             "cmd": cmd[:-1],
             "raw_stdout": result.stdout[:4000],
-            "event_types": list(result.event_types),
-            "session_id": result.session_id,
-            "artifact_path": artifact_path,
+            **run_metadata,
         }
 
     return {
@@ -707,4 +778,5 @@ def run_surface(
         "cwd": cwd,
         "attach_url": attach_url,
         "cmd": cmd[:-1],
+        **run_metadata,
     }
