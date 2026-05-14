@@ -128,6 +128,7 @@ print(result.output if result.ok else result.error)
 - (2026-04-09) [auth] Bedrock launches must clear inherited `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_BASE_URL`; otherwise Claude can take the wrong auth path and fail before it ever reaches AWS.
 - (2026-04-09) [ux] Agents should not be asked to choose raw backends like `bedrock` vs `codex`; surface `hatch claude` / `hatch codex` and map model-family aliases internally.
 - (2026-04-09) [testing] Secret-helper fallback is useful in real runs but breaks missing-credential tests unless they can disable it explicitly.
+- (2026-05-14) [mcp] Attached OpenCode runs may produce multiple assistant messages; MCP result extraction should prefer the final `step-finish reason=stop` message over the first `step_start` message id.
 - (2026-04-13) [claude] `claude --print --output-format stream-json` now requires `--verbose`; if you want live progress plus a clean final stdout payload, parse the stream and emit progress on stderr instead of buffering with `communicate()`.
 - (2026-04-13) [runtime] Surface `hatch claude` / `hatch codex` through OpenCode so Bedrock/OpenAI share one tool/runtime model; keep raw `-b bedrock` / `-b codex` only as backend escape hatches.
 - (2026-04-13) [ux] Do not expose raw OpenCode agent names in the public hatch contract; keep the common path to plain `hatch claude ...` / `hatch codex ...` commands.
