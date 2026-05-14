@@ -328,6 +328,33 @@ def test_extract_attached_session_output_prefers_current_message_id():
     assert result.output == "Current output"
 
 
+def test_extract_attached_session_output_prefers_final_stop_over_first_step_message():
+    messages = [
+        {
+            "info": {"id": "msg_first", "role": "assistant", "time": {"completed": 1}},
+            "parts": [
+                {"type": "step-start"},
+                {"type": "text", "text": "I'll review this."},
+                {"type": "step-finish", "reason": "tool-calls"},
+            ],
+        },
+        {
+            "info": {"id": "msg_final", "role": "assistant", "time": {"completed": 2}},
+            "parts": [
+                {"type": "step-start"},
+                {"type": "text", "text": "Final review"},
+                {"type": "step-finish", "reason": "stop"},
+            ],
+        },
+    ]
+
+    result = _extract_attached_session_output(messages, "msg_first")
+
+    assert result is not None
+    assert result.output == "Final review"
+    assert result.finish_reason == "stop"
+
+
 def test_run_attached_command_recovers_step_start_only_from_session_api():
     stdout = (
         '{"type":"step_start","sessionID":"ses_123",'

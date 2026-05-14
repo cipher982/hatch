@@ -73,6 +73,7 @@ class OpenCodeRunResult:
 class OpenCodeSessionSnapshot:
     output: str
     completed: bool
+    finish_reason: str | None = None
 
 
 class HatchMcpRuntimeError(RuntimeError):
@@ -223,6 +224,7 @@ def _extract_message_output(message: dict[str, Any]) -> OpenCodeSessionSnapshot 
     chunks: list[str] = []
     time_info = info.get("time")
     completed = bool(time_info.get("completed")) if isinstance(time_info, dict) else False
+    finish_reason: str | None = None
     parts = message.get("parts") or []
     if not isinstance(parts, list):
         return None
@@ -233,31 +235,48 @@ def _extract_message_output(message: dict[str, Any]) -> OpenCodeSessionSnapshot 
         if part.get("type") == "text" and isinstance(part.get("text"), str):
             chunks.append(part["text"])
         if part.get("type") == "step-finish" and part.get("reason") == "stop":
+            finish_reason = part.get("reason")
             completed = True
+        elif part.get("type") == "step-finish" and isinstance(part.get("reason"), str):
+            finish_reason = part.get("reason")
 
     text = "".join(chunks).strip()
     if not text:
         return None
-    return OpenCodeSessionSnapshot(output=text, completed=completed)
+    return OpenCodeSessionSnapshot(output=text, completed=completed, finish_reason=finish_reason)
 
 
 def _extract_attached_session_output(
     messages: list[dict[str, Any]],
     assistant_message_id: str | None = None,
 ) -> OpenCodeSessionSnapshot | None:
-    """Return assistant text for this run, falling back to the last assistant message."""
-    if assistant_message_id:
-        for message in messages:
-            info = message.get("info") or {}
-            if isinstance(info, dict) and info.get("id") == assistant_message_id:
-                return _extract_message_output(message)
+    """Return final assistant text for this run.
 
-    for message in reversed(messages):
+    OpenCode can emit several assistant messages during one run: short pre-tool
+    narration, more tool-use narration, then the final answer. The JSON stream's
+    first step_start message id is useful for correlation, but it is not
+    necessarily the final assistant message.
+    """
+    snapshots: list[tuple[str | None, OpenCodeSessionSnapshot]] = []
+    for message in messages:
         info = message.get("info") or {}
         if not isinstance(info, dict) or info.get("role") != "assistant":
             continue
         snapshot = _extract_message_output(message)
         if snapshot:
+            message_id = info.get("id") if isinstance(info.get("id"), str) else None
+            snapshots.append((message_id, snapshot))
+
+    for _, snapshot in reversed(snapshots):
+        if snapshot.finish_reason == "stop":
+            return snapshot
+
+    if assistant_message_id:
+        for message_id, snapshot in snapshots:
+            if message_id == assistant_message_id:
+                return snapshot
+
+    for _, snapshot in reversed(snapshots):
             return snapshot
 
     return None
