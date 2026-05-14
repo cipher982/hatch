@@ -738,6 +738,10 @@ def run_surface(
         session_messages=result.session_messages,
         session_fetch_error=result.session_fetch_error,
     )
+    artifact_note = (
+        "Full OpenCode run/session output is persisted at artifact_path; inspect it "
+        "if output looks incomplete, confusing, or the run needs forensic recovery."
+    )
     run_metadata = {
         "output_source": result.output_source,
         "session_id": result.session_id,
@@ -747,6 +751,7 @@ def run_surface(
         "session_fetch_error": result.session_fetch_error,
         "event_types": list(result.event_types),
         "artifact_path": artifact_path,
+        "artifact_note": artifact_note,
     }
 
     if result.timed_out:

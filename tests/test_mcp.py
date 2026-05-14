@@ -174,6 +174,7 @@ def test_run_surface_success_uses_attach_runtime(monkeypatch, tmp_path):
     assert result["attach_url"] == "http://127.0.0.1:4196"
     assert result["output_source"] == "stdout"
     assert Path(result["artifact_path"]).exists()
+    assert "artifact_path" in result["artifact_note"]
 
 
 def test_run_surface_empty_output_is_protocol_error(monkeypatch, tmp_path):
@@ -204,6 +205,7 @@ def test_run_surface_empty_output_is_protocol_error(monkeypatch, tmp_path):
     assert result["status"] == "opencode_protocol_error"
     assert result["error"] == "OpenCode exited 0 without JSON output"
     assert Path(result["artifact_path"]).exists()
+    assert "forensic recovery" in result["artifact_note"]
 
 
 def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
