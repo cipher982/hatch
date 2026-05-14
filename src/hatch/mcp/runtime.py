@@ -63,6 +63,8 @@ class OpenCodeRunResult:
     event_types: tuple[str, ...] = ()
     session_id: str | None = None
     assistant_message_id: str | None = None
+    selected_message_id: str | None = None
+    selected_finish_reason: str | None = None
     output_source: str = "stdout"
     session_messages: list[dict[str, Any]] | None = None
     session_fetch_error: str | None = None
@@ -74,6 +76,7 @@ class OpenCodeSessionSnapshot:
     output: str
     completed: bool
     finish_reason: str | None = None
+    message_id: str | None = None
 
 
 class HatchMcpRuntimeError(RuntimeError):
@@ -220,6 +223,7 @@ def _extract_message_output(message: dict[str, Any]) -> OpenCodeSessionSnapshot 
     info = message.get("info") or {}
     if not isinstance(info, dict) or info.get("role") != "assistant":
         return None
+    message_id = info.get("id") if isinstance(info.get("id"), str) else None
 
     chunks: list[str] = []
     time_info = info.get("time")
@@ -243,7 +247,12 @@ def _extract_message_output(message: dict[str, Any]) -> OpenCodeSessionSnapshot 
     text = "".join(chunks).strip()
     if not text:
         return None
-    return OpenCodeSessionSnapshot(output=text, completed=completed, finish_reason=finish_reason)
+    return OpenCodeSessionSnapshot(
+        output=text,
+        completed=completed,
+        finish_reason=finish_reason,
+        message_id=message_id,
+    )
 
 
 def _extract_attached_session_output(
@@ -257,27 +266,26 @@ def _extract_attached_session_output(
     first step_start message id is useful for correlation, but it is not
     necessarily the final assistant message.
     """
-    snapshots: list[tuple[str | None, OpenCodeSessionSnapshot]] = []
+    snapshots: list[OpenCodeSessionSnapshot] = []
     for message in messages:
         info = message.get("info") or {}
         if not isinstance(info, dict) or info.get("role") != "assistant":
             continue
         snapshot = _extract_message_output(message)
         if snapshot:
-            message_id = info.get("id") if isinstance(info.get("id"), str) else None
-            snapshots.append((message_id, snapshot))
+            snapshots.append(snapshot)
 
-    for _, snapshot in reversed(snapshots):
+    for snapshot in reversed(snapshots):
         if snapshot.finish_reason == "stop":
             return snapshot
 
     if assistant_message_id:
-        for message_id, snapshot in snapshots:
-            if message_id == assistant_message_id:
+        for snapshot in snapshots:
+            if snapshot.message_id == assistant_message_id:
                 return snapshot
 
-    for _, snapshot in reversed(snapshots):
-            return snapshot
+    for snapshot in reversed(snapshots):
+        return snapshot
 
     return None
 
@@ -294,6 +302,8 @@ def _write_run_artifact(
     event_types: tuple[str, ...],
     session_id: str | None,
     assistant_message_id: str | None,
+    selected_message_id: str | None,
+    selected_finish_reason: str | None,
     output_source: str,
     session_messages: list[dict[str, Any]] | None,
     session_fetch_error: str | None,
@@ -309,6 +319,8 @@ def _write_run_artifact(
         "event_types": list(event_types),
         "session_id": session_id,
         "assistant_message_id": assistant_message_id,
+        "selected_message_id": selected_message_id,
+        "selected_finish_reason": selected_finish_reason,
         "output_source": output_source,
         "session_messages": session_messages,
         "session_fetch_error": session_fetch_error,
@@ -628,6 +640,8 @@ def run_attached_command(
     output_source = "stdout"
     session_messages: list[dict[str, Any]] | None = None
     session_fetch_error: str | None = None
+    selected_message_id: str | None = None
+    selected_finish_reason: str | None = None
 
     if session_id:
         session_messages, session_fetch_error = _fetch_attached_session_messages(attach_url, session_id)
@@ -636,6 +650,8 @@ def run_attached_command(
             if snapshot:
                 final_output = snapshot.output
                 completed = snapshot.completed
+                selected_message_id = snapshot.message_id
+                selected_finish_reason = snapshot.finish_reason
                 output_source = "session"
 
     return OpenCodeRunResult(
@@ -651,6 +667,8 @@ def run_attached_command(
         event_types=event_types,
         session_id=session_id,
         assistant_message_id=assistant_message_id,
+        selected_message_id=selected_message_id,
+        selected_finish_reason=selected_finish_reason,
         output_source=output_source,
         session_messages=session_messages,
         session_fetch_error=session_fetch_error,
@@ -714,6 +732,8 @@ def run_surface(
         event_types=result.event_types,
         session_id=result.session_id,
         assistant_message_id=result.assistant_message_id,
+        selected_message_id=result.selected_message_id,
+        selected_finish_reason=result.selected_finish_reason,
         output_source=result.output_source,
         session_messages=result.session_messages,
         session_fetch_error=result.session_fetch_error,
@@ -722,6 +742,8 @@ def run_surface(
         "output_source": result.output_source,
         "session_id": result.session_id,
         "assistant_message_id": result.assistant_message_id,
+        "selected_message_id": result.selected_message_id,
+        "selected_finish_reason": result.selected_finish_reason,
         "session_fetch_error": result.session_fetch_error,
         "event_types": list(result.event_types),
         "artifact_path": artifact_path,
