@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Sequence
 
 from hatch import __version__
+from hatch.aws_preflight import BedrockAwsAuthError
+from hatch.aws_preflight import preflight_bedrock_aws
 from hatch.backends import Backend
 from hatch.backends import get_config
 from hatch.context import detect_context
@@ -727,6 +729,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     if getattr(args, "automation", False):
         env["LONGHOUSE_IS_SIDECHAIN"] = "1"
     cwd = args.cwd
+
+    try:
+        preflight_bedrock_aws(model_name, env)
+    except BedrockAwsAuthError as e:
+        if args.json_output:
+            print(json.dumps({
+                "ok": False,
+                "status": "config_error",
+                "output": "",
+                "exit_code": EXIT_CONFIG_ERROR,
+                "duration_ms": 0,
+                "error": str(e),
+                "stderr": None,
+            }))
+        else:
+            print(f"Error: {e}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
 
     # Run the agent
     start = time.monotonic()

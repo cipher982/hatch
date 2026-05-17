@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any
 from typing import Callable
 
+from hatch.aws_preflight import BedrockAwsAuthError
+from hatch.aws_preflight import preflight_bedrock_aws
 from hatch.backends import Backend
 from hatch.credentials import SECRET_SPECS
 from hatch.credentials import OPENROUTER_CREDENTIAL
@@ -700,8 +702,29 @@ def run_surface(
     reasoning_effort: str | None = None,
     progress_handler: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
-    attach_url = SERVER_MANAGER.ensure_server()
+    start = time.perf_counter()
     resolved_model = _resolve_model(tool_name, model)
+    try:
+        preflight_bedrock_aws(resolved_model, _build_run_env(resolved_model))
+    except BedrockAwsAuthError as exc:
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        return {
+            "ok": False,
+            "status": "config_error",
+            "output": "",
+            "exit_code": 4,
+            "duration_ms": duration_ms,
+            "error": str(exc),
+            "stderr": None,
+            "surface": SURFACE_NAMES[tool_name],
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": None,
+        }
+
+    attach_url = SERVER_MANAGER.ensure_server()
     cmd = build_run_command(
         tool_name=tool_name,
         prompt=prompt,
@@ -711,7 +734,6 @@ def run_surface(
         reasoning_effort=reasoning_effort,
     )
 
-    start = time.perf_counter()
     result = run_attached_command(
         cmd,
         model=resolved_model,

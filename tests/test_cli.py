@@ -10,6 +10,7 @@ from unittest import mock
 
 import pytest
 
+from hatch.aws_preflight import BedrockAwsAuthError
 from hatch.cli import (
     EXIT_AGENT_ERROR,
     EXIT_CONFIG_ERROR,
@@ -708,6 +709,42 @@ class TestMain:
         data = json.loads(captured.out)
         assert data["ok"] is False
         assert data["error"] == "AWS session expired"
+
+    def test_bedrock_preflight_failure_is_config_error(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        capsys,
+    ):
+        """Surfaced Claude fails before OpenCode when AWS SSO is expired."""
+        from hatch.backends import BackendConfig
+
+        config = BackendConfig(
+            cmd=["opencode", "run"],
+            env={"AWS_PROFILE": "zh-qa-engineer", "AWS_REGION": "us-east-1"},
+            stdin_data=None,
+        )
+        with (
+            mock.patch("hatch.cli.get_config", return_value=config),
+            mock.patch(
+                "hatch.cli.preflight_bedrock_aws",
+                side_effect=BedrockAwsAuthError(
+                    "Bedrock AWS credentials are not ready for AWS_PROFILE=zh-qa-engineer: "
+                    "The SSO session associated with this profile has expired. "
+                    "Refresh with: aws sso login --profile zh-qa-engineer"
+                ),
+            ),
+        ):
+            exit_code = main(["--json", "claude", "haiku", "test prompt"])
+
+        assert exit_code == EXIT_CONFIG_ERROR
+        mock_run_opencode_stream_sync.assert_not_called()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["ok"] is False
+        assert data["status"] == "config_error"
+        assert "aws sso login --profile zh-qa-engineer" in data["error"]
 
     def test_timeout_exit_code(
         self,

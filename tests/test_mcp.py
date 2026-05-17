@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from unittest import mock
 
+from hatch.aws_preflight import BedrockAwsAuthError
 from hatch.mcp.doctor import call_tool
 from hatch.mcp.doctor import check_mcp_server_tools
 from hatch.mcp.doctor import _recv_response
@@ -206,6 +207,35 @@ def test_run_surface_empty_output_is_protocol_error(monkeypatch, tmp_path):
     assert result["error"] == "OpenCode exited 0 without JSON output"
     assert Path(result["artifact_path"]).exists()
     assert "forensic recovery" in result["artifact_note"]
+
+
+def test_run_surface_bedrock_preflight_failure_is_config_error(monkeypatch, tmp_path):
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(tmp_path / "runtime"))
+
+    with (
+        mock.patch("hatch.mcp.runtime.SERVER_MANAGER.ensure_server") as ensure_server,
+        mock.patch(
+            "hatch.mcp.runtime.preflight_bedrock_aws",
+            side_effect=BedrockAwsAuthError(
+                "Bedrock AWS credentials are not ready for AWS_PROFILE=zh-qa-engineer: "
+                "The SSO session associated with this profile has expired. "
+                "Refresh with: aws sso login --profile zh-qa-engineer"
+            ),
+        ),
+    ):
+        result = run_surface(
+            tool_name="hatch_claude",
+            prompt="hello",
+            model="haiku",
+            timeout_s=30,
+        )
+
+    ensure_server.assert_not_called()
+    assert result["ok"] is False
+    assert result["status"] == "config_error"
+    assert result["exit_code"] == 4
+    assert "aws sso login --profile zh-qa-engineer" in result["error"]
+    assert result["attach_url"] is None
 
 
 def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
