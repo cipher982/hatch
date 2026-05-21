@@ -131,9 +131,9 @@ def create_expert_parser() -> argparse.ArgumentParser:
     parser.add_argument("prompt", nargs="*", metavar="PROMPT")
     parser.add_argument(
         "--reasoning-effort",
-        choices=["medium", "high", "xhigh"],
+        choices=["low", "medium"],
         default="medium",
-        help="Reasoning effort: medium is fastest/cheapest valid, xhigh is slowest/deepest",
+        help="Reasoning effort for expert calls: low is fastest, medium is the default",
     )
     search_group = parser.add_mutually_exclusive_group()
     search_group.add_argument(
@@ -215,6 +215,8 @@ def _dispatch_expert(raw_argv: Sequence[str]) -> int:
             print(result.output.rstrip())
         else:
             print(f"Error: {result.error}", file=sys.stderr)
+            if getattr(result, "artifact_path", None):
+                print(f"Artifact: {result.artifact_path}", file=sys.stderr)
     if result.ok:
         return EXIT_SUCCESS
     if result.status == "timeout":
@@ -332,7 +334,7 @@ Surfaces:
 
 Advanced:
   hatch codex max --reasoning-effort low "Write unit tests"
-  hatch expert --reasoning-effort xhigh "Evaluate this design"
+  hatch expert --reasoning-effort low "Evaluate this design"
   hatch -b gemini "Summarize this image"
   hatch mcp              # run the MCP server
   hatch codex mini --json "Analyze this" | jq .output

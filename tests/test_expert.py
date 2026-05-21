@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest import mock
 
 from hatch.expert import DEFAULT_EXPERT_MODEL
@@ -71,7 +72,7 @@ def test_build_payload_can_enable_web_search():
     payload = _build_payload(
         prompt="What changed today?",
         model=DEFAULT_EXPERT_MODEL,
-        reasoning_effort="high",
+        reasoning_effort="low",
         web_search=True,
         background=True,
     )
@@ -186,3 +187,35 @@ def test_run_expert_sync_polls_background_response():
     assert urlopen.call_count == 2
     assert progress[0] == "[hatch] expert response resp_123 status=queued"
     assert progress[1].startswith("[hatch] expert response resp_123 status=completed")
+
+
+def test_run_expert_sync_timeout_leaves_background_response_running(monkeypatch, tmp_path):
+    create_payload = {
+        "id": "resp_123",
+        "status": "queued",
+        "model": "gpt-5.5-pro",
+    }
+
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+
+    with (
+        mock.patch("hatch.expert.hydrate_backend_kwargs", return_value={"api_key": "sk-test"}),
+        mock.patch("hatch.expert.urllib.request.urlopen", return_value=_FakeResponse(create_payload)) as urlopen,
+        mock.patch("hatch.expert.time.perf_counter", side_effect=[100.0, 101.0, 101.0]),
+    ):
+        result = run_expert_sync(
+            prompt="question",
+            web_search=False,
+            timeout_s=0,
+        )
+
+    assert result.ok is False
+    assert result.status == "timeout"
+    assert result.response_id == "resp_123"
+    assert "left it running server-side" in (result.error or "")
+    assert result.artifact_path
+    artifact = json.loads(Path(result.artifact_path).read_text(encoding="utf-8"))
+    assert artifact["response_id"] == "resp_123"
+    assert artifact["status"] == "queued"
+    assert artifact["error"] == "Expert consultation still running after 0s"
+    assert urlopen.call_count == 1

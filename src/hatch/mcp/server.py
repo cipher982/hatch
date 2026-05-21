@@ -38,13 +38,13 @@ Recommended defaults:
 - Codex: model="mini"
 - Claude: model="sonnet"
 - OpenRouter: model="deepseek-v4-pro"
-- Expert: reasoning_effort="medium", web_search=true; use high/xhigh only for harder questions
+- Expert: reasoning_effort="medium", web_search=true; use low for faster calls
 
 Pass cwd for repo work. Omit cwd for one-off prompts.
 Agent tool results preserve a stable hatch-style JSON envelope with status,
 output, stderr, exit_code, duration, surface, resolved_model, and attach_url.
 Expert results return status, output, duration, model, reasoning_effort,
-web_search, usage, response_id, and citations.
+web_search, usage, response_id, citations, and artifact_path.
 
 Use batch() when you need multiple independent hatch calls from this server.
 """,
@@ -272,7 +272,7 @@ async def hatch_expert(
     ],
     reasoning_effort: Annotated[
         ExpertReasoningEffort,
-        "medium is fastest/cheapest valid; high and xhigh spend more time for harder reasoning.",
+        "Expert reasoning effort. Use low for faster calls; medium is the default.",
     ] = "medium",
     web_search: Annotated[
         bool,

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-import contextlib
+import os
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from typing import Callable
 from typing import Literal
@@ -17,7 +18,7 @@ from hatch.backends import Backend
 from hatch.credentials import hydrate_backend_kwargs
 
 
-ExpertReasoningEffort = Literal["medium", "high", "xhigh"]
+ExpertReasoningEffort = Literal["low", "medium"]
 DEFAULT_EXPERT_MODEL = "gpt-5.5-pro"
 RESPONSES_URL = "https://api.openai.com/v1/responses"
 BACKGROUND_POLL_INTERVAL_S = 15.0
@@ -55,6 +56,7 @@ class ExpertResult:
     citations: list[dict[str, Any]] | None = None
     sources: list[dict[str, Any]] | None = None
     raw_response: dict[str, Any] | None = None
+    artifact_path: str | None = None
 
     def to_dict(self, *, include_raw_response: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -71,6 +73,7 @@ class ExpertResult:
             "response_id": self.response_id,
             "citations": self.citations or [],
             "sources": self.sources or [],
+            "artifact_path": self.artifact_path,
         }
         if include_raw_response:
             payload["raw_response"] = self.raw_response
@@ -181,6 +184,56 @@ def _request_json(
         return json.loads(response.read().decode("utf-8"))
 
 
+def _expert_artifacts_dir() -> Path:
+    cache_home = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache"))
+    path = cache_home / "hatch" / "expert"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _artifact_path_for_response(response_id: str) -> Path:
+    safe_id = "".join(ch for ch in response_id if ch.isalnum() or ch in {"_", "-"})
+    if not safe_id:
+        safe_id = f"unknown-{int(time.time())}"
+    return _expert_artifacts_dir() / f"{safe_id}.json"
+
+
+def _write_expert_artifact(
+    *,
+    response_id: str | None,
+    status: str,
+    model: str,
+    resolved_model: str | None,
+    reasoning_effort: str,
+    web_search: bool,
+    timeout_s: int,
+    response: dict[str, Any] | None = None,
+    error: str | None = None,
+) -> str | None:
+    if not response_id:
+        return None
+    path = _artifact_path_for_response(response_id)
+    payload = {
+        "response_id": response_id,
+        "status": status,
+        "model": model,
+        "resolved_model": resolved_model,
+        "reasoning_effort": reasoning_effort,
+        "web_search": web_search,
+        "timeout_s": timeout_s,
+        "updated_at": int(time.time()),
+        "error": error,
+        "response": response,
+        "note": (
+            "Expert responses are OpenAI background Responses API calls. "
+            "If status is active, retrieve the response by id before OpenAI's "
+            "short background polling retention expires."
+        ),
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return str(path)
+
+
 def _response_url(response_id: str, *, include_sources: bool = False) -> str:
     url = f"{RESPONSES_URL}/{urllib.parse.quote(response_id)}"
     if not include_sources:
@@ -190,17 +243,6 @@ def _response_url(response_id: str, *, include_sources: bool = False) -> str:
         doseq=True,
     )
     return f"{url}?{query}"
-
-
-def _cancel_response(api_key: str, response_id: str) -> None:
-    with contextlib.suppress(Exception):
-        _request_json(
-            url=f"{RESPONSES_URL}/{urllib.parse.quote(response_id)}/cancel",
-            api_key=api_key,
-            method="POST",
-            payload={},
-            timeout_s=REQUEST_TIMEOUT_S,
-        )
 
 
 def _response_error_message(response: dict[str, Any]) -> str:
@@ -222,6 +264,9 @@ def _wait_for_background_response(
     web_search: bool,
     started_at: float,
     progress_handler: Callable[[str], None] | None,
+    model: str,
+    reasoning_effort: str,
+    artifact_path_ref: list[str | None],
     poll_interval_s: float = BACKGROUND_POLL_INTERVAL_S,
 ) -> dict[str, Any]:
     response_id = str(response.get("id") or "")
@@ -229,6 +274,16 @@ def _wait_for_background_response(
         return response
 
     last_status = str(response.get("status") or "unknown")
+    artifact_path_ref[0] = _write_expert_artifact(
+        response_id=response_id,
+        status=last_status,
+        model=model,
+        resolved_model=response.get("model"),
+        reasoning_effort=reasoning_effort,
+        web_search=web_search,
+        timeout_s=timeout_s,
+        response=response,
+    )
     if progress_handler:
         progress_handler(f"[hatch] expert response {response_id} status={last_status}")
 
@@ -236,8 +291,21 @@ def _wait_for_background_response(
         elapsed = time.perf_counter() - started_at
         remaining = timeout_s - elapsed
         if remaining <= 0:
-            _cancel_response(api_key, response_id)
-            raise TimeoutError(f"Expert consultation timed out after {timeout_s}s")
+            artifact_path_ref[0] = _write_expert_artifact(
+                response_id=response_id,
+                status=last_status,
+                model=model,
+                resolved_model=response.get("model"),
+                reasoning_effort=reasoning_effort,
+                web_search=web_search,
+                timeout_s=timeout_s,
+                response=response,
+                error=f"Expert consultation still running after {timeout_s}s",
+            )
+            raise TimeoutError(
+                f"Expert consultation still running after {timeout_s}s; "
+                f"response_id={response_id}. Hatch left it running server-side."
+            )
 
         time.sleep(min(poll_interval_s, max(0.0, remaining)))
         response = _request_json(
@@ -250,6 +318,16 @@ def _wait_for_background_response(
             elapsed_s = int(time.perf_counter() - started_at)
             progress_handler(f"[hatch] expert response {response_id} status={status} ({elapsed_s}s)")
         last_status = status
+        artifact_path_ref[0] = _write_expert_artifact(
+            response_id=response_id,
+            status=last_status,
+            model=model,
+            resolved_model=response.get("model"),
+            reasoning_effort=reasoning_effort,
+            web_search=web_search,
+            timeout_s=timeout_s,
+            response=response,
+        )
 
     return response
 
@@ -269,6 +347,7 @@ def run_expert_sync(
     start = time.perf_counter()
     resolved_model: str | None = None
     response_id: str | None = None
+    artifact_path_ref: list[str | None] = [None]
 
     try:
         key = _resolve_api_key(api_key)
@@ -288,6 +367,16 @@ def run_expert_sync(
         )
         response_id = response_payload.get("id")
         resolved_model = response_payload.get("model")
+        artifact_path_ref[0] = _write_expert_artifact(
+            response_id=response_id,
+            status=str(response_payload.get("status") or "created"),
+            model=model,
+            resolved_model=resolved_model,
+            reasoning_effort=reasoning_effort,
+            web_search=web_search,
+            timeout_s=timeout_s,
+            response=response_payload,
+        )
         if background:
             response_payload = _wait_for_background_response(
                 api_key=key,
@@ -296,6 +385,9 @@ def run_expert_sync(
                 web_search=web_search,
                 started_at=start,
                 progress_handler=progress_handler,
+                model=model,
+                reasoning_effort=reasoning_effort,
+                artifact_path_ref=artifact_path_ref,
             )
             response_id = response_payload.get("id") or response_id
             resolved_model = response_payload.get("model") or resolved_model
@@ -316,6 +408,7 @@ def run_expert_sync(
             resolved_model=resolved_model,
             reasoning_effort=reasoning_effort,
             web_search=web_search,
+            artifact_path=artifact_path_ref[0],
         )
     except TimeoutError as e:
         duration_ms = int((time.perf_counter() - start) * 1000)
@@ -330,6 +423,7 @@ def run_expert_sync(
             reasoning_effort=reasoning_effort,
             web_search=web_search,
             response_id=response_id,
+            artifact_path=artifact_path_ref[0],
         )
     except Exception as e:
         duration_ms = int((time.perf_counter() - start) * 1000)
@@ -343,6 +437,8 @@ def run_expert_sync(
             resolved_model=resolved_model,
             reasoning_effort=reasoning_effort,
             web_search=web_search,
+            response_id=response_id,
+            artifact_path=artifact_path_ref[0],
         )
 
     duration_ms = int((time.perf_counter() - start) * 1000)
@@ -364,6 +460,7 @@ def run_expert_sync(
             citations=_extract_citations(response_payload),
             sources=_extract_sources(response_payload),
             raw_response=response_payload,
+            artifact_path=artifact_path_ref[0],
         )
 
     output = _extract_output_text(response_payload)
@@ -381,6 +478,7 @@ def run_expert_sync(
             usage=response_payload.get("usage"),
             response_id=response_payload.get("id"),
             raw_response=response_payload,
+            artifact_path=artifact_path_ref[0],
         )
 
     return ExpertResult(
@@ -398,4 +496,5 @@ def run_expert_sync(
         citations=_extract_citations(response_payload),
         sources=_extract_sources(response_payload),
         raw_response=response_payload,
+        artifact_path=artifact_path_ref[0],
     )

@@ -241,12 +241,12 @@ class TestSpecialCommands:
         fake_result.to_dict.return_value = {"ok": True, "output": "answer"}
 
         with mock.patch("hatch.cli.run_expert_sync", return_value=fake_result) as run_expert:
-            exit_code = main(["expert", "--reasoning-effort", "high", "question"])
+            exit_code = main(["expert", "--reasoning-effort", "low", "question"])
 
         assert exit_code == EXIT_SUCCESS
         run_expert.assert_called_once()
         assert run_expert.call_args.kwargs["prompt"] == "question"
-        assert run_expert.call_args.kwargs["reasoning_effort"] == "high"
+        assert run_expert.call_args.kwargs["reasoning_effort"] == "low"
         assert run_expert.call_args.kwargs["web_search"] is True
         captured = capsys.readouterr()
         assert "answer" in captured.out
