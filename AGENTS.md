@@ -141,3 +141,5 @@ print(result.output if result.ok else result.error)
 - (2026-04-29) [expert] Long expert calls use background Responses internally with server-side polling, but the public CLI/MCP contract stays one blocking call.
 - (2026-05-04) [mcp] In attached OpenCode runs, treat the session API/store as authoritative for final assistant text; stdout is only a progress/debug stream and may omit final events.
 - (2026-05-21) [expert] Keep `hatch expert` to low/medium effort. On timeout, preserve the background response id/artifact instead of cancelling at the boundary.
+- (2026-05-24) [codex] Headless Hatch runs for Codex must explicitly pass `--dangerously-bypass-approvals-and-sandbox` to prevent deadlocks on interactive tool-approval prompts in non-interactive/redirected subshells.
+- (2026-05-27) [opencode] Surfaced Hatch/OpenCode runs must pass `--dangerously-skip-permissions`; keep `--dir` for repo context instead of broadening by omitting cwd.

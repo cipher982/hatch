@@ -291,6 +291,7 @@ class TestConfigureOpenCode:
         assert config.cmd == [
             "opencode",
             "run",
+            "--dangerously-skip-permissions",
             "--pure",
             "--format",
             "json",
@@ -323,6 +324,7 @@ class TestConfigureOpenCode:
         assert config.cmd == [
             "opencode",
             "run",
+            "--dangerously-skip-permissions",
             "--pure",
             "--format",
             "json",
@@ -406,7 +408,13 @@ class TestConfigureCodex:
     def test_command_structure_full_auto(self, mock_openai_key, laptop_context):
         """Command has correct structure with full-auto."""
         config = configure_codex("test prompt", laptop_context)
-        assert config.cmd == ["codex", "exec", "-", "--full-auto"]
+        assert config.cmd == [
+            "codex",
+            "exec",
+            "-",
+            "--full-auto",
+            "--dangerously-bypass-approvals-and-sandbox",
+        ]
 
     def test_command_structure_no_full_auto(self, mock_openai_key, laptop_context):
         """Command without full-auto flag."""

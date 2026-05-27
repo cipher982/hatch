@@ -511,6 +511,7 @@ def build_run_command(
         "--format",
         "json",
         "--pure",
+        "--dangerously-skip-permissions",
     ]
 
     if cwd:

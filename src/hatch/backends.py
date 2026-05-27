@@ -233,6 +233,8 @@ def configure_codex(
     # Full auto mode for automatic execution without prompts
     if full_auto:
         cmd.append("--full-auto")
+        # Ensure headless runs don't hang on interactive tool approvals
+        cmd.append("--dangerously-bypass-approvals-and-sandbox")
 
     # Model override if specified
     if model:
@@ -331,7 +333,7 @@ def configure_opencode(
         env["AWS_PROFILE"] = aws_profile or os.environ.get("AWS_PROFILE", "zh-qa-engineer")
         env["AWS_REGION"] = aws_region or os.environ.get("AWS_REGION", "us-east-1")
 
-    cmd = ["opencode", "run"]
+    cmd = ["opencode", "run", "--dangerously-skip-permissions"]
 
     if pure:
         cmd.append("--pure")

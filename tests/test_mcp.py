@@ -48,6 +48,7 @@ def test_build_run_command_codex_with_reasoning_and_dir():
         reasoning_effort="xhigh",
     )
     assert cmd[-1] == "review"
+    assert "--dangerously-skip-permissions" in cmd
     assert cmd[cmd.index("--dir") + 1] == "/tmp"
     assert cmd[cmd.index("-m") + 1] == "openai/gpt-5.4-mini"
     assert cmd[cmd.index("--variant") + 1] == "high"
