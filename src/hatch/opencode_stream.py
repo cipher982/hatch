@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shlex
 from typing import Any
 
@@ -86,6 +87,39 @@ class OpenCodeStreamAccumulator:
             return messages
 
         return messages
+
+
+def extract_opencode_log_error(stderr: str) -> str | None:
+    """Pull a clean provider error message from OpenCode's --print-logs stderr.
+
+    OpenCode logs transport/provider failures (Bedrock 503, throttling,
+    data-retention ValidationException, etc.) as ERROR lines that embed a large
+    JSON blob. The useful part is the nested responseBody/data message; the rest
+    is the echoed request (including the whole system prompt). Return just the
+    message, with a status code prefix when present, or None if nothing matches.
+    """
+    best: str | None = None
+    status: str | None = None
+    for line in stderr.splitlines():
+        if "ERROR" not in line or "error=" not in line:
+            continue
+        status_match = re.search(r'"statusCode":\s*(\d{3})', line)
+        if status_match:
+            status = status_match.group(1)
+        # Prefer the innermost human-readable message OpenCode received.
+        message_match = re.search(
+            r'"data":\{"message":"((?:[^"\\]|\\.)*)"', line
+        ) or re.search(
+            r'"responseBody":"\{\\"message\\":\\"((?:[^"\\]|\\.)*?)\\"', line
+        ) or re.search(
+            r'"message":"((?:[^"\\]|\\.)*)"', line
+        )
+        if message_match:
+            message = message_match.group(1).encode().decode("unicode_escape")
+            best = message
+    if best is None:
+        return None
+    return f"Bedrock error {status}: {best}" if status else best
 
 
 def summarize_opencode_tool_use(part: dict[str, Any]) -> str:

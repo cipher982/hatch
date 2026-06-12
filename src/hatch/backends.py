@@ -12,8 +12,11 @@ from dataclasses import field
 from enum import Enum
 from typing import Any
 
+from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_PROFILE
+from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_REGION
 from hatch.context import ExecutionContext
 from hatch.context import detect_context
+from hatch.observatory import apply_observatory_trust_env
 
 
 def _build_simple_claude_headless_cmd(
@@ -147,8 +150,8 @@ def configure_bedrock(
     ctx: ExecutionContext | None = None,
     *,
     model: str = "us.anthropic.claude-sonnet-4-6",
-    aws_profile: str = "zh-qa-engineer",
-    aws_region: str = "us-east-1",
+    aws_profile: str = DEFAULT_BEDROCK_AWS_PROFILE,
+    aws_region: str = DEFAULT_BEDROCK_AWS_REGION,
     resume: str | None = None,
     output_format: str = "text",
     include_partial_messages: bool = False,
@@ -330,13 +333,21 @@ def configure_opencode(
         env["OPENROUTER_API_KEY"] = api_key
 
     if model.startswith("amazon-bedrock/"):
-        env["AWS_PROFILE"] = aws_profile or os.environ.get("AWS_PROFILE", "zh-qa-engineer")
-        env["AWS_REGION"] = aws_region or os.environ.get("AWS_REGION", "us-east-1")
+        env["AWS_PROFILE"] = aws_profile or os.environ.get("AWS_PROFILE", DEFAULT_BEDROCK_AWS_PROFILE)
+        env["AWS_REGION"] = aws_region or os.environ.get("AWS_REGION", DEFAULT_BEDROCK_AWS_REGION)
+
+    apply_observatory_trust_env(env)
 
     cmd = ["opencode", "run", "--dangerously-skip-permissions"]
 
     if pure:
         cmd.append("--pure")
+
+    # OpenCode swallows provider/transport errors (e.g. Bedrock 503/throttling
+    # or data-retention ValidationException) into its own logfile and emits a
+    # silent step_start with no error event. --print-logs surfaces them on
+    # stderr so the runner can report the real cause instead of "Empty output".
+    cmd.extend(["--print-logs", "--log-level", "ERROR"])
 
     cmd.extend(["--format", "json", "-m", model])
 

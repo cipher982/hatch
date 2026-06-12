@@ -416,7 +416,7 @@ class TestNormalizeArgv:
             "--backend",
             "opencode",
             "--model",
-            "amazon-bedrock/us.anthropic.claude-opus-4-7",
+            "amazon-bedrock/global.anthropic.claude-opus-4-8",
             "review",
         ]
         assert normalize_argv(["openrouter", "deepseek-v4-pro", "review"]) == [

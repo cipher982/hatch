@@ -328,6 +328,39 @@ class TestOpenCodeStreamRunSync:
         assert result.final_output is None
         assert result.error_message == "AWS session expired"
 
+    def test_recovers_bedrock_error_from_print_logs_stderr(self):
+        """When OpenCode exits 0 with no result, recover the cause from stderr.
+
+        Reproduces the Fable 5 launch failure: OpenCode emits only a step_start
+        on stdout and logs the real Bedrock 503 to stderr via --print-logs.
+        """
+        err_line = (
+            'ERROR 2026-06-10T00:00:00 service=llm providerID=amazon-bedrock '
+            'modelID=global.anthropic.claude-fable-5 error={"error":{"name":'
+            '"AI_APICallError","url":"https://bedrock-runtime.us-east-1.amazonaws'
+            '.com/model/global.anthropic.claude-fable-5/converse-stream",'
+            '"statusCode":503,"responseBody":"{\\"message\\":\\"Bedrock is unable '
+            'to process your request.\\"}","isRetryable":true,"data":{"message":'
+            '"Bedrock is unable to process your request."}}}'
+        )
+        script = "\n".join([
+            "import sys",
+            'print(\'{\"type\":\"step_start\",\"sessionID\":\"ses_12345678\"}\', flush=True)',
+            f"print({err_line!r}, file=sys.stderr, flush=True)",
+        ])
+
+        result = run_opencode_stream_sync(
+            cmd=[sys.executable, "-c", script],
+            stdin_data=None,
+            env={},
+            cwd=None,
+            timeout_s=10,
+        )
+
+        assert result.return_code == 0
+        assert result.final_output is None
+        assert result.error_message == "Bedrock error 503: Bedrock is unable to process your request."
+
 
 class TestAsyncRun:
     """Tests for async run function."""

@@ -26,17 +26,18 @@ mcp = FastMCP(
     instructions="""
 Stable MCP front door for hatch.
 
-Use this when you want the simple hatch contract without shell syntax:
-- hatch_claude(model, prompt, cwd, timeout_s?) -> Claude via Bedrock
-- hatch_codex(model, prompt, cwd, timeout_s?, reasoning_effort?) -> GPT-5 via OpenAI
-- hatch_openrouter(model, prompt, cwd, timeout_s?) -> OpenRouter models
-- hatch_gemini(prompt, cwd?, timeout_s?) -> Gemini path
-- hatch_expert(prompt, reasoning_effort?, web_search?, timeout_s?) -> one slow synchronous expert consultation with web search on by default
-- hatch_doctor() -> verify the underlying OpenCode runtime is reachable
+hatch_claude, hatch_codex, hatch_gemini, and hatch_openrouter run as FULL AGENTS
+via the OpenCode runtime with web search, file access, bash, and other tools.
+Use these for web research, repo code work, and multi-step tasks.
+
+hatch_expert is a SINGLE-CALL LLM consultation (OpenAI Responses API, GPT-5.5-pro),
+NOT an agent. No tool loops, no multi-step work, no file access. It answers in one
+pass with optional built-in web search. Use only for simple single-turn Q&A where
+you specifically want the Responses API — otherwise use hatch_codex/claude.
 
 Recommended defaults:
 - Codex: model="mini"
-- Claude: model="sonnet"
+- Claude: model="sonnet". Use model="fable" for Mythos-class (highest capability, always-on adaptive thinking, $10/$50 per MTok).
 - OpenRouter: model="deepseek-v4-pro"
 - Expert: reasoning_effort="medium", web_search=true; use low for faster calls
 
@@ -187,13 +188,13 @@ async def _run_expert_with_progress(
 
 @mcp.tool()
 async def hatch_claude(
-    model: Annotated[ClaudeModelAlias, "Claude tier. Start with sonnet."],
+    model: Annotated[ClaudeModelAlias, "Claude tier. Start with sonnet. Use fable for Mythos-class (highest capability)."],
     prompt: Annotated[str, "Prompt to send to Claude via the surfaced hatch path."],
     cwd: Annotated[str | None, "Absolute repo path for repo-aware work. Omit for one-off prompts."] = None,
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     ctx: Context | None = None,
 ) -> dict:
-    """Run `hatch claude <tier> "prompt"`."""
+    """Run Claude (Bedrock) as a full agent with web search, file access, and tools via OpenCode runtime."""
     return await _run_with_progress(
         tool_name="hatch_claude",
         prompt=prompt,
@@ -216,7 +217,7 @@ async def hatch_codex(
     ] = None,
     ctx: Context | None = None,
 ) -> dict:
-    """Run `hatch codex <tier> "prompt"`."""
+    """Run Codex (OpenAI GPT-5) as a full agent with web search, file access, and tools via OpenCode runtime."""
     return await _run_with_progress(
         tool_name="hatch_codex",
         prompt=prompt,
@@ -235,7 +236,7 @@ async def hatch_gemini(
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     ctx: Context | None = None,
 ) -> dict:
-    """Run the Gemini surfaced path."""
+    """Run Gemini as a full agent with web search, file access, and tools via OpenCode runtime."""
     return await _run_with_progress(
         tool_name="hatch_gemini",
         prompt=prompt,
@@ -253,7 +254,7 @@ async def hatch_openrouter(
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     ctx: Context | None = None,
 ) -> dict:
-    """Run `hatch openrouter <model> "prompt"`."""
+    """Run OpenRouter model as a full agent with web search, file access, and tools via OpenCode runtime."""
     return await _run_with_progress(
         tool_name="hatch_openrouter",
         prompt=prompt,
@@ -268,7 +269,7 @@ async def hatch_openrouter(
 async def hatch_expert(
     prompt: Annotated[
         str,
-        "Question/context for a single slow expert consultation. Include all needed local context.",
+        "Prompt for a single-call consultation. NOT an agent — use hatch_codex/claude for agent work including web research.",
     ],
     reasoning_effort: Annotated[
         ExpertReasoningEffort,
@@ -281,7 +282,7 @@ async def hatch_expert(
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     ctx: Context | None = None,
 ) -> dict:
-    """Ask one synchronous expert question. This does not run an agent or expose polling."""
+    """Single-call LLM consultation (GPT-5.5-pro + OpenAI Responses API). NOT an agent — no tool loops, no multi-step. Use hatch_codex/claude for web research and agent work."""
     return await _run_expert_with_progress(
         prompt=prompt,
         reasoning_effort=reasoning_effort,

@@ -7,7 +7,7 @@ from typing import Literal
 
 
 CodexModelAlias = Literal["nano", "mini", "max"]
-ClaudeModelAlias = Literal["haiku", "sonnet", "opus"]
+ClaudeModelAlias = Literal["haiku", "sonnet", "opus", "fable"]
 OpenRouterModelAlias = Literal["deepseek-v4-pro"]
 
 
@@ -44,7 +44,8 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
         models={
             "haiku": "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
             "sonnet": "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
-            "opus": "amazon-bedrock/us.anthropic.claude-opus-4-7",
+            "opus": "amazon-bedrock/global.anthropic.claude-opus-4-8",
+            "fable": "amazon-bedrock/global.anthropic.claude-fable-5",
         },
     ),
     "openrouter": SurfacedProvider(

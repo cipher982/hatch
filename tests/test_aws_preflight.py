@@ -5,6 +5,7 @@ from unittest import mock
 
 import pytest
 
+from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_PROFILE
 from hatch.aws_preflight import BedrockAwsAuthError
 from hatch.aws_preflight import bedrock_aws_profile
 from hatch.aws_preflight import preflight_bedrock_aws
@@ -21,7 +22,8 @@ def test_uses_bedrock_aws_for_raw_claude_env():
 
 def test_bedrock_aws_profile_defaults_to_hatch_profile(monkeypatch):
     monkeypatch.delenv("AWS_PROFILE", raising=False)
-    assert bedrock_aws_profile({}) == "zh-qa-engineer"
+    assert bedrock_aws_profile({}) == DEFAULT_BEDROCK_AWS_PROFILE
+    assert DEFAULT_BEDROCK_AWS_PROFILE == "zh-ml-mlengineer"
 
 
 def test_preflight_skips_non_bedrock_models():

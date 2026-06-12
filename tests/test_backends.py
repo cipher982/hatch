@@ -252,7 +252,7 @@ class TestConfigureBedrock:
         """Environment variables set correctly."""
         config = configure_bedrock("test prompt", laptop_context)
         assert config.env["CLAUDE_CODE_USE_BEDROCK"] == "1"
-        assert config.env["AWS_PROFILE"] == "zh-qa-engineer"
+        assert config.env["AWS_PROFILE"] == "zh-ml-mlengineer"
         assert config.env["AWS_REGION"] == "us-east-1"
         assert config.env["ANTHROPIC_MODEL"] == "us.anthropic.claude-sonnet-4-6"
 
@@ -293,6 +293,9 @@ class TestConfigureOpenCode:
             "run",
             "--dangerously-skip-permissions",
             "--pure",
+            "--print-logs",
+            "--log-level",
+            "ERROR",
             "--format",
             "json",
             "-m",
@@ -326,6 +329,9 @@ class TestConfigureOpenCode:
             "run",
             "--dangerously-skip-permissions",
             "--pure",
+            "--print-logs",
+            "--log-level",
+            "ERROR",
             "--format",
             "json",
             "-m",
@@ -346,15 +352,42 @@ class TestConfigureOpenCode:
         assert "--agent" in config.cmd
         assert "review" in config.cmd
 
-    def test_bedrock_defaults(self, laptop_context):
-        """Bedrock-backed OpenCode models preserve the existing defaults."""
+    def test_bedrock_defaults(self, monkeypatch, laptop_context):
+        """Bedrock-backed OpenCode models fall back to the hatch default profile."""
+        monkeypatch.delenv("AWS_PROFILE", raising=False)
+        monkeypatch.delenv("AWS_REGION", raising=False)
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="amazon-bedrock/us.anthropic.claude-sonnet-4-6",
+        )
+        assert config.env["AWS_PROFILE"] == "zh-ml-mlengineer"
+        assert config.env["AWS_REGION"] == "us-east-1"
+
+    def test_bedrock_inherits_aws_profile_from_env(self, monkeypatch, laptop_context):
+        """An explicit AWS_PROFILE in the environment still wins over the default."""
+        monkeypatch.setenv("AWS_PROFILE", "zh-qa-engineer")
         config = configure_opencode(
             "test prompt",
             laptop_context,
             model="amazon-bedrock/us.anthropic.claude-sonnet-4-6",
         )
         assert config.env["AWS_PROFILE"] == "zh-qa-engineer"
-        assert config.env["AWS_REGION"] == "us-east-1"
+
+    def test_discovers_observatory_ca_without_inherited_env(self, monkeypatch, tmp_path, laptop_context):
+        """OpenCode gets Observatory trust even if Hatch itself lacked inherited env."""
+        home = tmp_path / "home"
+        ca = home / ".local" / "state" / "agent-observatory" / "ca" / "observatory-ca.pem"
+        ca.parent.mkdir(parents=True)
+        ca.write_text("FAKE CA\n")
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.delenv("NODE_EXTRA_CA_CERTS", raising=False)
+        monkeypatch.delenv("CODEX_CA_CERTIFICATE", raising=False)
+
+        config = configure_opencode("test prompt", laptop_context, model="openai/gpt-5.4")
+
+        assert config.env["NODE_EXTRA_CA_CERTS"] == str(ca)
+        assert config.env["CODEX_CA_CERTIFICATE"] == str(ca)
 
     def test_container_readonly_sets_home(self, container_readonly_context):
         """OpenCode uses the effective writable home in read-only containers."""

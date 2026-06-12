@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any
 from typing import Callable
 
+from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_PROFILE
+from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_REGION
 from hatch.aws_preflight import BedrockAwsAuthError
 from hatch.aws_preflight import preflight_bedrock_aws
 from hatch.backends import Backend
@@ -31,7 +33,11 @@ from hatch.models import SURFACE_NAMES
 from hatch.models import TOOL_TO_PROVIDER
 from hatch.models import resolve_tool_model
 from hatch.models import tool_model_choices
+from hatch.observatory import apply_observatory_trust_env
+from hatch.observatory import observatory_ca_path
+from hatch.observatory import observatory_trust_signature
 from hatch.opencode_stream import OpenCodeStreamAccumulator
+from hatch.opencode_stream import extract_opencode_log_error
 
 
 OPENCODE_BIN = os.environ.get("HATCH_MCP_OPENCODE_BIN", "opencode")
@@ -139,12 +145,13 @@ def _build_server_env() -> dict[str, str]:
         if secret:
             env["OPENROUTER_API_KEY"] = secret
 
-    env.setdefault("AWS_PROFILE", os.environ.get("AWS_PROFILE", "zh-qa-engineer"))
-    env.setdefault("AWS_REGION", os.environ.get("AWS_REGION", "us-east-1"))
+    env.setdefault("AWS_PROFILE", os.environ.get("AWS_PROFILE", DEFAULT_BEDROCK_AWS_PROFILE))
+    env.setdefault("AWS_REGION", os.environ.get("AWS_REGION", DEFAULT_BEDROCK_AWS_REGION))
     for key, value in runtime_paths.items():
         env[key] = str(value)
     env["OPENCODE_CONFIG"] = str(_runtime_config_path())
     env.pop("OPENCODE_CONFIG_CONTENT", None)
+    apply_observatory_trust_env(env)
     return env
 
 
@@ -405,6 +412,7 @@ class OpenCodeServerManager:
         self._proc: subprocess.Popen[str] | None = None
         self._url: str | None = None
         self._managed = False
+        self._trust_signature: tuple[tuple[str, str], ...] = ()
         atexit.register(self.shutdown)
 
     @property
@@ -422,11 +430,15 @@ class OpenCodeServerManager:
                 )
             self._url = configured_url
             self._managed = False
+            self._trust_signature = ()
             return configured_url
 
         with self._lock:
+            desired_signature = observatory_trust_signature(_build_server_env())
             if self._proc and self._proc.poll() is None and self._url and _healthcheck(self._url):
-                return self._url
+                if self._trust_signature == desired_signature:
+                    return self._url
+                self.shutdown()
 
             self._start_locked()
             assert self._url is not None
@@ -436,6 +448,7 @@ class OpenCodeServerManager:
         port = int(os.environ.get(OPENCODE_PORT_ENV) or _find_free_port())
         url = f"http://127.0.0.1:{port}"
         _ensure_runtime_paths()
+        env = _build_server_env()
 
         cmd = [
             OPENCODE_BIN,
@@ -450,7 +463,7 @@ class OpenCodeServerManager:
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            env=_build_server_env(),
+            env=env,
             text=True,
         )
 
@@ -460,6 +473,7 @@ class OpenCodeServerManager:
                 self._proc = proc
                 self._url = url
                 self._managed = True
+                self._trust_signature = observatory_trust_signature(env)
                 return
             if proc.poll() is not None:
                 raise HatchMcpRuntimeError(f"OpenCode server exited during startup ({proc.returncode})")
@@ -471,12 +485,20 @@ class OpenCodeServerManager:
     def shutdown(self) -> None:
         proc = self._proc
         if proc is None or proc.poll() is not None or not self._managed:
+            self._proc = None
+            self._url = None
+            self._managed = False
+            self._trust_signature = ()
             return
         try:
             proc.terminate()
             proc.wait(timeout=2)
         except Exception:
             proc.kill()
+        self._proc = None
+        self._url = None
+        self._managed = False
+        self._trust_signature = ()
 
 
 SERVER_MANAGER = OpenCodeServerManager()
@@ -512,6 +534,10 @@ def build_run_command(
         "json",
         "--pure",
         "--dangerously-skip-permissions",
+        # Surface provider/transport errors on stderr (see configure_opencode).
+        "--print-logs",
+        "--log-level",
+        "ERROR",
     ]
 
     if cwd:
@@ -657,13 +683,19 @@ def run_attached_command(
                 selected_finish_reason = snapshot.finish_reason
                 output_source = "session"
 
+    error_message = accumulator.error_message
+    # Recover provider failures (Bedrock 503/throttling, etc.) from the
+    # --print-logs ERROR lines when OpenCode exits without a final answer.
+    if error_message is None and final_output is None:
+        error_message = extract_opencode_log_error(stderr)
+
     return OpenCodeRunResult(
         stdout=stdout,
         stderr=stderr,
         return_code=-1 if timed_out else proc.returncode,
         timed_out=timed_out,
         final_output=final_output,
-        error_message=accumulator.error_message,
+        error_message=error_message,
         attach_url=attach_url,
         model=model,
         completed=completed,
@@ -681,6 +713,7 @@ def run_attached_command(
 def doctor() -> dict[str, Any]:
     opencode_path = shutil.which(OPENCODE_BIN)
     attach_url = os.environ.get(ATTACH_URL_ENV, "").strip() or SERVER_MANAGER.current_url
+    env = _build_server_env()
     return {
         "ok": bool(opencode_path),
         "opencode_path": opencode_path,
@@ -690,6 +723,8 @@ def doctor() -> dict[str, Any]:
         "opencode_root": str(_runtime_root()),
         "opencode_config": str(_runtime_config_path()),
         "run_artifacts_dir": str(_run_artifacts_dir()),
+        "observatory_ca_path": str(observatory_ca_path(env) or ""),
+        "observatory_trust_env": dict(observatory_trust_signature(env)),
     }
 
 

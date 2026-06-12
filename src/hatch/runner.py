@@ -19,6 +19,7 @@ from hatch.context import detect_context
 from hatch.credentials import credential_backend_for
 from hatch.credentials import hydrate_backend_kwargs
 from hatch.opencode_stream import OpenCodeStreamAccumulator
+from hatch.opencode_stream import extract_opencode_log_error
 
 
 @dataclass
@@ -443,13 +444,21 @@ def run_opencode_stream_sync(
         else:
             stderr_chunks.append(line)
 
+    stderr_text = "".join(stderr_chunks)
+    error_message = accumulator.error_message
+    # OpenCode often exits 0 with no stream error event when the provider call
+    # failed (e.g. Bedrock 503/throttling). Recover the real cause from the
+    # --print-logs ERROR lines on stderr so callers see why it produced nothing.
+    if error_message is None and accumulator.final_output is None:
+        error_message = extract_opencode_log_error(stderr_text)
+
     return OpenCodeStreamRunResult(
         stdout="".join(stdout_chunks),
-        stderr="".join(stderr_chunks),
+        stderr=stderr_text,
         return_code=-1 if timed_out else proc.returncode,
         timed_out=timed_out,
         final_output=accumulator.final_output,
-        error_message=accumulator.error_message,
+        error_message=error_message,
     )
 
 

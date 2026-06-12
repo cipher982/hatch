@@ -7,7 +7,12 @@ import subprocess
 from collections.abc import Mapping
 
 
-DEFAULT_BEDROCK_AWS_PROFILE = "zh-qa-engineer"
+# zh-ml-mlengineer is the account with the Bedrock data-retention opt-in
+# (provider_data_share) required by Mythos-class models like Fable 5, and it
+# also serves the haiku/sonnet/opus tiers. Keeping one profile for every tier
+# matters because the MCP path runs a single shared `opencode serve` whose AWS
+# env is fixed at server startup and cannot switch per-model per-request.
+DEFAULT_BEDROCK_AWS_PROFILE = "zh-ml-mlengineer"
 DEFAULT_BEDROCK_AWS_REGION = "us-east-1"
 
 

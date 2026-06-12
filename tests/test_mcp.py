@@ -80,7 +80,7 @@ def test_build_run_command_uses_latest_frontier_aliases():
     )
 
     assert codex_cmd[codex_cmd.index("-m") + 1] == "openai/gpt-5.5"
-    assert claude_cmd[claude_cmd.index("-m") + 1] == "amazon-bedrock/us.anthropic.claude-opus-4-7"
+    assert claude_cmd[claude_cmd.index("-m") + 1] == "amazon-bedrock/global.anthropic.claude-opus-4-8"
 
 
 def test_build_run_command_openrouter_deepseek_alias():
@@ -117,6 +117,39 @@ def test_runtime_env_uses_isolated_xdg_paths_and_repo_config(monkeypatch, tmp_pa
     assert "OPENCODE_CONFIG_CONTENT" not in env
 
 
+def test_runtime_env_discovers_observatory_ca_without_inherited_env(monkeypatch, tmp_path):
+    home = tmp_path / "home"
+    ca = home / ".local" / "state" / "agent-observatory" / "ca" / "observatory-ca.pem"
+    ca.parent.mkdir(parents=True)
+    ca.write_text("FAKE CA\n")
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
+    monkeypatch.delenv("NODE_EXTRA_CA_CERTS", raising=False)
+    monkeypatch.delenv("CODEX_CA_CERTIFICATE", raising=False)
+
+    with mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None):
+        env = _build_server_env()
+
+    assert env["NODE_EXTRA_CA_CERTS"] == str(ca)
+    assert env["CODEX_CA_CERTIFICATE"] == str(ca)
+
+
+def test_runtime_env_keeps_existing_observatory_ca(monkeypatch, tmp_path):
+    ca = tmp_path / "custom-observatory-ca.pem"
+    ca.write_text("FAKE CA\n")
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
+    monkeypatch.setenv("NODE_EXTRA_CA_CERTS", str(ca))
+    monkeypatch.delenv("CODEX_CA_CERTIFICATE", raising=False)
+
+    with mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None):
+        env = _build_server_env()
+
+    assert env["NODE_EXTRA_CA_CERTS"] == str(ca)
+    assert env["CODEX_CA_CERTIFICATE"] == str(ca)
+
+
 def test_runtime_env_loads_openrouter_secret(monkeypatch, tmp_path):
     runtime_root = tmp_path / "runtime"
     monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
@@ -143,6 +176,47 @@ def test_configured_attach_url_shuts_down_managed_server(monkeypatch):
 
     assert url == "http://127.0.0.1:5000"
     fake_proc.terminate.assert_called_once()
+
+
+def test_managed_server_restarts_when_observatory_trust_changes(monkeypatch, tmp_path):
+    home = tmp_path / "home"
+    ca = home / ".local" / "state" / "agent-observatory" / "ca" / "observatory-ca.pem"
+    ca.parent.mkdir(parents=True)
+    ca.write_text("FAKE CA\n")
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
+    monkeypatch.delenv("NODE_EXTRA_CA_CERTS", raising=False)
+    monkeypatch.delenv("CODEX_CA_CERTIFICATE", raising=False)
+
+    manager = OpenCodeServerManager()
+    old_proc = mock.Mock()
+    old_proc.poll.return_value = None
+    manager._proc = old_proc
+    manager._managed = True
+    manager._url = "http://127.0.0.1:4999"
+    manager._trust_signature = ()
+
+    def fake_start() -> None:
+        new_proc = mock.Mock()
+        new_proc.poll.return_value = None
+        manager._proc = new_proc
+        manager._managed = True
+        manager._url = "http://127.0.0.1:5001"
+        manager._trust_signature = (
+            ("NODE_EXTRA_CA_CERTS", str(ca)),
+            ("CODEX_CA_CERTIFICATE", str(ca)),
+        )
+
+    with (
+        mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None),
+        mock.patch("hatch.mcp.runtime._healthcheck", return_value=True),
+        mock.patch.object(manager, "_start_locked", side_effect=fake_start),
+    ):
+        url = manager.ensure_server()
+
+    assert url == "http://127.0.0.1:5001"
+    old_proc.terminate.assert_called_once()
 
 
 def test_run_surface_success_uses_attach_runtime(monkeypatch, tmp_path):

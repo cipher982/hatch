@@ -13,7 +13,7 @@ uv tool install -e ~/git/hatch
 ## Entrypoints
 
 Public surface:
-- `hatch claude <haiku|sonnet|opus>` → Claude on Amazon Bedrock
+- `hatch claude <haiku|sonnet|opus|fable>` → Claude on Amazon Bedrock (`fable` = Mythos-class, highest capability)
 - `hatch codex <nano|mini|max>` → GPT-5 on OpenAI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
@@ -24,6 +24,7 @@ Default tiers:
 - Start with `sonnet` for Claude and `mini` for Codex
 - Drop to `haiku` / `nano` for faster cheaper work
 - Rise to `opus` / `max` when depth matters
+- Use `fable` for Mythos-class Claude (highest capability, always-on adaptive thinking)
 - Use `openrouter deepseek-v4-pro` as the non-OpenAI/non-Anthropic third option
 
 Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
