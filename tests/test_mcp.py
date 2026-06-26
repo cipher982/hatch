@@ -506,13 +506,17 @@ def test_run_attached_command_recovers_step_start_only_from_session_api():
 def test_run_env_scopes_provider_credentials(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+    monkeypatch.setattr(
+        "hatch.mcp.runtime._maybe_load_secret",
+        lambda backend: "stable-openai-key" if str(backend) == "Backend.CODEX" else None,
+    )
 
     claude_env = _build_run_env("amazon-bedrock/us.anthropic.claude-opus-4-7")
     assert "OPENAI_API_KEY" not in claude_env
     assert "OPENROUTER_API_KEY" not in claude_env
 
     openai_env = _build_run_env("openai/gpt-5.4-mini")
-    assert openai_env["OPENAI_API_KEY"] == "openai-key"
+    assert openai_env["OPENAI_API_KEY"] == "stable-openai-key"
     assert "OPENROUTER_API_KEY" not in openai_env
 
     openrouter_env = _build_run_env("openrouter/deepseek/deepseek-v4-pro")

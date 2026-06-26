@@ -16,6 +16,7 @@ from hatch.backends import Backend
 _INFISICAL_HELPER = os.path.expanduser("~/git/me/scripts/infisical-get.py")
 _PERSONAL_PROJECT = "personal-shell"
 OPENROUTER_CREDENTIAL = "openrouter"
+_ROULETTE_MARKER = "HATCH_CREDENTIAL_ROULETTE"
 
 
 @dataclass(frozen=True)
@@ -77,14 +78,26 @@ def hydrate_backend_kwargs(
     if not spec:
         return resolved
 
-    env_value = os.environ.get(spec.env_var, "").strip()
-    if env_value:
-        resolved["api_key"] = env_value
-        return resolved
+    if os.environ.get(_ROULETTE_MARKER, "").strip() == "1":
+        roulette_value = os.environ.get(f"HATCH_ROULETTE_{spec.env_var}", "").strip()
+        if roulette_value:
+            resolved["api_key"] = roulette_value
+            return resolved
+
+    if backend != Backend.CODEX:
+        env_value = os.environ.get(spec.env_var, "").strip()
+        if env_value:
+            resolved["api_key"] = env_value
+            return resolved
 
     helper_value = _load_secret_from_helper(spec)
     if helper_value:
         resolved["api_key"] = helper_value
+        return resolved
+
+    env_value = os.environ.get(spec.env_var, "").strip()
+    if env_value:
+        resolved["api_key"] = env_value
         return resolved
 
     raise ValueError(

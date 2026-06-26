@@ -18,6 +18,14 @@ from hatch.context import ExecutionContext
 from hatch.context import detect_context
 from hatch.observatory import apply_observatory_trust_env
 
+_ROULETTE_MARKER = "HATCH_CREDENTIAL_ROULETTE"
+_ROULETTE_ENV = [
+    _ROULETTE_MARKER,
+    "HATCH_ROULETTE_OPENAI_API_KEY",
+    "HATCH_ROULETTE_AWS_PROFILE",
+    "HATCH_ROULETTE_AWS_REGION",
+]
+
 
 def _build_simple_claude_headless_cmd(
     *,
@@ -163,6 +171,10 @@ def configure_bedrock(
     """
     ctx = ctx or detect_context()
 
+    if os.environ.get(_ROULETTE_MARKER, "").strip() == "1":
+        aws_profile = os.environ.get("HATCH_ROULETTE_AWS_PROFILE") or aws_profile
+        aws_region = os.environ.get("HATCH_ROULETTE_AWS_REGION") or aws_region
+
     env = {
         "CLAUDE_CODE_USE_BEDROCK": "1",
         "AWS_PROFILE": aws_profile,
@@ -187,9 +199,13 @@ def configure_bedrock(
         cmd=cmd,
         env=env,
         env_unset=[
+            "AWS_PROFILE",
+            "AWS_REGION",
+            "AWS_DEFAULT_REGION",
             "ANTHROPIC_AUTH_TOKEN",
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_BASE_URL",
+            *_ROULETTE_ENV,
         ],
         stdin_data=prompt.encode("utf-8"),
     )
@@ -250,7 +266,16 @@ def configure_codex(
     if skip_git_repo_check:
         cmd.append("--skip-git-repo-check")
 
-    return BackendConfig(cmd=cmd, env=env, stdin_data=prompt.encode("utf-8"))
+    return BackendConfig(
+        cmd=cmd,
+        env=env,
+        env_unset=[
+            "CODEX_API_KEY",
+            "CLAUDE_CODE_USE_BEDROCK",
+            *_ROULETTE_ENV,
+        ],
+        stdin_data=prompt.encode("utf-8"),
+    )
 
 
 def configure_gemini(
@@ -284,7 +309,12 @@ def configure_gemini(
         "-",  # Read prompt from stdin
     ]
 
-    return BackendConfig(cmd=cmd, env=env, stdin_data=prompt.encode("utf-8"))
+    return BackendConfig(
+        cmd=cmd,
+        env=env,
+        env_unset=["CLAUDE_CODE_USE_BEDROCK"],
+        stdin_data=prompt.encode("utf-8"),
+    )
 
 
 def _map_opencode_variant(model: str, reasoning_effort: str | None) -> str | None:
@@ -333,8 +363,11 @@ def configure_opencode(
         env["OPENROUTER_API_KEY"] = api_key
 
     if model.startswith("amazon-bedrock/"):
-        env["AWS_PROFILE"] = aws_profile or os.environ.get("AWS_PROFILE", DEFAULT_BEDROCK_AWS_PROFILE)
-        env["AWS_REGION"] = aws_region or os.environ.get("AWS_REGION", DEFAULT_BEDROCK_AWS_REGION)
+        if os.environ.get(_ROULETTE_MARKER, "").strip() == "1":
+            aws_profile = aws_profile or os.environ.get("HATCH_ROULETTE_AWS_PROFILE")
+            aws_region = aws_region or os.environ.get("HATCH_ROULETTE_AWS_REGION")
+        env["AWS_PROFILE"] = aws_profile or DEFAULT_BEDROCK_AWS_PROFILE
+        env["AWS_REGION"] = aws_region or DEFAULT_BEDROCK_AWS_REGION
 
     apply_observatory_trust_env(env)
 
@@ -361,7 +394,19 @@ def configure_opencode(
     # OpenCode's non-interactive CLI accepts the prompt as argv, not stdin.
     cmd.append(prompt)
 
-    return BackendConfig(cmd=cmd, env=env, stdin_data=None)
+    return BackendConfig(
+        cmd=cmd,
+        env=env,
+        env_unset=[
+            "AWS_PROFILE",
+            "AWS_REGION",
+            "AWS_DEFAULT_REGION",
+            "OPENAI_API_KEY",
+            "CODEX_API_KEY",
+            *_ROULETTE_ENV,
+        ],
+        stdin_data=None,
+    )
 
 
 # Backend to configure function mapping

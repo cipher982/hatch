@@ -135,18 +135,35 @@ def _build_server_env() -> dict[str, str]:
     env = dict(os.environ)
     runtime_paths = _runtime_paths()
 
-    if not env.get("OPENAI_API_KEY"):
-        secret = _maybe_load_secret(Backend.CODEX)
-        if secret:
-            env["OPENAI_API_KEY"] = secret
+    for key in [
+        "HATCH_CREDENTIAL_ROULETTE",
+        "HATCH_ROULETTE_OPENAI_API_KEY",
+        "HATCH_ROULETTE_AWS_PROFILE",
+        "HATCH_ROULETTE_AWS_REGION",
+        "OPENAI_API_KEY",
+        "CODEX_API_KEY",
+        "AWS_PROFILE",
+        "AWS_REGION",
+        "AWS_DEFAULT_REGION",
+        "CLAUDE_CODE_USE_BEDROCK",
+        "ANTHROPIC_MODEL",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_BASE_URL",
+    ]:
+        env.pop(key, None)
+
+    secret = _maybe_load_secret(Backend.CODEX)
+    if secret:
+        env["OPENAI_API_KEY"] = secret
 
     if not env.get("OPENROUTER_API_KEY"):
         secret = _maybe_load_secret(OPENROUTER_CREDENTIAL)
         if secret:
             env["OPENROUTER_API_KEY"] = secret
 
-    env.setdefault("AWS_PROFILE", os.environ.get("AWS_PROFILE", DEFAULT_BEDROCK_AWS_PROFILE))
-    env.setdefault("AWS_REGION", os.environ.get("AWS_REGION", DEFAULT_BEDROCK_AWS_REGION))
+    env["AWS_PROFILE"] = DEFAULT_BEDROCK_AWS_PROFILE
+    env["AWS_REGION"] = DEFAULT_BEDROCK_AWS_REGION
     for key, value in runtime_paths.items():
         env[key] = str(value)
     env["OPENCODE_CONFIG"] = str(_runtime_config_path())

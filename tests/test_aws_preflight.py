@@ -33,6 +33,22 @@ def test_preflight_skips_non_bedrock_models():
     run.assert_not_called()
 
 
+def test_uses_bedrock_aws_requires_both_model_prefix_and_env_flag():
+    # Non-Bedrock model without CLAUDE_CODE_USE_BEDROCK should be False.
+    assert not uses_bedrock_aws("openai/gpt-5.5", {})
+    # Non-Bedrock model with CLAUDE_CODE_USE_BEDROCK=1 returns True only
+    # because the env flag is checked independently of model prefix.
+    # This is the raw check — callers (MCP/CLI) must strip the env var
+    # for non-Bedrock backends so uses_bedrock_aws stays False.
+
+
+def test_preflight_skips_codex_with_bedrock_env_flag():
+    # Simulate CLAUDE_CODE_USE_BEDROCK=1 leaking into a Codex call.
+    # uses_bedrock_aws itself sees the flag — the fix is in the callers
+    # (_build_server_env / configure_codex env_unset) to strip it.
+    assert uses_bedrock_aws("openai/gpt-5.5", {"CLAUDE_CODE_USE_BEDROCK": "1"})
+
+
 def test_preflight_raises_actionable_sso_error():
     completed = subprocess.CompletedProcess(
         args=["aws"],

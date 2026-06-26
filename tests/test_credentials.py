@@ -25,11 +25,33 @@ class TestHydrateBackendKwargs:
         kwargs = hydrate_backend_kwargs(Backend.CODEX, {"api_key": "explicit"})
         assert kwargs["api_key"] == "explicit"
 
-    def test_uses_env_when_present(self):
-        """Environment vars are the first non-explicit source."""
+    def test_uses_helper_before_ambient_openai_env(self):
+        """Codex uses the stable helper before ambient shell env."""
         with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "env-key"}, clear=False):
-            kwargs = hydrate_backend_kwargs(Backend.CODEX, {})
+            with mock.patch("hatch.credentials._load_secret_from_helper", return_value="helper-key"):
+                kwargs = hydrate_backend_kwargs(Backend.CODEX, {})
+        assert kwargs["api_key"] == "helper-key"
+
+    def test_uses_env_when_helper_missing(self):
+        """Ambient env remains a fallback when the helper is unavailable."""
+        with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "env-key"}, clear=False):
+            with mock.patch("hatch.credentials._load_secret_from_helper", return_value=None):
+                kwargs = hydrate_backend_kwargs(Backend.CODEX, {})
         assert kwargs["api_key"] == "env-key"
+
+    def test_uses_marked_roulette_key(self):
+        """The shell roulette wrapper has an explicit one-process handoff."""
+        with mock.patch.dict(
+            os.environ,
+            {
+                "HATCH_CREDENTIAL_ROULETTE": "1",
+                "HATCH_ROULETTE_OPENAI_API_KEY": "roulette-key",
+                "OPENAI_API_KEY": "ambient-key",
+            },
+            clear=False,
+        ):
+            kwargs = hydrate_backend_kwargs(Backend.CODEX, {})
+        assert kwargs["api_key"] == "roulette-key"
 
     def test_uses_helper_when_env_missing(self):
         """Canonical helper is used when env is absent."""

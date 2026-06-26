@@ -364,15 +364,27 @@ class TestConfigureOpenCode:
         assert config.env["AWS_PROFILE"] == "zh-ml-mlengineer"
         assert config.env["AWS_REGION"] == "us-east-1"
 
-    def test_bedrock_inherits_aws_profile_from_env(self, monkeypatch, laptop_context):
-        """An explicit AWS_PROFILE in the environment still wins over the default."""
+    def test_bedrock_ignores_ambient_aws_profile(self, monkeypatch, laptop_context):
+        """Ambient AWS_PROFILE does not silently override the stable default."""
         monkeypatch.setenv("AWS_PROFILE", "zh-qa-engineer")
         config = configure_opencode(
             "test prompt",
             laptop_context,
             model="amazon-bedrock/us.anthropic.claude-sonnet-4-6",
         )
-        assert config.env["AWS_PROFILE"] == "zh-qa-engineer"
+        assert config.env["AWS_PROFILE"] == "zh-ml-mlengineer"
+
+    def test_bedrock_uses_marked_roulette_profile(self, monkeypatch, laptop_context):
+        """The shell roulette wrapper has an explicit one-process Bedrock handoff."""
+        monkeypatch.setenv("HATCH_CREDENTIAL_ROULETTE", "1")
+        monkeypatch.setenv("HATCH_ROULETTE_AWS_PROFILE", "zh-qa-aiengineer")
+        monkeypatch.setenv("HATCH_ROULETTE_AWS_REGION", "us-east-1")
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="amazon-bedrock/us.anthropic.claude-sonnet-4-6",
+        )
+        assert config.env["AWS_PROFILE"] == "zh-qa-aiengineer"
 
     def test_discovers_observatory_ca_without_inherited_env(self, monkeypatch, tmp_path, laptop_context):
         """OpenCode gets Observatory trust even if Hatch itself lacked inherited env."""
@@ -407,9 +419,16 @@ class TestConfigureOpenCode:
         """Clears incompatible Anthropic/z.ai env when using Bedrock."""
         config = configure_bedrock("test", laptop_context)
         assert config.env_unset == [
+            "AWS_PROFILE",
+            "AWS_REGION",
+            "AWS_DEFAULT_REGION",
             "ANTHROPIC_AUTH_TOKEN",
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_BASE_URL",
+            "HATCH_CREDENTIAL_ROULETTE",
+            "HATCH_ROULETTE_OPENAI_API_KEY",
+            "HATCH_ROULETTE_AWS_PROFILE",
+            "HATCH_ROULETTE_AWS_REGION",
         ]
 
     def test_container_readonly_sets_home(self, container_readonly_context):
@@ -488,6 +507,16 @@ class TestConfigureCodex:
         config = configure_codex("test", container_readonly_context)
         assert config.env["HOME"] == "/tmp"
 
+    def test_unsets_leaked_bedrock_env(self, laptop_context):
+        """build_env strips CLAUDE_CODE_USE_BEDROCK leaked from os.environ."""
+        with mock.patch.dict(os.environ, {
+            "OPENAI_API_KEY": "sk-test",
+            "CLAUDE_CODE_USE_BEDROCK": "1",
+        }):
+            config = configure_codex("test", laptop_context)
+            env = config.build_env()
+            assert "CLAUDE_CODE_USE_BEDROCK" not in env
+
 
 class TestConfigureGemini:
     """Tests for Gemini backend configuration."""
@@ -519,6 +548,13 @@ class TestConfigureGemini:
         """Sets HOME in container with read-only home."""
         config = configure_gemini("test", container_readonly_context)
         assert config.env["HOME"] == "/tmp"
+
+    def test_unsets_leaked_bedrock_env(self, laptop_context):
+        """build_env strips CLAUDE_CODE_USE_BEDROCK leaked from os.environ."""
+        with mock.patch.dict(os.environ, {"CLAUDE_CODE_USE_BEDROCK": "1"}):
+            config = configure_gemini("test", laptop_context)
+            env = config.build_env()
+            assert "CLAUDE_CODE_USE_BEDROCK" not in env
 
 
 class TestGetConfig:
