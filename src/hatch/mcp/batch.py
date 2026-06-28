@@ -94,7 +94,7 @@ def add_batch_support(mcp_server: Any, tools: dict[str, Any], max_concurrent: in
             flush=True,
         )
         tasks = [
-            _execute_one(batch_id, i + 1, len(calls), call["tool"], call.get("args", {}))
+            _execute_one(batch_id, i + 1, len(calls), call["tool"], call.get("args") or call.get("arguments", {}))
             for i, call in enumerate(calls)
         ]
         results = await asyncio.gather(*tasks)
