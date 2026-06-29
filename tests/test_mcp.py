@@ -230,6 +230,29 @@ def test_configured_attach_url_shuts_down_managed_server(monkeypatch):
     fake_proc.terminate.assert_called_once()
 
 
+def test_ensure_server_cancels_pending_idle_timer(monkeypatch):
+    manager = OpenCodeServerManager()
+    fake_proc = mock.Mock()
+    fake_proc.poll.return_value = None
+    timer = mock.Mock()
+    manager._proc = fake_proc
+    manager._managed = True
+    manager._url = "http://127.0.0.1:5001"
+    manager._trust_signature = ()
+    manager._idle_timer = timer
+
+    with (
+        mock.patch("hatch.mcp.runtime._build_server_env", return_value={}),
+        mock.patch("hatch.mcp.runtime.observatory_trust_signature", return_value=()),
+        mock.patch("hatch.mcp.runtime._healthcheck", return_value=True),
+    ):
+        url = manager.ensure_server()
+
+    assert url == "http://127.0.0.1:5001"
+    timer.cancel.assert_called_once()
+    assert manager._idle_timer is None
+
+
 def test_managed_server_restarts_when_observatory_trust_changes(monkeypatch, tmp_path):
     home = tmp_path / "home"
     ca = home / ".local" / "state" / "agent-observatory" / "ca" / "observatory-ca.pem"
@@ -286,6 +309,37 @@ def test_release_server_shuts_down_immediately_when_idle(monkeypatch):
 
     terminate.assert_called_once_with(fake_proc)
     assert manager.current_url is None
+
+
+def test_release_server_schedules_delayed_idle_shutdown(monkeypatch):
+    manager = OpenCodeServerManager()
+    fake_proc = mock.Mock()
+    fake_proc.poll.return_value = None
+    fake_timer = mock.Mock()
+    manager._proc = fake_proc
+    manager._managed = True
+    manager._url = "http://127.0.0.1:5001"
+    manager._active_runs = 1
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_IDLE_SHUTDOWN_S", "15")
+
+    with mock.patch("hatch.mcp.runtime.threading.Timer", return_value=fake_timer) as timer_cls:
+        manager.release_server()
+
+    timer_cls.assert_called_once_with(15.0, manager._shutdown_if_idle)
+    assert fake_timer.daemon is True
+    fake_timer.start.assert_called_once()
+
+
+def test_idle_timer_does_not_shutdown_when_run_is_active():
+    manager = OpenCodeServerManager()
+    manager._active_runs = 1
+    manager._idle_timer = mock.Mock()
+
+    with mock.patch.object(manager, "shutdown") as shutdown:
+        manager._shutdown_if_idle()
+
+    shutdown.assert_not_called()
+    assert manager._idle_timer is None
 
 
 def test_mcp_main_installs_shutdown_and_cleans_up():

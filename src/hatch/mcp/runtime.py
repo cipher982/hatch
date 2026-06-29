@@ -486,20 +486,22 @@ class OpenCodeServerManager:
     def ensure_server(self) -> str:
         configured_url = os.environ.get(ATTACH_URL_ENV, "").strip()
         if configured_url:
-            if self._managed and self._proc and self._proc.poll() is None:
-                self.shutdown()
             healthy, health_error = _healthcheck_status(configured_url)
             if not healthy:
                 raise HatchMcpRuntimeError(
                     f"Configured attach url is not healthy: {configured_url}"
                     f" ({health_error or 'unknown healthcheck failure'})"
                 )
-            self._url = configured_url
-            self._managed = False
-            self._trust_signature = ()
+            with self._lock:
+                proc = self._take_shutdown_proc_locked()
+                self._url = configured_url
+                self._managed = False
+                self._trust_signature = ()
+            _terminate_process(proc)
             return configured_url
 
         with self._lock:
+            self._cancel_idle_timer_locked()
             desired_signature = observatory_trust_signature(_build_server_env())
             if self._proc and self._proc.poll() is None and self._url and _healthcheck(self._url):
                 if self._trust_signature == desired_signature:
