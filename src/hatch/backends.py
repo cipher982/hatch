@@ -225,7 +225,7 @@ def configure_codex(
     """Configure Codex backend (OpenAI Codex CLI).
 
     Uses `codex exec` subcommand for non-interactive mode.
-    Prompt passed via stdin (using `-` as prompt arg) to avoid ARG_MAX limits.
+    Prompt passed via stdin to avoid ARG_MAX limits.
     """
     ctx = ctx or detect_context()
 
@@ -241,18 +241,16 @@ def configure_codex(
     if ctx.in_container and not ctx.home_writable:
         env["HOME"] = ctx.effective_home
 
-    # Codex exec subcommand for non-interactive mode
-    # `-` means read prompt from stdin
+    # Codex exec reads prompt from stdin when no prompt arg is provided.
     cmd = [
         "codex",
         "exec",
-        "-",  # Read prompt from stdin
     ]
 
     # Full auto mode for automatic execution without prompts
     if full_auto:
-        cmd.append("--full-auto")
-        # Ensure headless runs don't hang on interactive tool approvals
+        # Ensure headless runs don't hang on interactive tool approvals.
+        # Newer Codex CLIs reject combining this with the legacy --full-auto flag.
         cmd.append("--dangerously-bypass-approvals-and-sandbox")
 
     # Model override if specified

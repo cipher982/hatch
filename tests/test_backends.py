@@ -463,15 +463,13 @@ class TestConfigureCodex:
         assert config.cmd == [
             "codex",
             "exec",
-            "-",
-            "--full-auto",
             "--dangerously-bypass-approvals-and-sandbox",
         ]
 
     def test_command_structure_no_full_auto(self, mock_openai_key, laptop_context):
         """Command without full-auto flag."""
         config = configure_codex("test prompt", laptop_context, full_auto=False)
-        assert config.cmd == ["codex", "exec", "-"]
+        assert config.cmd == ["codex", "exec"]
 
     def test_custom_model(self, mock_openai_key, laptop_context):
         """Custom model adds -m flag."""
