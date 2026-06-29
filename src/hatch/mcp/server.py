@@ -14,7 +14,9 @@ from hatch.expert import DEFAULT_EXPERT_MODEL
 from hatch.expert import ExpertReasoningEffort
 from hatch.expert import run_expert_sync
 from hatch.mcp.batch import add_batch_support
+from hatch.mcp.runtime import SERVER_MANAGER
 from hatch.mcp.runtime import doctor
+from hatch.mcp.runtime import install_shutdown_signal_handlers
 from hatch.mcp.runtime import run_surface
 from hatch.models import ClaudeModelAlias
 from hatch.models import CodexModelAlias
@@ -312,7 +314,11 @@ add_batch_support(mcp, TOOLS)
 
 def main() -> None:
     """Run the MCP server over stdio."""
-    mcp.run()
+    install_shutdown_signal_handlers()
+    try:
+        mcp.run()
+    finally:
+        SERVER_MANAGER.shutdown()
 
 
 if __name__ == "__main__":

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import atexit
+import contextlib
 import json
 import os
 import queue
 import shutil
+import signal
 import socket
 import subprocess
 import threading
@@ -45,12 +47,14 @@ ATTACH_URL_ENV = "HATCH_MCP_OPENCODE_ATTACH_URL"
 OPENCODE_PORT_ENV = "HATCH_MCP_OPENCODE_PORT"
 OPENCODE_ROOT_ENV = "HATCH_MCP_OPENCODE_ROOT"
 OPENCODE_CONFIG_ENV = "HATCH_MCP_OPENCODE_CONFIG"
+OPENCODE_IDLE_SHUTDOWN_ENV = "HATCH_MCP_OPENCODE_IDLE_SHUTDOWN_S"
 SESSION_FETCH_TIMEOUT_ENV = "HATCH_MCP_SESSION_FETCH_TIMEOUT_S"
 DEFAULT_GEMINI_MODEL = os.environ.get(
     "HATCH_MCP_GEMINI_MODEL",
     "google/gemini-3-flash-preview",
 )
 SERVER_START_TIMEOUT_S = 15.0
+SERVER_IDLE_SHUTDOWN_S = 60.0
 DEFAULT_OPENCODE_ROOT = Path.home() / ".local" / "share" / "hatch" / "mcp-runtime"
 DEFAULT_OPENCODE_CONFIG = Path(__file__).with_name("opencode.json")
 
@@ -152,6 +156,9 @@ def _build_server_env() -> dict[str, str]:
         "ANTHROPIC_BASE_URL",
     ]:
         env.pop(key, None)
+    for key in list(env):
+        if key.startswith("OPENCODE"):
+            env.pop(key, None)
 
     secret = _maybe_load_secret(Backend.CODEX)
     if secret:
@@ -222,6 +229,34 @@ def _session_fetch_timeout_s() -> float:
     except ValueError:
         return 5.0
     return max(0.1, timeout)
+
+
+def _idle_shutdown_s() -> float:
+    configured = os.environ.get(OPENCODE_IDLE_SHUTDOWN_ENV, "").strip()
+    if not configured:
+        return SERVER_IDLE_SHUTDOWN_S
+    try:
+        return float(configured)
+    except ValueError:
+        return SERVER_IDLE_SHUTDOWN_S
+
+
+def _terminate_process(proc: subprocess.Popen[str] | None, timeout_s: float = 2.0) -> None:
+    if proc is None:
+        return
+    if proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=timeout_s)
+        return
+    except subprocess.TimeoutExpired:
+        proc.kill()
+    except Exception:
+        with contextlib.suppress(Exception):
+            proc.kill()
+    with contextlib.suppress(Exception):
+        proc.wait(timeout=timeout_s)
 
 
 def _fetch_attached_session_messages(
@@ -412,13 +447,23 @@ def _find_free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def _healthcheck(url: str, timeout_s: float = 1.0) -> bool:
+def _healthcheck_status(url: str, timeout_s: float = 1.0) -> tuple[bool, str | None]:
     try:
         with urllib.request.urlopen(f"{url}/global/health", timeout=timeout_s) as response:
             payload = json.load(response)
-    except (OSError, urllib.error.URLError, json.JSONDecodeError):
-        return False
-    return bool(payload.get("healthy"))
+    except urllib.error.HTTPError as exc:
+        return False, f"HTTP {exc.code} {exc.reason}"
+    except (OSError, urllib.error.URLError) as exc:
+        return False, str(exc)
+    except json.JSONDecodeError as exc:
+        return False, f"invalid health JSON: {exc}"
+    healthy = bool(payload.get("healthy"))
+    return healthy, None if healthy else f"unhealthy payload: {payload!r}"
+
+
+def _healthcheck(url: str, timeout_s: float = 1.0) -> bool:
+    healthy, _ = _healthcheck_status(url, timeout_s=timeout_s)
+    return healthy
 
 
 class OpenCodeServerManager:
@@ -430,6 +475,8 @@ class OpenCodeServerManager:
         self._url: str | None = None
         self._managed = False
         self._trust_signature: tuple[tuple[str, str], ...] = ()
+        self._active_runs = 0
+        self._idle_timer: threading.Timer | None = None
         atexit.register(self.shutdown)
 
     @property
@@ -441,9 +488,11 @@ class OpenCodeServerManager:
         if configured_url:
             if self._managed and self._proc and self._proc.poll() is None:
                 self.shutdown()
-            if not _healthcheck(configured_url):
+            healthy, health_error = _healthcheck_status(configured_url)
+            if not healthy:
                 raise HatchMcpRuntimeError(
                     f"Configured attach url is not healthy: {configured_url}"
+                    f" ({health_error or 'unknown healthcheck failure'})"
                 )
             self._url = configured_url
             self._managed = False
@@ -455,11 +504,69 @@ class OpenCodeServerManager:
             if self._proc and self._proc.poll() is None and self._url and _healthcheck(self._url):
                 if self._trust_signature == desired_signature:
                     return self._url
-                self.shutdown()
+                _terminate_process(self._take_shutdown_proc_locked())
 
             self._start_locked()
             assert self._url is not None
             return self._url
+
+    def acquire_server(self) -> str:
+        with self._lock:
+            self._active_runs += 1
+            self._cancel_idle_timer_locked()
+        try:
+            return self.ensure_server()
+        except Exception:
+            self.release_server()
+            raise
+
+    def release_server(self) -> None:
+        should_shutdown_now = False
+        with self._lock:
+            if self._active_runs > 0:
+                self._active_runs -= 1
+            if self._active_runs != 0:
+                return
+            if self._proc is None or self._proc.poll() is not None or not self._managed:
+                return
+
+            delay_s = _idle_shutdown_s()
+            if delay_s < 0:
+                return
+            self._cancel_idle_timer_locked()
+            if delay_s == 0:
+                should_shutdown_now = True
+            else:
+                self._idle_timer = threading.Timer(delay_s, self._shutdown_if_idle)
+                self._idle_timer.daemon = True
+                self._idle_timer.start()
+
+        if should_shutdown_now:
+            self.shutdown()
+
+    def _shutdown_if_idle(self) -> None:
+        with self._lock:
+            self._idle_timer = None
+            if self._active_runs != 0:
+                return
+        self.shutdown()
+
+    def _cancel_idle_timer_locked(self) -> None:
+        timer = self._idle_timer
+        self._idle_timer = None
+        if timer is not None:
+            timer.cancel()
+
+    def _take_shutdown_proc_locked(self) -> subprocess.Popen[str] | None:
+        self._cancel_idle_timer_locked()
+        proc = self._proc
+        should_terminate = proc is not None and proc.poll() is None and self._managed
+        self._proc = None
+        self._url = None
+        self._managed = False
+        self._trust_signature = ()
+        self._active_runs = 0
+        return proc if should_terminate else None
 
     def _start_locked(self) -> None:
         port = int(os.environ.get(OPENCODE_PORT_ENV) or _find_free_port())
@@ -485,40 +592,62 @@ class OpenCodeServerManager:
         )
 
         deadline = time.monotonic() + SERVER_START_TIMEOUT_S
+        last_health_error: str | None = None
         while time.monotonic() < deadline:
-            if _healthcheck(url):
+            healthy, health_error = _healthcheck_status(url)
+            if healthy:
                 self._proc = proc
                 self._url = url
                 self._managed = True
                 self._trust_signature = observatory_trust_signature(env)
                 return
+            last_health_error = health_error
             if proc.poll() is not None:
                 raise HatchMcpRuntimeError(f"OpenCode server exited during startup ({proc.returncode})")
             time.sleep(0.2)
 
-        proc.terminate()
-        raise HatchMcpRuntimeError("Timed out waiting for OpenCode server to become healthy")
+        _terminate_process(proc)
+        raise HatchMcpRuntimeError(
+            "Timed out waiting for OpenCode server to become healthy"
+            f" at {url}; last healthcheck: {last_health_error or 'unknown failure'}"
+        )
 
     def shutdown(self) -> None:
-        proc = self._proc
-        if proc is None or proc.poll() is not None or not self._managed:
-            self._proc = None
-            self._url = None
-            self._managed = False
-            self._trust_signature = ()
-            return
-        try:
-            proc.terminate()
-            proc.wait(timeout=2)
-        except Exception:
-            proc.kill()
-        self._proc = None
-        self._url = None
-        self._managed = False
-        self._trust_signature = ()
+        with self._lock:
+            proc = self._take_shutdown_proc_locked()
+
+        _terminate_process(proc)
 
 
 SERVER_MANAGER = OpenCodeServerManager()
+_SIGNAL_HANDLERS_INSTALLED = False
+
+
+def install_shutdown_signal_handlers() -> None:
+    """Ensure managed OpenCode servers are torn down on normal MCP termination."""
+    global _SIGNAL_HANDLERS_INSTALLED
+    if _SIGNAL_HANDLERS_INSTALLED:
+        return
+
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        previous_handler = signal.getsignal(signum)
+
+        def _handler(
+            received: int,
+            frame: Any,
+            previous_handler: Any = previous_handler,
+        ) -> None:
+            SERVER_MANAGER.shutdown()
+            if callable(previous_handler):
+                previous_handler(received, frame)
+                return
+            if previous_handler == signal.SIG_IGN:
+                return
+            raise SystemExit(128 + received)
+
+        signal.signal(signum, _handler)
+
+    _SIGNAL_HANDLERS_INSTALLED = True
 
 
 def build_run_command(
@@ -777,24 +906,27 @@ def run_surface(
             "cmd": None,
         }
 
-    attach_url = SERVER_MANAGER.ensure_server()
-    cmd = build_run_command(
-        tool_name=tool_name,
-        prompt=prompt,
-        attach_url=attach_url,
-        model=model,
-        cwd=cwd,
-        reasoning_effort=reasoning_effort,
-    )
+    attach_url = SERVER_MANAGER.acquire_server()
+    try:
+        cmd = build_run_command(
+            tool_name=tool_name,
+            prompt=prompt,
+            attach_url=attach_url,
+            model=model,
+            cwd=cwd,
+            reasoning_effort=reasoning_effort,
+        )
 
-    result = run_attached_command(
-        cmd,
-        model=resolved_model,
-        attach_url=attach_url,
-        timeout_s=timeout_s,
-        progress_label=SURFACE_LABELS[tool_name],
-        progress_handler=progress_handler,
-    )
+        result = run_attached_command(
+            cmd,
+            model=resolved_model,
+            attach_url=attach_url,
+            timeout_s=timeout_s,
+            progress_label=SURFACE_LABELS[tool_name],
+            progress_handler=progress_handler,
+        )
+    finally:
+        SERVER_MANAGER.release_server()
     duration_ms = int((time.perf_counter() - start) * 1000)
     artifact_path = _write_run_artifact(
         stdout=result.stdout,

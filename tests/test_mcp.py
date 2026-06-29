@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import subprocess
 import sys
 from pathlib import Path
 from unittest import mock
@@ -16,12 +17,14 @@ from hatch.mcp.runtime import _build_run_env
 from hatch.mcp.runtime import _build_server_env
 from hatch.mcp.runtime import _extract_attached_session_output
 from hatch.mcp.runtime import _fetch_attached_session_messages
+from hatch.mcp.runtime import _terminate_process
 from hatch.mcp.runtime import build_run_command
 from hatch.mcp.runtime import doctor
 from hatch.mcp.runtime import run_attached_command
 from hatch.mcp.runtime import run_surface
 from hatch.mcp.server import _run_with_progress
 from hatch.mcp.server import _run_expert_with_progress
+from hatch.mcp.server import main as mcp_main
 from hatch.mcp.server import TOOLS
 
 
@@ -117,6 +120,55 @@ def test_runtime_env_uses_isolated_xdg_paths_and_repo_config(monkeypatch, tmp_pa
     assert "OPENCODE_CONFIG_CONTENT" not in env
 
 
+def test_runtime_env_strips_inherited_opencode_server_env(monkeypatch, tmp_path):
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
+    monkeypatch.setenv("OPENCODE", "1")
+    monkeypatch.setenv("OPENCODE_PID", "12345")
+    monkeypatch.setenv("OPENCODE_PRINT_LOGS", "1")
+    monkeypatch.setenv("OPENCODE_SERVER_USERNAME", "opencode")
+    monkeypatch.setenv("OPENCODE_SERVER_PASSWORD", "secret")
+    monkeypatch.setenv("OPENCODE_CONFIG_CONTENT", '{"plugin":[]}')
+    monkeypatch.setenv("OPENCODE_CONFIG", "/tmp/ambient-opencode.json")
+
+    with mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None):
+        env = _build_server_env()
+
+    assert env["OPENCODE_CONFIG"].endswith("hatch/mcp/opencode.json")
+    assert "OPENCODE" not in env
+    assert "OPENCODE_PID" not in env
+    assert "OPENCODE_PRINT_LOGS" not in env
+    assert "OPENCODE_SERVER_USERNAME" not in env
+    assert "OPENCODE_SERVER_PASSWORD" not in env
+    assert "OPENCODE_CONFIG_CONTENT" not in env
+
+
+def test_terminate_process_waits_after_terminate():
+    proc = mock.Mock()
+    proc.poll.return_value = None
+
+    _terminate_process(proc, timeout_s=0.1)
+
+    proc.terminate.assert_called_once()
+    proc.wait.assert_called_once_with(timeout=0.1)
+    proc.kill.assert_not_called()
+
+
+def test_terminate_process_kills_and_reaps_after_timeout():
+    proc = mock.Mock()
+    proc.poll.return_value = None
+    proc.wait.side_effect = [
+        subprocess.TimeoutExpired(cmd="opencode serve", timeout=0.1),
+        None,
+    ]
+
+    _terminate_process(proc, timeout_s=0.1)
+
+    proc.terminate.assert_called_once()
+    proc.kill.assert_called_once()
+    assert proc.wait.call_count == 2
+
+
 def test_runtime_env_discovers_observatory_ca_without_inherited_env(monkeypatch, tmp_path):
     home = tmp_path / "home"
     ca = home / ".local" / "state" / "agent-observatory" / "ca" / "observatory-ca.pem"
@@ -171,7 +223,7 @@ def test_configured_attach_url_shuts_down_managed_server(monkeypatch):
     manager._url = "http://127.0.0.1:4999"
 
     monkeypatch.setenv("HATCH_MCP_OPENCODE_ATTACH_URL", "http://127.0.0.1:5000")
-    with mock.patch("hatch.mcp.runtime._healthcheck", return_value=True):
+    with mock.patch("hatch.mcp.runtime._healthcheck_status", return_value=(True, None)):
         url = manager.ensure_server()
 
     assert url == "http://127.0.0.1:5000"
@@ -219,6 +271,36 @@ def test_managed_server_restarts_when_observatory_trust_changes(monkeypatch, tmp
     old_proc.terminate.assert_called_once()
 
 
+def test_release_server_shuts_down_immediately_when_idle(monkeypatch):
+    manager = OpenCodeServerManager()
+    fake_proc = mock.Mock()
+    fake_proc.poll.return_value = None
+    manager._proc = fake_proc
+    manager._managed = True
+    manager._url = "http://127.0.0.1:5001"
+    manager._active_runs = 1
+    monkeypatch.setenv("HATCH_MCP_OPENCODE_IDLE_SHUTDOWN_S", "0")
+
+    with mock.patch("hatch.mcp.runtime._terminate_process") as terminate:
+        manager.release_server()
+
+    terminate.assert_called_once_with(fake_proc)
+    assert manager.current_url is None
+
+
+def test_mcp_main_installs_shutdown_and_cleans_up():
+    with (
+        mock.patch("hatch.mcp.server.install_shutdown_signal_handlers") as install_handlers,
+        mock.patch("hatch.mcp.server.mcp.run") as run,
+        mock.patch("hatch.mcp.server.SERVER_MANAGER.shutdown") as shutdown,
+    ):
+        mcp_main()
+
+    install_handlers.assert_called_once()
+    run.assert_called_once()
+    shutdown.assert_called_once()
+
+
 def test_run_surface_success_uses_attach_runtime(monkeypatch, tmp_path):
     monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(tmp_path / "runtime"))
     fake_result = OpenCodeRunResult(
@@ -233,6 +315,7 @@ def test_run_surface_success_uses_attach_runtime(monkeypatch, tmp_path):
     )
 
     with (
+        mock.patch("hatch.mcp.runtime.preflight_bedrock_aws", return_value=None),
         mock.patch("hatch.mcp.runtime.SERVER_MANAGER.ensure_server", return_value="http://127.0.0.1:4196"),
         mock.patch("hatch.mcp.runtime.run_attached_command", return_value=fake_result),
     ):
@@ -267,6 +350,7 @@ def test_run_surface_empty_output_is_protocol_error(monkeypatch, tmp_path):
     )
 
     with (
+        mock.patch("hatch.mcp.runtime.preflight_bedrock_aws", return_value=None),
         mock.patch("hatch.mcp.runtime.SERVER_MANAGER.ensure_server", return_value="http://127.0.0.1:4196"),
         mock.patch("hatch.mcp.runtime.run_attached_command", return_value=fake_result),
     ):
@@ -333,6 +417,7 @@ def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
     )
 
     with (
+        mock.patch("hatch.mcp.runtime.preflight_bedrock_aws", return_value=None),
         mock.patch("hatch.mcp.runtime.SERVER_MANAGER.ensure_server", return_value="http://127.0.0.1:4196"),
         mock.patch("hatch.mcp.runtime.run_attached_command", return_value=fake_result),
     ):
