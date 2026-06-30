@@ -10,7 +10,9 @@ import pytest
 from hatch.backends import Backend
 from hatch.credentials import OPENROUTER_CREDENTIAL
 from hatch.credentials import credential_backend_for
+from hatch.credentials import ensure_opencode_credentials
 from hatch.credentials import hydrate_backend_kwargs
+from hatch.credentials import resolve_env_secret
 
 
 class TestHydrateBackendKwargs:
@@ -82,3 +84,19 @@ class TestHydrateBackendKwargs:
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-env"}, clear=False):
             kwargs = hydrate_backend_kwargs(backend, {})
         assert kwargs["api_key"] == "sk-or-env"
+
+    def test_resolve_env_secret_ignores_whitespace_env(self):
+        with mock.patch("hatch.credentials._load_secret_from_helper", return_value="sk-or-helper"):
+            value = resolve_env_secret(
+                OPENROUTER_CREDENTIAL,
+                {"OPENROUTER_API_KEY": "   "},
+            )
+        assert value == "sk-or-helper"
+
+    def test_ensure_opencode_credentials_raises_for_missing_openrouter(self):
+        with mock.patch("hatch.credentials.resolve_env_secret", return_value=None):
+            with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
+                ensure_opencode_credentials(
+                    "openrouter/deepseek/deepseek-v4-pro",
+                    {},
+                )

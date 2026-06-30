@@ -207,8 +207,7 @@ def test_runtime_env_loads_openrouter_secret(monkeypatch, tmp_path):
     monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
-    with mock.patch("hatch.mcp.runtime._maybe_load_secret") as loader:
-        loader.side_effect = lambda backend: "sk-or-helper" if backend == "openrouter" else None
+    with mock.patch("hatch.mcp.runtime.resolve_env_secret", return_value="sk-or-helper"):
         env = _build_server_env()
 
     assert env["OPENROUTER_API_KEY"] == "sk-or-helper"
@@ -650,9 +649,9 @@ def test_run_env_scopes_provider_credentials(monkeypatch):
         lambda backend: "stable-openai-key" if str(backend) == "Backend.CODEX" else None,
     )
 
-    claude_env = _build_run_env("amazon-bedrock/us.anthropic.claude-opus-4-7")
+    claude_env = _build_run_env("openrouter/anthropic/claude-sonnet-4.6")
     assert "OPENAI_API_KEY" not in claude_env
-    assert "OPENROUTER_API_KEY" not in claude_env
+    assert claude_env["OPENROUTER_API_KEY"] == "openrouter-key"
 
     openai_env = _build_run_env("openai/gpt-5.4-mini")
     assert openai_env["OPENAI_API_KEY"] == "stable-openai-key"

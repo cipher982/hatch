@@ -29,6 +29,9 @@ from hatch.aws_preflight import preflight_bedrock_aws
 from hatch.backends import Backend
 from hatch.credentials import SECRET_SPECS
 from hatch.credentials import OPENROUTER_CREDENTIAL
+from hatch.credentials import credential_status
+from hatch.credentials import ensure_opencode_credentials
+from hatch.credentials import resolve_env_secret
 from hatch.credentials import _load_secret_from_helper
 from hatch.models import SURFACE_LABELS
 from hatch.models import SURFACE_NAMES
@@ -164,10 +167,11 @@ def _build_server_env() -> dict[str, str]:
     if secret:
         env["OPENAI_API_KEY"] = secret
 
-    if not env.get("OPENROUTER_API_KEY"):
-        secret = _maybe_load_secret(OPENROUTER_CREDENTIAL)
-        if secret:
-            env["OPENROUTER_API_KEY"] = secret
+    openrouter_secret = resolve_env_secret(OPENROUTER_CREDENTIAL, env)
+    if openrouter_secret:
+        env["OPENROUTER_API_KEY"] = openrouter_secret
+    else:
+        env.pop("OPENROUTER_API_KEY", None)
 
     env["AWS_PROFILE"] = DEFAULT_BEDROCK_AWS_PROFILE
     env["AWS_REGION"] = DEFAULT_BEDROCK_AWS_REGION
@@ -873,6 +877,11 @@ def doctor() -> dict[str, Any]:
         "run_artifacts_dir": str(_run_artifacts_dir()),
         "observatory_ca_path": str(observatory_ca_path(env) or ""),
         "observatory_trust_env": dict(observatory_trust_signature(env)),
+        "credentials": credential_status(),
+        "secret_helper_disabled": os.environ.get("HATCH_DISABLE_SECRET_HELPER", "").strip() == "1",
+        "infisical_access_token_present": (
+            Path.home() / ".config" / "infisical" / "access-token"
+        ).is_file(),
     }
 
 
@@ -889,8 +898,10 @@ def run_surface(
     start = time.perf_counter()
     resolved_model = _resolve_model(tool_name, model)
     try:
-        preflight_bedrock_aws(resolved_model, _build_run_env(resolved_model))
-    except BedrockAwsAuthError as exc:
+        run_env = _build_run_env(resolved_model)
+        preflight_bedrock_aws(resolved_model, run_env)
+        ensure_opencode_credentials(resolved_model, run_env)
+    except (BedrockAwsAuthError, ValueError) as exc:
         duration_ms = int((time.perf_counter() - start) * 1000)
         return {
             "ok": False,

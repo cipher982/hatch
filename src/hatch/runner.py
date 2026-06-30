@@ -199,7 +199,7 @@ def _run_subprocess(
     """
     proc = subprocess.Popen(
         cmd,
-        stdin=subprocess.PIPE if stdin_data else None,
+        stdin=subprocess.PIPE if stdin_data else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env,
@@ -246,7 +246,7 @@ def run_claude_stream_sync(
     """Run Claude in stream-json mode and preserve only the final answer."""
     proc = subprocess.Popen(
         cmd,
-        stdin=subprocess.PIPE if stdin_data else None,
+        stdin=subprocess.PIPE if stdin_data else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env,
@@ -357,7 +357,7 @@ def run_opencode_stream_sync(
     """Run OpenCode in JSON event mode and preserve only the final answer."""
     proc = subprocess.Popen(
         cmd,
-        stdin=subprocess.PIPE if stdin_data else None,
+        stdin=subprocess.PIPE if stdin_data else subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env,
