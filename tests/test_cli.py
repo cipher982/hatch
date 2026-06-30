@@ -361,12 +361,12 @@ class TestNormalizeArgv:
         ]
 
     def test_claude_model_aliases_work(self):
-        """Claude shorthand models map to Bedrock model IDs."""
+        """Claude shorthand models map to OpenRouter Anthropic model IDs."""
         assert normalize_argv(["claude", "haiku", "summarize"]) == [
             "--backend",
             "opencode",
             "--model",
-            "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "openrouter/anthropic/claude-haiku-4.5",
             "summarize",
         ]
 
@@ -409,14 +409,14 @@ class TestNormalizeArgv:
             "--backend",
             "opencode",
             "--model",
-            "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
+            "openrouter/anthropic/claude-sonnet-4.6",
             "review",
         ]
         assert normalize_argv(["claude", "opus", "review"]) == [
             "--backend",
             "opencode",
             "--model",
-            "amazon-bedrock/global.anthropic.claude-opus-4-8",
+            "openrouter/anthropic/claude-opus-4.8",
             "review",
         ]
         assert normalize_argv(["openrouter", "deepseek-v4-pro", "review"]) == [

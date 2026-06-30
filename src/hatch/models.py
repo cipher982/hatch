@@ -42,10 +42,10 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
         tool_name="hatch_claude",
         surface_name="hatch claude",
         models={
-            "haiku": "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-            "sonnet": "amazon-bedrock/us.anthropic.claude-sonnet-4-6",
-            "opus": "amazon-bedrock/global.anthropic.claude-opus-4-8",
-            "fable": "amazon-bedrock/global.anthropic.claude-fable-5",
+            "haiku": "openrouter/anthropic/claude-haiku-4.5",
+            "sonnet": "openrouter/anthropic/claude-sonnet-4.6",
+            "opus": "openrouter/anthropic/claude-opus-4.8",
+            "fable": "openrouter/~anthropic/claude-fable-latest",
         },
     ),
     "openrouter": SurfacedProvider(
@@ -102,7 +102,7 @@ def opencode_progress_label(model_name: str) -> str:
     """Map OpenCode model IDs to user-facing progress labels."""
     if model_name.startswith("openai/"):
         return "Codex"
-    if model_name.startswith("amazon-bedrock/") or model_name.startswith("anthropic/"):
+    if model_name.startswith("openrouter/") and ("/anthropic/" in model_name or "/~anthropic/" in model_name):
         return "Claude"
     if model_name.startswith("google/") or model_name.startswith("gemini/"):
         return "Gemini"

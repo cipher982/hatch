@@ -13,7 +13,7 @@ uv tool install -e ~/git/hatch
 ## Entrypoints
 
 Public surface:
-- `hatch claude <haiku|sonnet|opus|fable>` → Claude on Amazon Bedrock (`fable` = Mythos-class, highest capability)
+- `hatch claude <haiku|sonnet|opus|fable>` → Claude via OpenRouter Anthropic models (`fable` = Fable-class, higher capability)
 - `hatch codex <nano|mini|max>` → GPT-5 on OpenAI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
@@ -24,7 +24,7 @@ Default tiers:
 - Start with `sonnet` for Claude and `mini` for Codex
 - Drop to `haiku` / `nano` for faster cheaper work
 - Rise to `opus` / `max` when depth matters
-- Use `fable` for Mythos-class Claude (highest capability, always-on adaptive thinking)
+- Use `fable` for Fable-class Claude (higher capability, always-on adaptive thinking)
 - Use `openrouter deepseek-v4-pro` as the non-OpenAI/non-Anthropic third option
 
 Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
@@ -144,3 +144,4 @@ print(result.output if result.ok else result.error)
 - (2026-05-21) [expert] Keep `hatch expert` to low/medium effort. On timeout, preserve the background response id/artifact instead of cancelling at the boundary.
 - (2026-05-24) [codex] Headless Hatch runs for Codex must explicitly pass `--dangerously-bypass-approvals-and-sandbox` to prevent deadlocks on interactive tool-approval prompts in non-interactive/redirected subshells.
 - (2026-05-27) [opencode] Surfaced Hatch/OpenCode runs must pass `--dangerously-skip-permissions`; keep `--dir` for repo context instead of broadening by omitting cwd.
+- (2026-06-29) [migration] Switched Claude models from `amazon-bedrock/` to `openrouter/anthropic/` because AWS Bedrock was down. Anthropic prohibits using Claude Pro/Max subscriptions in OpenCode (plugin removed in 1.3.0), so OpenRouter bridges to Anthropic models using the existing OpenRouter API key.

@@ -83,7 +83,7 @@ def test_build_run_command_uses_latest_frontier_aliases():
     )
 
     assert codex_cmd[codex_cmd.index("-m") + 1] == "openai/gpt-5.5"
-    assert claude_cmd[claude_cmd.index("-m") + 1] == "amazon-bedrock/global.anthropic.claude-opus-4-8"
+    assert claude_cmd[claude_cmd.index("-m") + 1] == "openrouter/anthropic/claude-opus-4.8"
 
 
 def test_build_run_command_openrouter_deepseek_alias():
@@ -492,7 +492,7 @@ def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
     assert artifact["stdout"] == stdout
     assert artifact["event_types"] == ["step_start"]
     assert artifact["session_id"] == "ses_123"
-    assert artifact["cmd"][-1] == "amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    assert artifact["cmd"][-1] == "openrouter/anthropic/claude-haiku-4.5"
 
 
 def test_fetch_attached_session_messages_reads_server_payload():
