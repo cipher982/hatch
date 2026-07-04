@@ -70,7 +70,7 @@ class TestHydrateBackendKwargs:
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("OPENAI_API_KEY", None)
             with mock.patch("hatch.credentials._load_secret_from_helper", return_value=None):
-                with pytest.raises(ValueError, match="infisical-get.py"):
+                with pytest.raises(ValueError, match="from Infisical"):
                     hydrate_backend_kwargs(Backend.CODEX, {})
 
     def test_openrouter_uses_openrouter_env(self):

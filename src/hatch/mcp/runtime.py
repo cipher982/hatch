@@ -26,13 +26,9 @@ from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_PROFILE
 from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_REGION
 from hatch.aws_preflight import BedrockAwsAuthError
 from hatch.aws_preflight import preflight_bedrock_aws
-from hatch.backends import Backend
-from hatch.credentials import SECRET_SPECS
-from hatch.credentials import OPENROUTER_CREDENTIAL
+from hatch.credentials import CredentialCache
 from hatch.credentials import credential_status
 from hatch.credentials import ensure_opencode_credentials
-from hatch.credentials import resolve_env_secret
-from hatch.credentials import _load_secret_from_helper
 from hatch.models import SURFACE_LABELS
 from hatch.models import SURFACE_NAMES
 from hatch.models import TOOL_TO_PROVIDER
@@ -131,13 +127,6 @@ def _run_artifacts_dir() -> Path:
     return path
 
 
-def _maybe_load_secret(backend: Backend | str) -> str | None:
-    spec = SECRET_SPECS.get(backend)
-    if not spec:
-        return None
-    return _load_secret_from_helper(spec)
-
-
 def _build_server_env() -> dict[str, str]:
     env = dict(os.environ)
     runtime_paths = _runtime_paths()
@@ -163,13 +152,13 @@ def _build_server_env() -> dict[str, str]:
         if key.startswith("OPENCODE"):
             env.pop(key, None)
 
-    secret = _maybe_load_secret(Backend.CODEX)
-    if secret:
-        env["OPENAI_API_KEY"] = secret
+    openai_key = CredentialCache.get("OPENAI_API_KEY")
+    if openai_key:
+        env["OPENAI_API_KEY"] = openai_key
 
-    openrouter_secret = resolve_env_secret(OPENROUTER_CREDENTIAL, env)
-    if openrouter_secret:
-        env["OPENROUTER_API_KEY"] = openrouter_secret
+    openrouter_key = CredentialCache.get("OPENROUTER_API_KEY")
+    if openrouter_key:
+        env["OPENROUTER_API_KEY"] = openrouter_key
     else:
         env.pop("OPENROUTER_API_KEY", None)
 

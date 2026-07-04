@@ -109,7 +109,7 @@ def test_runtime_env_uses_isolated_xdg_paths_and_repo_config(monkeypatch, tmp_pa
     monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
     monkeypatch.delenv("OPENCODE_CONFIG_CONTENT", raising=False)
 
-    with mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None):
+    with mock.patch("hatch.mcp.runtime.CredentialCache.get", return_value=None):
         env = _build_server_env()
 
     assert env["XDG_CONFIG_HOME"] == str(runtime_root / "config")
@@ -131,7 +131,7 @@ def test_runtime_env_strips_inherited_opencode_server_env(monkeypatch, tmp_path)
     monkeypatch.setenv("OPENCODE_CONFIG_CONTENT", '{"plugin":[]}')
     monkeypatch.setenv("OPENCODE_CONFIG", "/tmp/ambient-opencode.json")
 
-    with mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None):
+    with mock.patch("hatch.mcp.runtime.CredentialCache.get", return_value=None):
         env = _build_server_env()
 
     assert env["OPENCODE_CONFIG"].endswith("hatch/mcp/opencode.json")
@@ -180,7 +180,7 @@ def test_runtime_env_discovers_observatory_ca_without_inherited_env(monkeypatch,
     monkeypatch.delenv("NODE_EXTRA_CA_CERTS", raising=False)
     monkeypatch.delenv("CODEX_CA_CERTIFICATE", raising=False)
 
-    with mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None):
+    with mock.patch("hatch.mcp.runtime.CredentialCache.get", return_value=None):
         env = _build_server_env()
 
     assert env["NODE_EXTRA_CA_CERTS"] == str(ca)
@@ -195,7 +195,7 @@ def test_runtime_env_keeps_existing_observatory_ca(monkeypatch, tmp_path):
     monkeypatch.setenv("NODE_EXTRA_CA_CERTS", str(ca))
     monkeypatch.delenv("CODEX_CA_CERTIFICATE", raising=False)
 
-    with mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None):
+    with mock.patch("hatch.mcp.runtime.CredentialCache.get", return_value=None):
         env = _build_server_env()
 
     assert env["NODE_EXTRA_CA_CERTS"] == str(ca)
@@ -207,7 +207,7 @@ def test_runtime_env_loads_openrouter_secret(monkeypatch, tmp_path):
     monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(runtime_root))
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
-    with mock.patch("hatch.mcp.runtime.resolve_env_secret", return_value="sk-or-helper"):
+    with mock.patch("hatch.mcp.runtime.CredentialCache.get", return_value="sk-or-helper"):
         env = _build_server_env()
 
     assert env["OPENROUTER_API_KEY"] == "sk-or-helper"
@@ -283,7 +283,7 @@ def test_managed_server_restarts_when_observatory_trust_changes(monkeypatch, tmp
         )
 
     with (
-        mock.patch("hatch.mcp.runtime._maybe_load_secret", return_value=None),
+        mock.patch("hatch.mcp.runtime.CredentialCache.get", return_value=None),
         mock.patch("hatch.mcp.runtime._healthcheck", return_value=True),
         mock.patch.object(manager, "_start_locked", side_effect=fake_start),
     ):
@@ -642,11 +642,12 @@ def test_run_attached_command_recovers_step_start_only_from_session_api():
 
 
 def test_run_env_scopes_provider_credentials(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
     monkeypatch.setattr(
-        "hatch.mcp.runtime._maybe_load_secret",
-        lambda backend: "stable-openai-key" if str(backend) == "Backend.CODEX" else None,
+        "hatch.mcp.runtime.CredentialCache.get",
+        lambda key: {
+            "OPENAI_API_KEY": "stable-openai-key",
+            "OPENROUTER_API_KEY": "openrouter-key",
+        }.get(key),
     )
 
     claude_env = _build_run_env("openrouter/anthropic/claude-sonnet-4.6")
