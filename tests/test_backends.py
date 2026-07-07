@@ -11,6 +11,7 @@ from hatch.backends import (
     Backend,
     BackendConfig,
     configure_bedrock,
+    configure_claude,
     configure_codex,
     configure_gemini,
     configure_opencode,
@@ -26,6 +27,7 @@ class TestBackendEnum:
     def test_backend_values(self):
         """Backend enum has expected values."""
         assert Backend.ZAI.value == "zai"
+        assert Backend.CLAUDE.value == "claude"
         assert Backend.BEDROCK.value == "bedrock"
         assert Backend.CODEX.value == "codex"
         assert Backend.GEMINI.value == "gemini"
@@ -34,6 +36,7 @@ class TestBackendEnum:
     def test_backend_from_string(self):
         """Backend can be created from string."""
         assert Backend("zai") == Backend.ZAI
+        assert Backend("claude") == Backend.CLAUDE
         assert Backend("bedrock") == Backend.BEDROCK
         assert Backend("codex") == Backend.CODEX
         assert Backend("gemini") == Backend.GEMINI
@@ -437,6 +440,85 @@ class TestConfigureOpenCode:
         assert config.env["HOME"] == "/tmp"
 
 
+class TestConfigureClaude:
+    """Tests for Claude Code subscription/OAuth backend configuration."""
+
+    def test_command_structure(self, laptop_context):
+        """Claude uses local CLI OAuth mode with an explicit model."""
+        config = configure_claude("test prompt", laptop_context, model="haiku")
+        assert config.cmd == [
+            "claude",
+            "--print",
+            "-",
+            "--output-format",
+            "text",
+            "--model",
+            "haiku",
+            "--dangerously-skip-permissions",
+            "--setting-sources",
+            "local",
+            "--no-session-persistence",
+            "--tools",
+            "default",
+            "--effort",
+            "low",
+        ]
+
+    def test_command_with_stream_json(self, laptop_context):
+        """Claude MCP mode uses stream-json with partial messages."""
+        config = configure_claude(
+            "test prompt",
+            laptop_context,
+            model="sonnet",
+            output_format="stream-json",
+            include_partial_messages=True,
+        )
+        assert config.cmd[:7] == [
+            "claude",
+            "--verbose",
+            "--print",
+            "-",
+            "--output-format",
+            "stream-json",
+            "--model",
+        ]
+        assert config.cmd[7] == "sonnet"
+        assert "--include-partial-messages" in config.cmd
+
+    def test_strips_api_key_and_provider_env(self, laptop_context):
+        """Claude local subscription mode must fail closed, not use API-key providers."""
+        config = configure_claude("test", laptop_context, model="haiku")
+        with mock.patch.dict(os.environ, {
+            "OPENROUTER_API_KEY": "or-key",
+            "ANTHROPIC_API_KEY": "anthropic-key",
+            "ANTHROPIC_AUTH_TOKEN": "anthropic-token",
+            "ANTHROPIC_BASE_URL": "https://example.test",
+            "CLAUDE_CODE_USE_BEDROCK": "1",
+            "AWS_PROFILE": "some-profile",
+        }):
+            env = config.build_env()
+
+        for key in [
+            "OPENROUTER_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+            "CLAUDE_CODE_USE_BEDROCK",
+            "AWS_PROFILE",
+        ]:
+            assert key not in env
+
+    def test_prompt_via_stdin(self, laptop_context):
+        """Prompt passed via stdin_data."""
+        config = configure_claude("my claude prompt", laptop_context)
+        assert config.stdin_data == b"my claude prompt"
+
+    def test_container_readonly_sets_home(self, container_readonly_context):
+        """Sets HOME in container with read-only home."""
+        config = configure_claude("test", container_readonly_context)
+        assert config.env["HOME"] == container_readonly_context.effective_home
+
+
 class TestConfigureCodex:
     """Tests for Codex backend configuration."""
 
@@ -568,6 +650,13 @@ class TestGetConfig:
         config = get_config(Backend.BEDROCK, "test", laptop_context)
         assert "claude" in config.cmd
         assert config.env.get("CLAUDE_CODE_USE_BEDROCK") == "1"
+
+    def test_dispatches_to_claude(self, laptop_context):
+        """Dispatches to configure_claude for CLAUDE backend."""
+        config = get_config(Backend.CLAUDE, "test", laptop_context, model="haiku")
+        assert config.cmd[0] == "claude"
+        assert config.cmd[config.cmd.index("--model") + 1] == "haiku"
+        assert "OPENROUTER_API_KEY" in config.env_unset
 
     def test_dispatches_to_codex(self, mock_openai_key, laptop_context):
         """Dispatches to configure_codex for CODEX backend."""

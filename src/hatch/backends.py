@@ -32,6 +32,8 @@ def _build_simple_claude_headless_cmd(
     output_format: str,
     include_partial_messages: bool,
     effort: str = "low",
+    model: str | None = None,
+    tools: str = "",
 ) -> list[str]:
     """Build a minimal Claude headless command that avoids user profile overhead."""
     cmd = [
@@ -47,12 +49,18 @@ def _build_simple_claude_headless_cmd(
         "-",  # Read prompt from stdin
         "--output-format",
         output_format,
+    ])
+
+    if model:
+        cmd.extend(["--model", model])
+
+    cmd.extend([
         "--dangerously-skip-permissions",
         "--setting-sources",
         "local",
         "--no-session-persistence",
         "--tools",
-        "",
+        tools,
         "--effort",
         effort,
     ])
@@ -67,6 +75,7 @@ class Backend(str, Enum):
     """Supported agent backends."""
 
     ZAI = "zai"  # Claude Code CLI with z.ai/GLM-5.1
+    CLAUDE = "claude"  # Claude Code CLI with local OAuth/subscription
     BEDROCK = "bedrock"  # Claude Code CLI with AWS Bedrock
     CODEX = "codex"  # OpenAI Codex CLI
     GEMINI = "gemini"  # Google Gemini CLI
@@ -202,6 +211,59 @@ def configure_bedrock(
             "AWS_PROFILE",
             "AWS_REGION",
             "AWS_DEFAULT_REGION",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_BASE_URL",
+            *_ROULETTE_ENV,
+        ],
+        stdin_data=prompt.encode("utf-8"),
+    )
+
+
+def configure_claude(
+    prompt: str,
+    ctx: ExecutionContext | None = None,
+    *,
+    model: str = "sonnet",
+    resume: str | None = None,
+    output_format: str = "text",
+    include_partial_messages: bool = False,
+    effort: str = "low",
+    tools: str = "default",
+    **_: Any,
+) -> BackendConfig:
+    """Configure Claude Code CLI using the local OAuth/subscription profile.
+
+    This path intentionally strips API-key, OpenRouter, Bedrock, and AWS env so
+    Hatch either uses the user's Claude Code login or fails closed.
+    """
+    ctx = ctx or detect_context()
+
+    env: dict[str, str] = {}
+    if ctx.in_container and not ctx.home_writable:
+        env["HOME"] = ctx.effective_home
+
+    cmd = _build_simple_claude_headless_cmd(
+        output_format=output_format,
+        include_partial_messages=include_partial_messages,
+        effort=effort,
+        model=model,
+        tools=tools,
+    )
+
+    if resume:
+        cmd.extend(["--resume", resume])
+
+    return BackendConfig(
+        cmd=cmd,
+        env=env,
+        env_unset=[
+            "OPENROUTER_API_KEY",
+            "CLAUDE_CODE_USE_BEDROCK",
+            "AWS_PROFILE",
+            "AWS_REGION",
+            "AWS_DEFAULT_REGION",
+            "ANTHROPIC_MODEL",
             "ANTHROPIC_AUTH_TOKEN",
             "ANTHROPIC_API_KEY",
             "ANTHROPIC_BASE_URL",
@@ -409,6 +471,7 @@ def configure_opencode(
 
 # Backend to configure function mapping
 BACKEND_CONFIGURATORS = {
+    Backend.CLAUDE: configure_claude,
     Backend.BEDROCK: configure_bedrock,
     Backend.CODEX: configure_codex,
     Backend.GEMINI: configure_gemini,

@@ -28,9 +28,10 @@ mcp = FastMCP(
     instructions="""
 Stable MCP front door for hatch.
 
-hatch_claude, hatch_codex, hatch_gemini, and hatch_openrouter run as FULL AGENTS
-via the OpenCode runtime with web search, file access, bash, and other tools.
-Use these for web research, repo code work, and multi-step tasks.
+hatch_claude runs through the official local Claude Code CLI using the user's
+Claude login/subscription. hatch_codex, hatch_gemini, and hatch_openrouter run
+through the OpenCode runtime. Use these full-agent tools for web research, repo
+code work, and multi-step tasks.
 
 hatch_expert is a SINGLE-CALL LLM consultation (OpenAI Responses API, GPT-5.5-pro),
 NOT an agent. No tool loops, no multi-step work, no file access. It answers in one
@@ -39,7 +40,7 @@ you specifically want the Responses API — otherwise use hatch_codex/claude.
 
 Recommended defaults:
 - Codex: model="mini"
-- Claude: model="sonnet". Use model="fable" for Mythos-class (highest capability, always-on adaptive thinking, $10/$50 per MTok).
+- Claude: model="sonnet". Use model="fable" only when the user explicitly asks for the highest-capability local Claude tier.
 - OpenRouter: model="deepseek-v4-pro"
 - Expert: reasoning_effort="medium", web_search=true; use low for faster calls
 
@@ -196,7 +197,7 @@ async def hatch_claude(
     timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
     ctx: Context | None = None,
 ) -> dict:
-    """Run Claude (Bedrock) as a full agent with web search, file access, and tools via OpenCode runtime."""
+    """Run Claude through the official local Claude Code CLI using the user's subscription/OAuth login."""
     return await _run_with_progress(
         tool_name="hatch_claude",
         prompt=prompt,

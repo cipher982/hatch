@@ -1,4 +1,4 @@
-"""Surfaced model aliases for Hatch's OpenCode-backed commands."""
+"""Surfaced model aliases for Hatch commands."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ OpenRouterModelAlias = Literal["deepseek-v4-pro"]
 
 @dataclass(frozen=True)
 class SurfacedProvider:
-    """Public provider surface that resolves to an OpenCode model."""
+    """Public provider surface that resolves to a backend model name."""
 
     backend: str
     label: str
@@ -37,15 +37,15 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
         },
     ),
     "claude": SurfacedProvider(
-        backend="opencode",
+        backend="claude",
         label="Claude",
         tool_name="hatch_claude",
         surface_name="hatch claude",
         models={
-            "haiku": "openrouter/anthropic/claude-haiku-4.5",
-            "sonnet": "openrouter/anthropic/claude-sonnet-4.6",
-            "opus": "openrouter/anthropic/claude-opus-4.8",
-            "fable": "openrouter/~anthropic/claude-fable-latest",
+            "haiku": "haiku",
+            "sonnet": "sonnet",
+            "opus": "opus",
+            "fable": "fable",
         },
     ),
     "openrouter": SurfacedProvider(

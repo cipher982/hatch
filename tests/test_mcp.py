@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 from unittest import mock
 
-from hatch.aws_preflight import BedrockAwsAuthError
 from hatch.mcp.doctor import call_tool
 from hatch.mcp.doctor import check_mcp_server_tools
 from hatch.mcp.doctor import _recv_response
@@ -26,6 +25,7 @@ from hatch.mcp.server import _run_with_progress
 from hatch.mcp.server import _run_expert_with_progress
 from hatch.mcp.server import main as mcp_main
 from hatch.mcp.server import TOOLS
+from hatch.runner import ClaudeStreamRunResult
 
 
 class _FakeStdout:
@@ -75,15 +75,22 @@ def test_build_run_command_uses_latest_frontier_aliases():
         prompt="review",
         attach_url="http://127.0.0.1:4196",
     )
-    claude_cmd = build_run_command(
-        tool_name="hatch_claude",
-        model="opus",
-        prompt="review",
-        attach_url="http://127.0.0.1:4196",
-    )
 
     assert codex_cmd[codex_cmd.index("-m") + 1] == "openai/gpt-5.5"
-    assert claude_cmd[claude_cmd.index("-m") + 1] == "openrouter/anthropic/claude-opus-4.8"
+
+
+def test_build_run_command_rejects_claude_surface():
+    try:
+        build_run_command(
+            tool_name="hatch_claude",
+            model="opus",
+            prompt="review",
+            attach_url="http://127.0.0.1:4196",
+        )
+    except Exception as exc:
+        assert "Claude Code CLI runtime" in str(exc)
+    else:
+        raise AssertionError("hatch_claude should not build an OpenCode command")
 
 
 def test_build_run_command_openrouter_deepseek_alias():
@@ -421,19 +428,20 @@ def test_run_surface_empty_output_is_protocol_error(monkeypatch, tmp_path):
     assert "forensic recovery" in result["artifact_note"]
 
 
-def test_run_surface_bedrock_preflight_failure_is_config_error(monkeypatch, tmp_path):
+def test_run_surface_claude_uses_local_cli_not_opencode(monkeypatch, tmp_path):
     monkeypatch.setenv("HATCH_MCP_OPENCODE_ROOT", str(tmp_path / "runtime"))
+    fake_result = ClaudeStreamRunResult(
+        stdout='{"type":"result","result":"DONE"}\n',
+        stderr="",
+        return_code=0,
+        timed_out=False,
+        final_output="DONE",
+    )
 
     with (
         mock.patch("hatch.mcp.runtime.SERVER_MANAGER.ensure_server") as ensure_server,
-        mock.patch(
-            "hatch.mcp.runtime.preflight_bedrock_aws",
-            side_effect=BedrockAwsAuthError(
-                "Bedrock AWS credentials are not ready for AWS_PROFILE=zh-qa-engineer: "
-                "The SSO session associated with this profile has expired. "
-                "Refresh with: aws sso login --profile zh-qa-engineer"
-            ),
-        ),
+        mock.patch("hatch.mcp.runtime.preflight_bedrock_aws") as preflight,
+        mock.patch("hatch.mcp.runtime.run_claude_stream_sync", return_value=fake_result) as run_claude,
     ):
         result = run_surface(
             tool_name="hatch_claude",
@@ -443,10 +451,14 @@ def test_run_surface_bedrock_preflight_failure_is_config_error(monkeypatch, tmp_
         )
 
     ensure_server.assert_not_called()
-    assert result["ok"] is False
-    assert result["status"] == "config_error"
-    assert result["exit_code"] == 4
-    assert "aws sso login --profile zh-qa-engineer" in result["error"]
+    preflight.assert_not_called()
+    run_claude.assert_called_once()
+    assert run_claude.call_args[0][0][0] == "claude"
+    assert run_claude.call_args[0][0][run_claude.call_args[0][0].index("--model") + 1] == "haiku"
+    assert "OPENROUTER_API_KEY" not in run_claude.call_args[0][2]
+    assert result["ok"] is True
+    assert result["status"] == "ok"
+    assert result["output"] == "DONE"
     assert result["attach_url"] is None
 
 
@@ -464,7 +476,7 @@ def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
         final_output=None,
         error_message=None,
         attach_url="http://127.0.0.1:4196",
-        model="amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        model="openai/gpt-5.4-mini",
         event_types=("step_start",),
         session_id="ses_123",
     )
@@ -475,9 +487,9 @@ def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
         mock.patch("hatch.mcp.runtime.run_attached_command", return_value=fake_result),
     ):
         result = run_surface(
-            tool_name="hatch_claude",
+            tool_name="hatch_codex",
             prompt="hello",
-            model="haiku",
+            model="mini",
             timeout_s=30,
         )
 
@@ -491,7 +503,7 @@ def test_run_surface_step_start_only_writes_artifact(monkeypatch, tmp_path):
     assert artifact["stdout"] == stdout
     assert artifact["event_types"] == ["step_start"]
     assert artifact["session_id"] == "ses_123"
-    assert artifact["cmd"][-1] == "openrouter/anthropic/claude-haiku-4.5"
+    assert artifact["cmd"][-1] == "openai/gpt-5.4-mini"
 
 
 def test_fetch_attached_session_messages_reads_server_payload():
@@ -649,10 +661,6 @@ def test_run_env_scopes_provider_credentials(monkeypatch):
             "OPENROUTER_API_KEY": "openrouter-key",
         }.get(key),
     )
-
-    claude_env = _build_run_env("openrouter/anthropic/claude-sonnet-4.6")
-    assert "OPENAI_API_KEY" not in claude_env
-    assert claude_env["OPENROUTER_API_KEY"] == "openrouter-key"
 
     openai_env = _build_run_env("openai/gpt-5.4-mini")
     assert openai_env["OPENAI_API_KEY"] == "stable-openai-key"

@@ -26,6 +26,9 @@ from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_PROFILE
 from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_REGION
 from hatch.aws_preflight import BedrockAwsAuthError
 from hatch.aws_preflight import preflight_bedrock_aws
+from hatch.backends import Backend
+from hatch.backends import get_config
+from hatch.context import detect_context
 from hatch.credentials import CredentialCache
 from hatch.credentials import credential_status
 from hatch.credentials import ensure_opencode_credentials
@@ -39,6 +42,7 @@ from hatch.observatory import observatory_ca_path
 from hatch.observatory import observatory_trust_signature
 from hatch.opencode_stream import OpenCodeStreamAccumulator
 from hatch.opencode_stream import extract_opencode_log_error
+from hatch.runner import run_claude_stream_sync
 
 
 OPENCODE_BIN = os.environ.get("HATCH_MCP_OPENCODE_BIN", "opencode")
@@ -654,6 +658,9 @@ def build_run_command(
     cwd: str | None = None,
     reasoning_effort: str | None = None,
 ) -> list[str]:
+    if tool_name == "hatch_claude":
+        raise HatchMcpRuntimeError("hatch_claude uses the Claude Code CLI runtime, not OpenCode")
+
     if not prompt.strip():
         raise HatchMcpRuntimeError("prompt must not be empty")
 
@@ -874,6 +881,199 @@ def doctor() -> dict[str, Any]:
     }
 
 
+def _validate_prompt_and_cwd(prompt: str, cwd: str | None) -> str | None:
+    if not prompt.strip():
+        raise HatchMcpRuntimeError("prompt must not be empty")
+
+    if not cwd:
+        return None
+
+    cwd_path = Path(cwd)
+    if not cwd_path.is_absolute():
+        raise HatchMcpRuntimeError("cwd must be an absolute path")
+    if not cwd_path.exists():
+        raise HatchMcpRuntimeError(f"cwd does not exist: {cwd}")
+    if not cwd_path.is_dir():
+        raise HatchMcpRuntimeError(f"cwd is not a directory: {cwd}")
+    return cwd
+
+
+def _run_claude_surface(
+    *,
+    prompt: str,
+    model: str | None,
+    cwd: str | None,
+    timeout_s: int,
+    progress_handler: Callable[[str], None] | None,
+    start: float,
+    resolved_model: str,
+) -> dict[str, Any]:
+    cmd: list[str] | None = None
+    artifact_path: str | None = None
+
+    try:
+        cwd = _validate_prompt_and_cwd(prompt, cwd)
+        config = get_config(
+            Backend.CLAUDE,
+            prompt,
+            detect_context(),
+            model=resolved_model,
+            output_format="stream-json",
+            include_partial_messages=True,
+        )
+        cmd = config.cmd
+        result = run_claude_stream_sync(
+            config.cmd,
+            config.stdin_data,
+            config.build_env(),
+            cwd,
+            timeout_s,
+            progress_handler=progress_handler,
+        )
+    except (HatchMcpRuntimeError, ValueError) as exc:
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        return {
+            "ok": False,
+            "status": "config_error",
+            "output": "",
+            "exit_code": 4,
+            "duration_ms": duration_ms,
+            "error": str(exc),
+            "stderr": None,
+            "surface": SURFACE_NAMES["hatch_claude"],
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+        }
+    except FileNotFoundError as exc:
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        return {
+            "ok": False,
+            "status": "not_found",
+            "output": "",
+            "exit_code": -2,
+            "duration_ms": duration_ms,
+            "error": f"CLI not found: {exc}",
+            "stderr": None,
+            "surface": SURFACE_NAMES["hatch_claude"],
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+        }
+
+    duration_ms = int((time.perf_counter() - start) * 1000)
+    if cmd is not None:
+        artifact_path = _write_run_artifact(
+            stdout=result.stdout,
+            stderr=result.stderr,
+            return_code=result.return_code,
+            timed_out=result.timed_out,
+            model=resolved_model,
+            attach_url="claude-cli",
+            cmd=[*cmd, "<stdin-prompt>"],
+            event_types=(),
+            session_id=None,
+            assistant_message_id=None,
+            selected_message_id=None,
+            selected_finish_reason=None,
+            output_source="claude_stream",
+            session_messages=None,
+            session_fetch_error=None,
+        )
+
+    artifact_note = (
+        "Full Claude stream output is persisted at artifact_path; inspect it if "
+        "output looks incomplete, confusing, or the run needs forensic recovery."
+    )
+    run_metadata = {
+        "output_source": "claude_stream",
+        "session_id": None,
+        "assistant_message_id": None,
+        "selected_message_id": None,
+        "selected_finish_reason": None,
+        "session_fetch_error": None,
+        "event_types": [],
+        "artifact_path": artifact_path,
+        "artifact_note": artifact_note,
+    }
+
+    if result.timed_out:
+        return {
+            "ok": False,
+            "status": "timeout",
+            "output": "",
+            "exit_code": -1,
+            "duration_ms": duration_ms,
+            "error": f"{SURFACE_NAMES['hatch_claude']} timed out after {timeout_s}s",
+            "stderr": result.stderr or None,
+            "surface": SURFACE_NAMES["hatch_claude"],
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+            **run_metadata,
+        }
+
+    if result.return_code != 0:
+        return {
+            "ok": False,
+            "status": "error",
+            "output": result.final_output or "",
+            "exit_code": result.return_code,
+            "duration_ms": duration_ms,
+            "error": result.stderr or f"Exit code {result.return_code}",
+            "stderr": result.stderr or None,
+            "surface": SURFACE_NAMES["hatch_claude"],
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+            **run_metadata,
+        }
+
+    if not (result.final_output or "").strip():
+        return {
+            "ok": False,
+            "status": "claude_protocol_error",
+            "output": "",
+            "exit_code": result.return_code,
+            "duration_ms": duration_ms,
+            "error": "Claude stream completed without a final result",
+            "stderr": result.stderr or None,
+            "surface": SURFACE_NAMES["hatch_claude"],
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+            "raw_stdout": result.stdout[:4000],
+            **run_metadata,
+        }
+
+    return {
+        "ok": True,
+        "status": "ok",
+        "output": result.final_output,
+        "exit_code": result.return_code,
+        "duration_ms": duration_ms,
+        "error": None,
+        "stderr": result.stderr or None,
+        "surface": SURFACE_NAMES["hatch_claude"],
+        "model": model,
+        "resolved_model": resolved_model,
+        "cwd": cwd,
+        "attach_url": None,
+        "cmd": cmd,
+        **run_metadata,
+    }
+
+
 def run_surface(
     *,
     tool_name: str,
@@ -886,6 +1086,17 @@ def run_surface(
 ) -> dict[str, Any]:
     start = time.perf_counter()
     resolved_model = _resolve_model(tool_name, model)
+    if tool_name == "hatch_claude":
+        return _run_claude_surface(
+            prompt=prompt,
+            model=model,
+            cwd=cwd,
+            timeout_s=timeout_s,
+            progress_handler=progress_handler,
+            start=start,
+            resolved_model=resolved_model,
+        )
+
     try:
         run_env = _build_run_env(resolved_model)
         preflight_bedrock_aws(resolved_model, run_env)

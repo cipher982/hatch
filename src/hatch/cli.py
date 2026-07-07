@@ -35,13 +35,13 @@ EXIT_AGENT_ERROR = 1
 EXIT_TIMEOUT = 2
 EXIT_NOT_FOUND = 3
 EXIT_CONFIG_ERROR = 4
-RAW_BACKEND_NAMES = ("bedrock", "codex", "gemini")
-CLAUDE_BACKENDS = {Backend.BEDROCK}
+RAW_BACKEND_NAMES = ("claude", "bedrock", "codex", "gemini")
+CLAUDE_BACKENDS = {Backend.CLAUDE, Backend.BEDROCK}
 OPENCODE_BACKENDS = {Backend.OPENCODE}
 EXPLICIT_PROVIDER_MSG = (
     "No default model is configured. Choose one of: "
     "hatch codex <nano|mini|max>, "
-    "hatch claude <haiku|sonnet|opus>, "
+    "hatch claude <haiku|sonnet|opus|fable>, "
     "hatch openrouter deepseek-v4-pro"
 )
 ZAI_DISABLED_MSG = (
@@ -312,7 +312,7 @@ def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hatch",
         usage=(
-            'hatch claude <haiku|sonnet|opus> [OPTIONS] "prompt"\n'
+            'hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"\n'
             '       hatch codex <nano|mini|max> [OPTIONS] "prompt"\n'
             '       hatch openrouter <deepseek-v4-pro> [OPTIONS] "prompt"\n'
             '       hatch expert [OPTIONS] "prompt"'
@@ -328,7 +328,7 @@ Start Here:
 
 Surfaces:
   codex tiers     nano, mini, max
-  claude tiers    haiku, sonnet, opus
+  claude tiers    haiku, sonnet, opus, fable
   openrouter      deepseek-v4-pro
   expert          one synchronous GPT pro Responses API call
 
@@ -732,22 +732,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         env["LONGHOUSE_IS_SIDECHAIN"] = "1"
     cwd = args.cwd
 
-    try:
-        preflight_bedrock_aws(model_name, env)
-    except BedrockAwsAuthError as e:
-        if args.json_output:
-            print(json.dumps({
-                "ok": False,
-                "status": "config_error",
-                "output": "",
-                "exit_code": EXIT_CONFIG_ERROR,
-                "duration_ms": 0,
-                "error": str(e),
-                "stderr": None,
-            }))
-        else:
-            print(f"Error: {e}", file=sys.stderr)
-        return EXIT_CONFIG_ERROR
+    if backend != Backend.CLAUDE:
+        try:
+            preflight_bedrock_aws(model_name, env)
+        except BedrockAwsAuthError as e:
+            if args.json_output:
+                print(json.dumps({
+                    "ok": False,
+                    "status": "config_error",
+                    "output": "",
+                    "exit_code": EXIT_CONFIG_ERROR,
+                    "duration_ms": 0,
+                    "error": str(e),
+                    "stderr": None,
+                }))
+            else:
+                print(f"Error: {e}", file=sys.stderr)
+            return EXIT_CONFIG_ERROR
 
     # Run the agent
     start = time.monotonic()

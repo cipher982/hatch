@@ -13,7 +13,7 @@ uv tool install -e ~/git/hatch
 ## Entrypoints
 
 Public surface:
-- `hatch claude <haiku|sonnet|opus|fable>` → Claude via OpenRouter Anthropic models (`fable` = Fable-class, higher capability)
+- `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`fable` = Fable-class, higher capability)
 - `hatch codex <nano|mini|max>` → GPT-5 on OpenAI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
@@ -73,7 +73,7 @@ cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude
     context.py (container detection)
 ```
 
-**Active backends:** `bedrock`, `codex`, `gemini`, `opencode`
+**Active backends:** `claude`, `bedrock`, `codex`, `gemini`, `opencode`
 
 `zai` / GLM-5.1 is intentionally disabled until the z.ai coding plan/resource package is active again. Bare `hatch "prompt"` has no default model; use an explicit surfaced provider.
 
@@ -92,7 +92,7 @@ cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude
 - **Single product repo** - the CLI and MCP server both live here; personal config repos should only point at `hatch`, not re-wrap it
 - **Prefer prompt via stdin when the backend supports it** - raw Claude/Codex/Gemini paths use stdin; OpenCode currently takes prompt text via argv
 - **Container-aware** - auto-sets HOME=/tmp for read-only filesystems
-- **Keep the surfaced CLI small** - `codex` and `claude` are the human/agent-facing entrypoints; they route through OpenCode, while raw backend flags are escape hatches
+- **Keep the surfaced CLI small** - `codex` and `claude` are the human/agent-facing entrypoints; Claude routes through local Claude Code OAuth, Codex/OpenRouter route through OpenCode, and raw backend flags are escape hatches
 - **Do not leak internal runtime nouns into the public contract** - `opencode` is an implementation detail, not part of the default user/agent mental model
 - **Machine callers should not remember flags** - real non-interactive CLI runs should default to JSON output + automation mode
 
@@ -115,7 +115,7 @@ print(result.output if result.ok else result.error)
 2. **Tests mock subprocess** - no real CLI calls except `integration` marked tests
 3. **Core deps should stay minimal** - `fastmcp` is in core because `hatch` now owns the MCP server; avoid growing beyond that without a strong reason
 4. **Credential loading lives in `credentials.py`** - do not fetch secrets inside backend config builders
-5. **Surfaced `claude` / `codex` should converge on one runtime** - keep OpenCode as the shared path and reserve raw `-b bedrock` / `-b codex` for debugging underlying harness behavior
+5. **Surfaced `claude` must not use OpenRouter implicitly** - `hatch claude` uses local Claude Code OAuth/subscription and strips `OPENROUTER_API_KEY`; OpenRouter Claude models require an explicit OpenRouter surface if ever re-added
 6. **The MCP server belongs here** - do not move hatch MCP code back into machine-local config repos
 
 ---
@@ -144,5 +144,5 @@ print(result.output if result.ok else result.error)
 - (2026-05-21) [expert] Keep `hatch expert` to low/medium effort. On timeout, preserve the background response id/artifact instead of cancelling at the boundary.
 - (2026-05-24) [codex] Headless Hatch runs for Codex must explicitly pass `--dangerously-bypass-approvals-and-sandbox` to prevent deadlocks on interactive tool-approval prompts in non-interactive/redirected subshells.
 - (2026-05-27) [opencode] Surfaced Hatch/OpenCode runs must pass `--dangerously-skip-permissions`; keep `--dir` for repo context instead of broadening by omitting cwd.
-- (2026-06-29) [migration] Switched Claude models from `amazon-bedrock/` to `openrouter/anthropic/` because AWS Bedrock was down. Anthropic prohibits using Claude Pro/Max subscriptions in OpenCode (plugin removed in 1.3.0), so OpenRouter bridges to Anthropic models using the existing OpenRouter API key.
+- (2026-07-07) [routing] `hatch_claude` must use the official local Claude Code CLI OAuth/subscription path and fail closed with OpenRouter/API-key/Bedrock env stripped. OpenRouter Claude was an expensive accidental fallback after Bedrock access ended; do not make it implicit again.
 - (2026-06-29) [subprocess] Always use `subprocess.DEVNULL` (never `None`) for stdin when no stdin_data is supplied. `None` inherits the caller's stdin — harmless in a TTY, but in non-TTY callers (Cursor Composer, CI, pipes) OpenCode sees an open pipe and hangs until the hatch timeout fires.

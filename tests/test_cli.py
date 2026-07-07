@@ -10,7 +10,6 @@ from unittest import mock
 
 import pytest
 
-from hatch.aws_preflight import BedrockAwsAuthError
 from hatch.cli import (
     EXIT_AGENT_ERROR,
     EXIT_CONFIG_ERROR,
@@ -189,7 +188,7 @@ class TestCreateParser:
         with pytest.raises(SystemExit):
             parser.parse_args(["--help"])
         captured = capsys.readouterr()
-        assert 'hatch claude <haiku|sonnet|opus>' in captured.out
+        assert 'hatch claude <haiku|sonnet|opus|fable>' in captured.out
         assert 'hatch codex <nano|mini|max>' in captured.out
 
     def test_help_text_hides_advanced_flags(self, capsys):
@@ -361,12 +360,12 @@ class TestNormalizeArgv:
         ]
 
     def test_claude_model_aliases_work(self):
-        """Claude shorthand models map to OpenRouter Anthropic model IDs."""
+        """Claude shorthand models map to local Claude Code model aliases."""
         assert normalize_argv(["claude", "haiku", "summarize"]) == [
             "--backend",
-            "opencode",
+            "claude",
             "--model",
-            "openrouter/anthropic/claude-haiku-4.5",
+            "haiku",
             "summarize",
         ]
 
@@ -407,16 +406,23 @@ class TestNormalizeArgv:
         ]
         assert normalize_argv(["claude", "sonnet", "review"]) == [
             "--backend",
-            "opencode",
+            "claude",
             "--model",
-            "openrouter/anthropic/claude-sonnet-4.6",
+            "sonnet",
             "review",
         ]
         assert normalize_argv(["claude", "opus", "review"]) == [
             "--backend",
-            "opencode",
+            "claude",
             "--model",
-            "openrouter/anthropic/claude-opus-4.8",
+            "opus",
+            "review",
+        ]
+        assert normalize_argv(["claude", "fable", "review"]) == [
+            "--backend",
+            "claude",
+            "--model",
+            "fable",
             "review",
         ]
         assert normalize_argv(["openrouter", "deepseek-v4-pro", "review"]) == [
@@ -710,41 +716,37 @@ class TestMain:
         assert data["ok"] is False
         assert data["error"] == "AWS session expired"
 
-    def test_bedrock_preflight_failure_is_config_error(
+    def test_surfaced_claude_uses_claude_runner_not_opencode_or_bedrock(
         self,
+        mock_run_claude_stream_sync,
         mock_run_opencode_stream_sync,
         mock_hydrate_backend_kwargs,
         mock_detect_context,
         capsys,
     ):
-        """Surfaced Claude fails before OpenCode when AWS SSO is expired."""
+        """Surfaced Claude uses local Claude Code, not OpenCode or Bedrock preflight."""
         from hatch.backends import BackendConfig
 
         config = BackendConfig(
-            cmd=["opencode", "run"],
-            env={"AWS_PROFILE": "zh-qa-engineer", "AWS_REGION": "us-east-1"},
-            stdin_data=None,
+            cmd=["claude", "--print", "-"],
+            env={},
+            env_unset=["OPENROUTER_API_KEY"],
+            stdin_data=b"test prompt",
         )
         with (
             mock.patch("hatch.cli.get_config", return_value=config),
-            mock.patch(
-                "hatch.cli.preflight_bedrock_aws",
-                side_effect=BedrockAwsAuthError(
-                    "Bedrock AWS credentials are not ready for AWS_PROFILE=zh-qa-engineer: "
-                    "The SSO session associated with this profile has expired. "
-                    "Refresh with: aws sso login --profile zh-qa-engineer"
-                ),
-            ),
+            mock.patch("hatch.cli.preflight_bedrock_aws") as preflight,
         ):
             exit_code = main(["--json", "claude", "haiku", "test prompt"])
 
-        assert exit_code == EXIT_CONFIG_ERROR
+        assert exit_code == EXIT_SUCCESS
+        mock_run_claude_stream_sync.assert_called_once()
         mock_run_opencode_stream_sync.assert_not_called()
+        preflight.assert_not_called()
         captured = capsys.readouterr()
         data = json.loads(captured.out)
-        assert data["ok"] is False
-        assert data["status"] == "config_error"
-        assert "aws sso login --profile zh-qa-engineer" in data["error"]
+        assert data["ok"] is True
+        assert data["output"] == "output"
 
     def test_timeout_exit_code(
         self,
