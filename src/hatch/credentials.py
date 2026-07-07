@@ -3,17 +3,15 @@
 Centralizes how hatch finds provider credentials so backend config builders
 stay focused on command/env shape instead of secret fetching policy.
 
-Credentials are cached locally — one `infisical secrets` call fetches all
-keys for the personal-shell project, and individual keys are served from a
-persisted cache that falls back to stale data when Infisical is unreachable.
+The actual Infisical cache lives in David's shared local helper at
+``~/git/me/scripts/infisical_cache.py``. Hatch deliberately delegates there so
+agent runtimes share one cache, TTL policy, and machine-token path.
 """
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
-import time
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,17 +20,9 @@ from hatch.backends import Backend
 _PERSONAL_PROJECT = "personal-shell"
 OPENROUTER_CREDENTIAL = "openrouter"
 _ROULETTE_MARKER = "HATCH_CREDENTIAL_ROULETTE"
-
-_INFISICAL_CLI = "infisical"
-_INFISICAL_PROJECT_ID = "a3f40ca4-1a1f-4499-be6b-8a4e96b3a3cf"
-_INFISICAL_DOMAIN = "https://secrets.drose.io"
-_INFISICAL_ENV = "dev"
-_INFISICAL_PATH = "/"
-
-_CACHE_DIR = Path.home() / ".cache" / "hatch"
-_CACHE_FILE = _CACHE_DIR / "credentials.json"
-_FRESH_TTL = 3600
-_STALE_TTL = 86400
+_SECRET_HELPER_DISABLE = "HATCH_DISABLE_SECRET_HELPER"
+_DEFAULT_ME_SCRIPTS_DIR = Path.home() / "git" / "me" / "scripts"
+_ME_SCRIPTS_DIR_ENV = "DROSE_ME_SCRIPTS_DIR"
 
 
 @dataclass(frozen=True)
@@ -48,119 +38,12 @@ SECRET_SPECS: dict[Backend | str, SecretSpec] = {
     OPENROUTER_CREDENTIAL: SecretSpec(env_var="OPENROUTER_API_KEY"),
 }
 
-_HELPER_PATH_PREFIXES = (
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    "/usr/bin",
-    "/bin",
-)
-
-
 class CredentialCache:
-    """Cached Infisical secret store with local file persistence.
-
-    One ``infisical secrets`` call fetches all secrets for the personal-shell
-    project. Individual key lookups are served from the in-memory dict.
-    On transient Infisical failures, stale cache (up to 24h) is used as
-    fallback instead of failing hard.
-    """
-
-    _secrets: dict[str, str] | None = None
-    _fetched_at: float = 0
+    """Compatibility facade over the canonical local Infisical cache."""
 
     @classmethod
-    def get(cls, key: str) -> str | None:
-        if os.environ.get("HATCH_DISABLE_SECRET_HELPER", "").strip() == "1":
-            return None
-
-        now = time.time()
-
-        if cls._secrets is not None and (now - cls._fetched_at) < _FRESH_TTL:
-            return cls._secrets.get(key)
-
-        cached = cls._load_file()
-        if cached and cached[1] > cls._fetched_at:
-            cls._secrets, cls._fetched_at = cached
-
-        if cls._secrets is not None and (now - cls._fetched_at) < _FRESH_TTL:
-            return cls._secrets.get(key)
-
-        try:
-            cls._refresh()
-            cls._write_file()
-        except Exception:
-            pass
-
-        if cls._secrets is not None and (now - cls._fetched_at) < _STALE_TTL:
-            return cls._secrets.get(key)
-
-        return None
-
-    @classmethod
-    def _refresh(cls) -> None:
-        token = cls._resolve_token()
-        result = subprocess.run(
-            [
-                _INFISICAL_CLI, "secrets",
-                "--projectId", _INFISICAL_PROJECT_ID,
-                "--token", token,
-                "--env", _INFISICAL_ENV,
-                "--path", _INFISICAL_PATH,
-                "--output", "json",
-                "--silent",
-                "--domain", _INFISICAL_DOMAIN,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-            env=_helper_subprocess_env(),
-        )
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout or "").strip()[:200]
-            raise RuntimeError(f"infisical exited {result.returncode}: {detail}")
-        items = json.loads(result.stdout)
-        cls._secrets = {
-            i["secretKey"]: str(i["secretValue"])
-            for i in items
-            if isinstance(i, dict) and i.get("secretKey") and i.get("secretValue") is not None
-        }
-        cls._fetched_at = time.time()
-
-    @classmethod
-    def _load_file(cls) -> tuple[dict[str, str], float] | None:
-        try:
-            data = json.loads(_CACHE_FILE.read_text(encoding="utf-8"))
-            secrets = data.get("secrets", {})
-            fetched_at = data.get("fetched_at", 0)
-            if isinstance(secrets, dict) and isinstance(fetched_at, (int, float)):
-                return secrets, float(fetched_at)
-        except Exception:
-            pass
-        return None
-
-    @classmethod
-    def _write_file(cls) -> None:
-        if cls._secrets is None:
-            return
-        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        payload = json.dumps({
-            "secrets": cls._secrets,
-            "fetched_at": cls._fetched_at,
-        }, indent=2)
-        _CACHE_FILE.write_text(payload, encoding="utf-8")
-
-    @staticmethod
-    def _resolve_token() -> str:
-        env_token = os.environ.get("INFISICAL_TOKEN")
-        if env_token:
-            return env_token
-        token_file = Path.home() / ".config" / "infisical" / "access-token"
-        if token_file.is_file():
-            token = token_file.read_text(encoding="utf-8").strip()
-            if token:
-                return token
-        raise RuntimeError("No Infisical access token available")
+    def get(cls, key: str, *, project: str = _PERSONAL_PROJECT) -> str | None:
+        return _load_secret_from_canonical_cache(key, project=project)
 
 
 def _non_empty_env_value(env: dict[str, str] | os._Environ, name: str) -> str | None:
@@ -172,20 +55,36 @@ def _non_empty_env_value(env: dict[str, str] | os._Environ, name: str) -> str | 
     return stripped or None
 
 
-def _helper_subprocess_env() -> dict[str, str]:
-    """Ensure Infisical CLI discovery works under stripped MCP launch envs."""
-    env = dict(os.environ)
-    path_parts = [part for part in env.get("PATH", "").split(os.pathsep) if part]
-    for prefix in _HELPER_PATH_PREFIXES:
-        if prefix not in path_parts:
-            path_parts.append(prefix)
-    env["PATH"] = os.pathsep.join(path_parts)
-    return env
+def _canonical_scripts_dir() -> Path:
+    configured = os.environ.get(_ME_SCRIPTS_DIR_ENV, "").strip()
+    return Path(configured).expanduser() if configured else _DEFAULT_ME_SCRIPTS_DIR
+
+
+def _load_secret_from_canonical_cache(key: str, *, project: str) -> str | None:
+    if os.environ.get(_SECRET_HELPER_DISABLE, "").strip() == "1":
+        return None
+
+    scripts_dir = _canonical_scripts_dir()
+    if not scripts_dir.exists():
+        return None
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+
+    try:
+        from infisical_cache import SecretCacheError
+        from infisical_cache import get_secret
+    except Exception:
+        return None
+
+    try:
+        return get_secret(key, project=project, prefer_env=False)
+    except SecretCacheError:
+        return None
 
 
 def _load_secret_from_helper(spec: SecretSpec) -> str | None:
     """Fetch a secret from the cached Infisical credential store."""
-    return CredentialCache.get(spec.env_var)
+    return CredentialCache.get(spec.env_var, project=spec.project)
 
 
 def resolve_env_secret(
