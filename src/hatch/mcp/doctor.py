@@ -100,6 +100,7 @@ async def check_mcp_server_tools(timeout_s: int = 5) -> McpCheck:
         tools = [tool["name"] for tool in tools_resp["result"]["tools"]]
         required = {
             "hatch_claude",
+            "hatch_cursor",
             "hatch_codex",
             "hatch_expert",
             "hatch_gemini",

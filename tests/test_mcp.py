@@ -93,6 +93,20 @@ def test_build_run_command_rejects_claude_surface():
         raise AssertionError("hatch_claude should not build an OpenCode command")
 
 
+def test_build_run_command_rejects_cursor_surface():
+    try:
+        build_run_command(
+            tool_name="hatch_cursor",
+            model="grok",
+            prompt="review",
+            attach_url="http://127.0.0.1:4196",
+        )
+    except Exception as exc:
+        assert "Cursor Agent CLI runtime" in str(exc)
+    else:
+        raise AssertionError("hatch_cursor should not build an OpenCode command")
+
+
 def test_build_run_command_openrouter_deepseek_alias():
     cmd = build_run_command(
         tool_name="hatch_openrouter",
@@ -676,12 +690,14 @@ def test_doctor_lists_expected_tools():
     assert result.ok is True
     assert "hatch_codex" in result.tools
     assert "hatch_claude" in result.tools
+    assert "hatch_cursor" in result.tools
     assert "hatch_expert" in result.tools
     assert "hatch_openrouter" in result.tools
 
 
 def test_batch_tool_map_includes_openrouter():
     assert "hatch_openrouter" in TOOLS
+    assert "hatch_cursor" in TOOLS
     assert "hatch_expert" in TOOLS
 
 

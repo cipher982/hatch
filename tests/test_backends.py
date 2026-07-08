@@ -13,6 +13,7 @@ from hatch.backends import (
     configure_bedrock,
     configure_claude,
     configure_codex,
+    configure_cursor,
     configure_gemini,
     configure_opencode,
     configure_zai,
@@ -28,6 +29,7 @@ class TestBackendEnum:
         """Backend enum has expected values."""
         assert Backend.ZAI.value == "zai"
         assert Backend.CLAUDE.value == "claude"
+        assert Backend.CURSOR.value == "cursor"
         assert Backend.BEDROCK.value == "bedrock"
         assert Backend.CODEX.value == "codex"
         assert Backend.GEMINI.value == "gemini"
@@ -37,6 +39,7 @@ class TestBackendEnum:
         """Backend can be created from string."""
         assert Backend("zai") == Backend.ZAI
         assert Backend("claude") == Backend.CLAUDE
+        assert Backend("cursor") == Backend.CURSOR
         assert Backend("bedrock") == Backend.BEDROCK
         assert Backend("codex") == Backend.CODEX
         assert Backend("gemini") == Backend.GEMINI
@@ -519,6 +522,53 @@ class TestConfigureClaude:
         assert config.env["HOME"] == container_readonly_context.effective_home
 
 
+class TestConfigureCursor:
+    """Tests for Cursor Agent CLI backend configuration."""
+
+    def test_command_structure(self, laptop_context):
+        """Cursor uses cursor-agent -p with argv prompt and force."""
+        config = configure_cursor(
+            "test prompt",
+            laptop_context,
+            model="grok-4.5-fast-xhigh",
+        )
+        assert config.cmd == [
+            "cursor-agent",
+            "--print",
+            "--trust",
+            "--model",
+            "grok-4.5-fast-xhigh",
+            "--output-format",
+            "text",
+            "--force",
+            "test prompt",
+        ]
+        assert config.stdin_data is None
+
+    def test_optional_api_key(self, laptop_context):
+        """CURSOR_API_KEY is optional; passed through when present."""
+        with mock.patch.dict(os.environ, {"CURSOR_API_KEY": "cursor-key"}):
+            config = configure_cursor("hi", laptop_context)
+            assert config.env["CURSOR_API_KEY"] == "cursor-key"
+
+    def test_strips_competing_provider_env(self, laptop_context):
+        """Cursor login path should not inherit OpenAI/Anthropic/OpenRouter keys."""
+        config = configure_cursor("test", laptop_context)
+        with mock.patch.dict(os.environ, {
+            "OPENAI_API_KEY": "openai-key",
+            "OPENROUTER_API_KEY": "or-key",
+            "ANTHROPIC_API_KEY": "anthropic-key",
+        }):
+            env = config.build_env()
+        for key in ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"]:
+            assert key not in env
+
+    def test_container_readonly_sets_home(self, container_readonly_context):
+        """Sets HOME in container with read-only home."""
+        config = configure_cursor("test", container_readonly_context)
+        assert config.env["HOME"] == container_readonly_context.effective_home
+
+
 class TestConfigureCodex:
     """Tests for Codex backend configuration."""
 
@@ -657,6 +707,17 @@ class TestGetConfig:
         assert config.cmd[0] == "claude"
         assert config.cmd[config.cmd.index("--model") + 1] == "haiku"
         assert "OPENROUTER_API_KEY" in config.env_unset
+
+    def test_dispatches_to_cursor(self, laptop_context):
+        """Dispatches to configure_cursor for CURSOR backend."""
+        config = get_config(
+            Backend.CURSOR,
+            "test",
+            laptop_context,
+            model="grok-4.5-fast-xhigh",
+        )
+        assert config.cmd[0] == "cursor-agent"
+        assert config.cmd[config.cmd.index("--model") + 1] == "grok-4.5-fast-xhigh"
 
     def test_dispatches_to_codex(self, mock_openai_key, laptop_context):
         """Dispatches to configure_codex for CODEX backend."""

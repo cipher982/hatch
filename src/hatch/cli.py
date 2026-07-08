@@ -35,18 +35,19 @@ EXIT_AGENT_ERROR = 1
 EXIT_TIMEOUT = 2
 EXIT_NOT_FOUND = 3
 EXIT_CONFIG_ERROR = 4
-RAW_BACKEND_NAMES = ("claude", "bedrock", "codex", "gemini")
+RAW_BACKEND_NAMES = ("claude", "cursor", "bedrock", "codex", "gemini")
 CLAUDE_BACKENDS = {Backend.CLAUDE, Backend.BEDROCK}
 OPENCODE_BACKENDS = {Backend.OPENCODE}
 EXPLICIT_PROVIDER_MSG = (
     "No default model is configured. Choose one of: "
     "hatch codex <nano|mini|max>, "
     "hatch claude <haiku|sonnet|opus|fable>, "
+    "hatch cursor grok, "
     "hatch openrouter deepseek-v4-pro"
 )
 ZAI_DISABLED_MSG = (
     "z.ai/GLM-5.1 is disabled because the coding plan has no active resource package; "
-    "choose codex, claude, or openrouter instead"
+    "choose codex, claude, cursor, or openrouter instead"
 )
 
 FLAGS_WITH_VALUE = {
@@ -314,21 +315,24 @@ def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
         usage=(
             'hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"\n'
             '       hatch codex <nano|mini|max> [OPTIONS] "prompt"\n'
+            '       hatch cursor grok [OPTIONS] "prompt"\n'
             '       hatch openrouter <deepseek-v4-pro> [OPTIONS] "prompt"\n'
             '       hatch expert [OPTIONS] "prompt"'
         ),
-        description="One headless CLI for Claude, Codex, Gemini, OpenRouter, and expert calls",
+        description="One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Start Here:
   hatch codex mini "Review this branch"
   hatch claude sonnet "Review this diff"
+  hatch cursor grok "Review this branch"
   hatch openrouter deepseek-v4-pro "Review this branch"
   hatch expert "Is this refactor direction sound?"
 
 Surfaces:
   codex tiers     nano, mini, max
   claude tiers    haiku, sonnet, opus, fable
+  cursor          grok (Grok 4.5 HiFast via Cursor Agent)
   openrouter      deepseek-v4-pro
   expert          one synchronous GPT pro Responses API call
 
@@ -343,6 +347,7 @@ Advanced:
 Environment Variables:
   OPENAI_API_KEY      API key for codex backend
   OPENROUTER_API_KEY  API key for OpenRouter models
+  CURSOR_API_KEY      Optional API key for cursor-agent (else uses Cursor login)
   AWS_PROFILE         AWS profile for bedrock backend
   AWS_REGION          AWS region for bedrock backend
 """,
@@ -732,7 +737,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         env["LONGHOUSE_IS_SIDECHAIN"] = "1"
     cwd = args.cwd
 
-    if backend != Backend.CLAUDE:
+    if backend != Backend.CLAUDE and backend != Backend.CURSOR:
         try:
             preflight_bedrock_aws(model_name, env)
         except BedrockAwsAuthError as e:

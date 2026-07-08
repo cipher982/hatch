@@ -15,16 +15,18 @@ uv tool install -e ~/git/hatch
 Public surface:
 - `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`fable` = Fable-class, higher capability)
 - `hatch codex <nano|mini|max>` → GPT-5 on OpenAI
+- `hatch cursor grok` → Grok 4.5 HiFast via local Cursor Agent CLI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - `hatch mcp` → run the MCP server over stdio
-- Raw `-b bedrock` / `-b codex` / `-b gemini` still invoke the underlying CLIs directly as escape hatches
+- Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
 Default tiers:
 - Start with `sonnet` for Claude and `mini` for Codex
 - Drop to `haiku` / `nano` for faster cheaper work
 - Rise to `opus` / `max` when depth matters
 - Use `fable` for Fable-class Claude (higher capability, always-on adaptive thinking)
+- Use `cursor grok` for Grok 4.5 HiFast via Cursor
 - Use `openrouter deepseek-v4-pro` as the non-OpenAI/non-Anthropic third option
 
 Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
@@ -32,6 +34,7 @@ Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in sh
 ```bash
 hatch codex mini "Review this branch"
 hatch claude haiku "Summarize this file"
+hatch cursor grok "Review this branch"
 hatch openrouter deepseek-v4-pro "Review this branch"
 hatch codex max --reasoning-effort low "Write unit tests"
 hatch claude sonnet "Review this diff"
@@ -73,7 +76,7 @@ cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude
     context.py (container detection)
 ```
 
-**Active backends:** `claude`, `bedrock`, `codex`, `gemini`, `opencode`
+**Active backends:** `claude`, `cursor`, `bedrock`, `codex`, `gemini`, `opencode`
 
 `zai` / GLM-5.1 is intentionally disabled until the z.ai coding plan/resource package is active again. Bare `hatch "prompt"` has no default model; use an explicit surfaced provider.
 
@@ -90,9 +93,9 @@ cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude
 ## Conventions
 
 - **Single product repo** - the CLI and MCP server both live here; personal config repos should only point at `hatch`, not re-wrap it
-- **Prefer prompt via stdin when the backend supports it** - raw Claude/Codex/Gemini paths use stdin; OpenCode currently takes prompt text via argv
+- **Prefer prompt via stdin when the backend supports it** - raw Claude/Codex/Gemini paths use stdin; Cursor Agent takes prompt via argv (stdin hangs); OpenCode currently takes prompt text via argv
 - **Container-aware** - auto-sets HOME=/tmp for read-only filesystems
-- **Keep the surfaced CLI small** - `codex` and `claude` are the human/agent-facing entrypoints; Claude routes through local Claude Code OAuth, Codex/OpenRouter route through OpenCode, and raw backend flags are escape hatches
+- **Keep the surfaced CLI small** - `codex`, `claude`, and `cursor` are the human/agent-facing entrypoints; Claude routes through local Claude Code OAuth, Cursor through local Cursor Agent login, Codex/OpenRouter route through OpenCode, and raw backend flags are escape hatches
 - **Do not leak internal runtime nouns into the public contract** - `opencode` is an implementation detail, not part of the default user/agent mental model
 - **Machine callers should not remember flags** - real non-interactive CLI runs should default to JSON output + automation mode
 
@@ -111,12 +114,13 @@ print(result.output if result.ok else result.error)
 
 ## Gotchas
 
-1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, or `hatch openrouter ...`; z.ai/GLM is disabled for now
+1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, `hatch cursor grok`, or `hatch openrouter ...`; z.ai/GLM is disabled for now
 2. **Tests mock subprocess** - no real CLI calls except `integration` marked tests
 3. **Core deps should stay minimal** - `fastmcp` is in core because `hatch` now owns the MCP server; avoid growing beyond that without a strong reason
 4. **Credential loading lives in `credentials.py`** - do not fetch secrets inside backend config builders
 5. **Surfaced `claude` must not use OpenRouter implicitly** - `hatch claude` uses local Claude Code OAuth/subscription and strips `OPENROUTER_API_KEY`; OpenRouter Claude models require an explicit OpenRouter surface if ever re-added
 6. **The MCP server belongs here** - do not move hatch MCP code back into machine-local config repos
+7. **Surfaced `cursor` uses Cursor Agent CLI** - `cursor-agent -p --trust --force --model ...`; auth is Cursor login (or optional `CURSOR_API_KEY`). Prefer the `cursor-agent` binary name over the `agent` symlink to avoid PATH collisions.
 
 ---
 
@@ -146,3 +150,4 @@ print(result.output if result.ok else result.error)
 - (2026-05-27) [opencode] Surfaced Hatch/OpenCode runs must pass `--dangerously-skip-permissions`; keep `--dir` for repo context instead of broadening by omitting cwd.
 - (2026-07-07) [routing] `hatch_claude` must use the official local Claude Code CLI OAuth/subscription path and fail closed with OpenRouter/API-key/Bedrock env stripped. OpenRouter Claude was an expensive accidental fallback after Bedrock access ended; do not make it implicit again.
 - (2026-06-29) [subprocess] Always use `subprocess.DEVNULL` (never `None`) for stdin when no stdin_data is supplied. `None` inherits the caller's stdin — harmless in a TTY, but in non-TTY callers (Cursor Composer, CI, pipes) OpenCode sees an open pipe and hangs until the hatch timeout fires.
+- (2026-07-08) [cursor] `cursor-agent -p` is the one-shot hatch path. Pass prompt as argv (stdin hangs). Use `--trust --force`, binary name `cursor-agent` (not `agent`), and model ids like `grok-4.5-fast-xhigh`. Auth is Cursor login; optional `CURSOR_API_KEY`.

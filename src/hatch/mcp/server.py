@@ -20,6 +20,7 @@ from hatch.mcp.runtime import install_shutdown_signal_handlers
 from hatch.mcp.runtime import run_surface
 from hatch.models import ClaudeModelAlias
 from hatch.models import CodexModelAlias
+from hatch.models import CursorModelAlias
 from hatch.models import OpenRouterModelAlias
 
 
@@ -29,18 +30,20 @@ mcp = FastMCP(
 Stable MCP front door for hatch.
 
 hatch_claude runs through the official local Claude Code CLI using the user's
-Claude login/subscription. hatch_codex, hatch_gemini, and hatch_openrouter run
-through the OpenCode runtime. Use these full-agent tools for web research, repo
-code work, and multi-step tasks.
+Claude login/subscription. hatch_cursor runs through the local Cursor Agent CLI
+using the user's Cursor login/subscription (Grok 4.5 by default). hatch_codex,
+hatch_gemini, and hatch_openrouter run through the OpenCode runtime. Use these
+full-agent tools for web research, repo code work, and multi-step tasks.
 
 hatch_expert is a SINGLE-CALL LLM consultation (OpenAI Responses API, GPT-5.5-pro),
 NOT an agent. No tool loops, no multi-step work, no file access. It answers in one
 pass with optional built-in web search. Use only for simple single-turn Q&A where
-you specifically want the Responses API — otherwise use hatch_codex/claude.
+you specifically want the Responses API — otherwise use hatch_codex/claude/cursor.
 
 Recommended defaults:
 - Codex: model="mini"
 - Claude: model="sonnet". Use model="fable" only when the user explicitly asks for the highest-capability local Claude tier.
+- Cursor: model="grok" (Grok 4.5 HiFast via Cursor Agent)
 - OpenRouter: model="deepseek-v4-pro"
 - Expert: reasoning_effort="medium", web_search=true; use low for faster calls
 
@@ -209,6 +212,25 @@ async def hatch_claude(
 
 
 @mcp.tool()
+async def hatch_cursor(
+    model: Annotated[CursorModelAlias, "Cursor model. Use grok (Grok 4.5 HiFast)."],
+    prompt: Annotated[str, "Prompt to send to Cursor Agent via the surfaced hatch path."],
+    cwd: Annotated[str | None, "Absolute repo path for repo-aware work. Omit for one-off prompts."] = None,
+    timeout_s: Annotated[int, "Inner runtime timeout in seconds. Default 900."] = 900,
+    ctx: Context | None = None,
+) -> dict:
+    """Run Cursor Agent CLI using the user's Cursor login/subscription (Grok 4.5 HiFast)."""
+    return await _run_with_progress(
+        tool_name="hatch_cursor",
+        prompt=prompt,
+        model=model,
+        cwd=cwd,
+        timeout_s=timeout_s,
+        ctx=ctx,
+    )
+
+
+@mcp.tool()
 async def hatch_codex(
     model: Annotated[CodexModelAlias, "Codex tier. Start with mini."],
     prompt: Annotated[str, "Prompt to send to Codex via the surfaced hatch path."],
@@ -303,6 +325,7 @@ async def hatch_doctor() -> dict:
 
 TOOLS = {
     "hatch_claude": hatch_claude,
+    "hatch_cursor": hatch_cursor,
     "hatch_codex": hatch_codex,
     "hatch_expert": hatch_expert,
     "hatch_gemini": hatch_gemini,

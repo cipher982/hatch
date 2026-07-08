@@ -43,6 +43,7 @@ from hatch.observatory import observatory_trust_signature
 from hatch.opencode_stream import OpenCodeStreamAccumulator
 from hatch.opencode_stream import extract_opencode_log_error
 from hatch.runner import run_claude_stream_sync
+from hatch.runner import run_sync
 
 
 OPENCODE_BIN = os.environ.get("HATCH_MCP_OPENCODE_BIN", "opencode")
@@ -660,6 +661,8 @@ def build_run_command(
 ) -> list[str]:
     if tool_name == "hatch_claude":
         raise HatchMcpRuntimeError("hatch_claude uses the Claude Code CLI runtime, not OpenCode")
+    if tool_name == "hatch_cursor":
+        raise HatchMcpRuntimeError("hatch_cursor uses the Cursor Agent CLI runtime, not OpenCode")
 
     if not prompt.strip():
         raise HatchMcpRuntimeError("prompt must not be empty")
@@ -1074,6 +1077,181 @@ def _run_claude_surface(
     }
 
 
+def _run_cursor_surface(
+    *,
+    prompt: str,
+    model: str | None,
+    cwd: str | None,
+    timeout_s: int,
+    progress_handler: Callable[[str], None] | None,
+    start: float,
+    resolved_model: str,
+) -> dict[str, Any]:
+    cmd: list[str] | None = None
+    artifact_path: str | None = None
+    surface = SURFACE_NAMES["hatch_cursor"]
+
+    try:
+        cwd = _validate_prompt_and_cwd(prompt, cwd)
+        config = get_config(
+            Backend.CURSOR,
+            prompt,
+            detect_context(),
+            model=resolved_model,
+        )
+        cmd = config.cmd
+        if progress_handler:
+            progress_handler(f"[hatch] Cursor started ({resolved_model})")
+        stdout, stderr, return_code, timed_out = run_sync(
+            config.cmd,
+            config.stdin_data,
+            config.build_env(),
+            cwd,
+            timeout_s,
+        )
+    except (HatchMcpRuntimeError, ValueError) as exc:
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        return {
+            "ok": False,
+            "status": "config_error",
+            "output": "",
+            "exit_code": 4,
+            "duration_ms": duration_ms,
+            "error": str(exc),
+            "stderr": None,
+            "surface": surface,
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+        }
+    except FileNotFoundError as exc:
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        return {
+            "ok": False,
+            "status": "not_found",
+            "output": "",
+            "exit_code": -2,
+            "duration_ms": duration_ms,
+            "error": f"CLI not found: {exc}",
+            "stderr": None,
+            "surface": surface,
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+        }
+
+    duration_ms = int((time.perf_counter() - start) * 1000)
+    if cmd is not None:
+        artifact_path = _write_run_artifact(
+            stdout=stdout,
+            stderr=stderr,
+            return_code=return_code,
+            timed_out=timed_out,
+            model=resolved_model,
+            attach_url="cursor-agent",
+            cmd=[*cmd[:-1], "<argv-prompt>"] if cmd else None,
+            event_types=(),
+            session_id=None,
+            assistant_message_id=None,
+            selected_message_id=None,
+            selected_finish_reason=None,
+            output_source="cursor_print",
+            session_messages=None,
+            session_fetch_error=None,
+        )
+
+    artifact_note = (
+        "Full Cursor Agent output is persisted at artifact_path; inspect it if "
+        "output looks incomplete, confusing, or the run needs forensic recovery."
+    )
+    run_metadata = {
+        "output_source": "cursor_print",
+        "session_id": None,
+        "assistant_message_id": None,
+        "selected_message_id": None,
+        "selected_finish_reason": None,
+        "session_fetch_error": None,
+        "event_types": [],
+        "artifact_path": artifact_path,
+        "artifact_note": artifact_note,
+    }
+
+    if timed_out:
+        return {
+            "ok": False,
+            "status": "timeout",
+            "output": "",
+            "exit_code": -1,
+            "duration_ms": duration_ms,
+            "error": f"{surface} timed out after {timeout_s}s",
+            "stderr": stderr or None,
+            "surface": surface,
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+            **run_metadata,
+        }
+
+    if return_code != 0:
+        return {
+            "ok": False,
+            "status": "error",
+            "output": stdout or "",
+            "exit_code": return_code,
+            "duration_ms": duration_ms,
+            "error": stderr or f"Exit code {return_code}",
+            "stderr": stderr or None,
+            "surface": surface,
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+            **run_metadata,
+        }
+
+    if not (stdout or "").strip():
+        return {
+            "ok": False,
+            "status": "cursor_protocol_error",
+            "output": "",
+            "exit_code": return_code,
+            "duration_ms": duration_ms,
+            "error": "Cursor Agent completed without output",
+            "stderr": stderr or None,
+            "surface": surface,
+            "model": model,
+            "resolved_model": resolved_model,
+            "cwd": cwd,
+            "attach_url": None,
+            "cmd": cmd,
+            **run_metadata,
+        }
+
+    return {
+        "ok": True,
+        "status": "ok",
+        "output": stdout,
+        "exit_code": return_code,
+        "duration_ms": duration_ms,
+        "error": None,
+        "stderr": stderr or None,
+        "surface": surface,
+        "model": model,
+        "resolved_model": resolved_model,
+        "cwd": cwd,
+        "attach_url": None,
+        "cmd": cmd,
+        **run_metadata,
+    }
+
+
 def run_surface(
     *,
     tool_name: str,
@@ -1088,6 +1266,16 @@ def run_surface(
     resolved_model = _resolve_model(tool_name, model)
     if tool_name == "hatch_claude":
         return _run_claude_surface(
+            prompt=prompt,
+            model=model,
+            cwd=cwd,
+            timeout_s=timeout_s,
+            progress_handler=progress_handler,
+            start=start,
+            resolved_model=resolved_model,
+        )
+    if tool_name == "hatch_cursor":
+        return _run_cursor_surface(
             prompt=prompt,
             model=model,
             cwd=cwd,

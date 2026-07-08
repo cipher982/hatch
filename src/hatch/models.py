@@ -8,6 +8,7 @@ from typing import Literal
 
 CodexModelAlias = Literal["nano", "mini", "max"]
 ClaudeModelAlias = Literal["haiku", "sonnet", "opus", "fable"]
+CursorModelAlias = Literal["grok"]
 OpenRouterModelAlias = Literal["deepseek-v4-pro"]
 
 
@@ -23,6 +24,7 @@ class SurfacedProvider:
 
 
 OPENROUTER_DEEPSEEK_V4_PRO = "openrouter/deepseek/deepseek-v4-pro"
+CURSOR_GROK = "grok-4.5-fast-xhigh"
 
 SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
     "codex": SurfacedProvider(
@@ -46,6 +48,16 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
             "sonnet": "sonnet",
             "opus": "opus",
             "fable": "fable",
+        },
+    ),
+    "cursor": SurfacedProvider(
+        backend="cursor",
+        label="Cursor",
+        tool_name="hatch_cursor",
+        surface_name="hatch cursor",
+        models={
+            # Grok 4.5 HiFast via Cursor Agent CLI.
+            "grok": CURSOR_GROK,
         },
     ),
     "openrouter": SurfacedProvider(

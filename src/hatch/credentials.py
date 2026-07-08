@@ -179,6 +179,11 @@ def credential_backend_for(
     backend_kwargs: dict,
 ) -> Backend | str | None:
     """Choose which credential policy applies for a backend/model combination."""
+    # Cursor uses local Cursor login (or optional CURSOR_API_KEY already in env).
+    # Do not force Infisical hydration — fail closed to the CLI's own auth.
+    if backend in {Backend.CLAUDE, Backend.CURSOR, Backend.GEMINI, Backend.BEDROCK}:
+        return None
+
     if backend != Backend.OPENCODE:
         return backend
 

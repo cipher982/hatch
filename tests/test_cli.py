@@ -190,6 +190,7 @@ class TestCreateParser:
         captured = capsys.readouterr()
         assert 'hatch claude <haiku|sonnet|opus|fable>' in captured.out
         assert 'hatch codex <nano|mini|max>' in captured.out
+        assert 'hatch cursor grok' in captured.out
 
     def test_help_text_hides_advanced_flags(self, capsys):
         """Hidden power-user flags should stay out of the default help surface."""
@@ -432,6 +433,13 @@ class TestNormalizeArgv:
             "openrouter/deepseek/deepseek-v4-pro",
             "review",
         ]
+        assert normalize_argv(["cursor", "grok", "review"]) == [
+            "--backend",
+            "cursor",
+            "--model",
+            "grok-4.5-fast-xhigh",
+            "review",
+        ]
 
     def test_surfaced_codex_preserves_reasoning_effort_flag(self):
         """Surfaced Codex syntax should still forward Codex-only flags."""
@@ -453,11 +461,15 @@ class TestNormalizeArgv:
             normalize_argv(["claude", "4.6", "review"])
         with pytest.raises(ValueError, match="invalid openrouter model 'deepseek'"):
             normalize_argv(["openrouter", "deepseek", "review"])
+        with pytest.raises(ValueError, match="invalid cursor model 'fast'"):
+            normalize_argv(["cursor", "fast", "review"])
 
     def test_openrouter_requires_explicit_model(self):
         """OpenRouter surface should fail clearly without a model alias."""
         with pytest.raises(ValueError, match="openrouter requires an explicit model"):
             normalize_argv(["openrouter"])
+        with pytest.raises(ValueError, match="cursor requires an explicit model"):
+            normalize_argv(["cursor"])
 
     def test_option_value_named_like_provider_is_not_rewritten(self):
         """Provider aliases inside option values do not trigger routing."""

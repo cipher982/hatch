@@ -85,6 +85,11 @@ class TestHydrateBackendKwargs:
             kwargs = hydrate_backend_kwargs(backend, {})
         assert kwargs["api_key"] == "sk-or-env"
 
+    def test_cursor_skips_infisical_hydration(self):
+        """Cursor uses local login; no Infisical credential policy."""
+        assert credential_backend_for(Backend.CURSOR, {"model": "grok-4.5-fast-xhigh"}) is None
+        assert credential_backend_for(Backend.CLAUDE, {"model": "sonnet"}) is None
+
     def test_resolve_env_secret_ignores_whitespace_env(self):
         with mock.patch("hatch.credentials._load_secret_from_helper", return_value="sk-or-helper"):
             value = resolve_env_secret(

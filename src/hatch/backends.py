@@ -76,6 +76,7 @@ class Backend(str, Enum):
 
     ZAI = "zai"  # Claude Code CLI with z.ai/GLM-5.1
     CLAUDE = "claude"  # Claude Code CLI with local OAuth/subscription
+    CURSOR = "cursor"  # Cursor Agent CLI with local Cursor login/subscription
     BEDROCK = "bedrock"  # Claude Code CLI with AWS Bedrock
     CODEX = "codex"  # OpenAI Codex CLI
     GEMINI = "gemini"  # Google Gemini CLI
@@ -377,6 +378,62 @@ def configure_gemini(
     )
 
 
+def configure_cursor(
+    prompt: str,
+    ctx: ExecutionContext | None = None,
+    *,
+    model: str = "grok-4.5-fast-xhigh",
+    api_key: str | None = None,
+    force: bool = True,
+    **_: Any,
+) -> BackendConfig:
+    """Configure Cursor Agent CLI using the local Cursor login/subscription.
+
+    Uses `cursor-agent -p` (print/headless) for one-shot non-interactive runs.
+    Prompt is passed as argv — stdin hangs on this CLI. Prefer `cursor-agent`
+    over the `agent` symlink to avoid PATH collisions with other agent binaries.
+    """
+    ctx = ctx or detect_context()
+
+    env: dict[str, str] = {}
+    if ctx.in_container and not ctx.home_writable:
+        env["HOME"] = ctx.effective_home
+
+    key = api_key or os.environ.get("CURSOR_API_KEY")
+    if key:
+        env["CURSOR_API_KEY"] = key
+
+    # --trust is required for headless workspace trust; --force/--yolo skips
+    # interactive command approvals so non-interactive hatch runs don't hang.
+    cmd = [
+        "cursor-agent",
+        "--print",
+        "--trust",
+        "--model",
+        model,
+        "--output-format",
+        "text",
+    ]
+    if force:
+        cmd.append("--force")
+    cmd.append(prompt)
+
+    return BackendConfig(
+        cmd=cmd,
+        env=env,
+        env_unset=[
+            "OPENAI_API_KEY",
+            "OPENROUTER_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_BASE_URL",
+            "CLAUDE_CODE_USE_BEDROCK",
+            *_ROULETTE_ENV,
+        ],
+        stdin_data=None,
+    )
+
+
 def _map_opencode_variant(model: str, reasoning_effort: str | None) -> str | None:
     """Map hatch reasoning-effort levels onto OpenCode model variants."""
     if not reasoning_effort:
@@ -472,6 +529,7 @@ def configure_opencode(
 # Backend to configure function mapping
 BACKEND_CONFIGURATORS = {
     Backend.CLAUDE: configure_claude,
+    Backend.CURSOR: configure_cursor,
     Backend.BEDROCK: configure_bedrock,
     Backend.CODEX: configure_codex,
     Backend.GEMINI: configure_gemini,
