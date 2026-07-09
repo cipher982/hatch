@@ -1,6 +1,7 @@
 # hatch
 
-Headless runner with a simple Claude/Codex/OpenRouter surface plus a built-in MCP server for agent callers.
+CLI-only headless runner for complete one-turn Claude, Codex, Cursor, Gemini,
+OpenRouter, and expert calls.
 
 **Owner**: david010@gmail.com
 
@@ -18,7 +19,6 @@ Public surface:
 - `hatch cursor grok` → Grok 4.5 HiFast via local Cursor Agent CLI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
-- `hatch mcp` → run the MCP server over stdio
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
 Default tiers:
@@ -50,7 +50,6 @@ Use the same surfaced commands for normal build/edit work and review prompts.
 uv sync --all-extras                   # Install dev deps
 uv run --extra dev pytest -v           # Run tests
 uv run --extra dev pytest -v -m integration  # Real API calls (needs creds)
-uv run hatch mcp doctor tools          # Check MCP server tool surface
 ```
 
 ## Runtime Notes
@@ -68,7 +67,7 @@ Machine callers:
 ## Architecture
 
 ```
-cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude/codex/gemini)
+cli.py → credentials.py → backends.py → subprocess(opencode/claude/codex/gemini)
                     ↓
                infisical-get.py
         ↓
@@ -84,14 +83,14 @@ cli.py / mcp/* → credentials.py → backends.py → subprocess(opencode/claude
 |------|---------|
 | `backends.py` | Env vars + cmd building per backend |
 | `runner.py` | Async subprocess wrapper + timeout |
-| `mcp/` | Built-in MCP server + persistent OpenCode runtime |
 | `expert.py` | Direct single-call Responses API expert mode |
 | `context.py` | Container/filesystem detection |
 | `cli.py` | Argument parsing + main() |
 
 ## Conventions
 
-- **Single product repo** - the CLI and MCP server both live here; personal config repos should only point at `hatch`, not re-wrap it
+- **CLI-only public surface** - agent callers invoke `hatch` as a subprocess;
+  do not add another MCP facade or persistent agent runtime
 - **Prefer prompt via stdin when the backend supports it** - raw Claude/Codex/Gemini paths use stdin; Cursor Agent takes prompt via argv (stdin hangs); OpenCode currently takes prompt text via argv
 - **Container-aware** - auto-sets HOME=/tmp for read-only filesystems
 - **Keep the surfaced CLI small** - `codex`, `claude`, and `cursor` are the human/agent-facing entrypoints; Claude routes through local Claude Code OAuth, Cursor through local Cursor Agent login, Codex/OpenRouter route through OpenCode, and raw backend flags are escape hatches
@@ -115,11 +114,10 @@ print(result.output if result.ok else result.error)
 
 1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, `hatch cursor grok`, or `hatch openrouter ...`; z.ai/GLM is disabled for now
 2. **Tests mock subprocess** - no real CLI calls except `integration` marked tests
-3. **Core deps should stay minimal** - `fastmcp` is in core because `hatch` now owns the MCP server; avoid growing beyond that without a strong reason
+3. **Core deps should stay minimal** - the CLI currently needs no runtime Python dependencies; add one only when it removes more complexity than it creates
 4. **Credential loading lives in `credentials.py`** - do not fetch secrets inside backend config builders
 5. **Surfaced `claude` must not use OpenRouter implicitly** - `hatch claude` uses local Claude Code OAuth/subscription and strips `OPENROUTER_API_KEY`; OpenRouter Claude models require an explicit OpenRouter surface if ever re-added
-6. **The MCP server belongs here** - do not move hatch MCP code back into machine-local config repos
-7. **Surfaced `cursor` uses Cursor Agent CLI** - `cursor-agent -p --trust --force --model ...`; auth is Cursor login (or optional `CURSOR_API_KEY`). Prefer the `cursor-agent` binary name over the `agent` symlink to avoid PATH collisions.
+6. **Surfaced `cursor` uses Cursor Agent CLI** - `cursor-agent -p --trust --force --model ...`; auth is Cursor login (or optional `CURSOR_API_KEY`). Prefer the `cursor-agent` binary name over the `agent` symlink to avoid PATH collisions.
 
 ---
 
@@ -132,21 +130,15 @@ print(result.output if result.ok else result.error)
 - (2026-04-09) [auth] Bedrock launches must clear inherited `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_BASE_URL`; otherwise Claude can take the wrong auth path and fail before it ever reaches AWS.
 - (2026-04-09) [ux] Agents should not be asked to choose raw backends like `bedrock` vs `codex`; surface `hatch claude` / `hatch codex` and map model-family aliases internally.
 - (2026-04-09) [testing] Secret-helper fallback is useful in real runs but breaks missing-credential tests unless they can disable it explicitly.
-- (2026-05-14) [mcp] Attached OpenCode runs may produce multiple assistant messages; MCP result extraction should prefer the final `step-finish reason=stop` message over the first `step_start` message id.
 - (2026-04-13) [claude] `claude --print --output-format stream-json` now requires `--verbose`; if you want live progress plus a clean final stdout payload, parse the stream and emit progress on stderr instead of buffering with `communicate()`.
 - (2026-04-13) [runtime] Surface `hatch claude` / `hatch codex` through OpenCode so Bedrock/OpenAI share one tool/runtime model; keep raw `-b bedrock` / `-b codex` only as backend escape hatches.
 - (2026-04-13) [ux] Do not expose raw OpenCode agent names in the public hatch contract; keep the common path to plain `hatch claude ...` / `hatch codex ...` commands.
-- (2026-04-14) [architecture] `hatch` owns both the CLI and the MCP server; personal config repos should only register `hatch mcp`, not carry a second wrapper implementation.
-- (2026-04-16) [mcp] Long-running hatch MCP tools must forward runtime heartbeats/progress over the MCP context; increasing client `tool_timeout_sec` alone does not prevent 120s idle transport timeouts.
-- (2026-04-28) [mcp] When adding an MCP tool, update both the `@mcp.tool()` function and the `TOOLS` map used by `batch()`, then include it in `hatch mcp doctor tools`.
 - (2026-04-28) [runtime] Disable z.ai/GLM-5.1 while the coding plan is inactive; bare `hatch "..."` should fail fast instead of falling back to an implicit paid/provider default.
-- (2026-04-29) [mcp] Keep `hatch_expert` synchronous and single-shot; do not add status/polling tools because agent callers loop on async progress.
-- (2026-04-29) [expert] `hatch_expert` and `hatch expert` default to web search on; only disable it explicitly for sealed local-context reasoning.
-- (2026-04-29) [expert] Long expert calls use background Responses internally with server-side polling, but the public CLI/MCP contract stays one blocking call.
-- (2026-05-04) [mcp] In attached OpenCode runs, treat the session API/store as authoritative for final assistant text; stdout is only a progress/debug stream and may omit final events.
+- (2026-04-29) [expert] `hatch expert` defaults to web search on; only disable it explicitly for sealed local-context reasoning.
+- (2026-04-29) [expert] Long expert calls use background Responses internally with server-side polling, but the public CLI contract stays one blocking call.
 - (2026-05-21) [expert] Keep `hatch expert` to low/medium effort. On timeout, preserve the background response id/artifact instead of cancelling at the boundary.
 - (2026-05-24) [codex] Headless Hatch runs for Codex must explicitly pass `--dangerously-bypass-approvals-and-sandbox` to prevent deadlocks on interactive tool-approval prompts in non-interactive/redirected subshells.
 - (2026-05-27) [opencode] Surfaced Hatch/OpenCode runs must pass `--dangerously-skip-permissions`; keep `--dir` for repo context instead of broadening by omitting cwd.
-- (2026-07-07) [routing] `hatch_claude` must use the official local Claude Code CLI OAuth/subscription path and fail closed with OpenRouter/API-key/Bedrock env stripped. OpenRouter Claude was an expensive accidental fallback after Bedrock access ended; do not make it implicit again.
+- (2026-07-07) [routing] `hatch claude` must use the official local Claude Code CLI OAuth/subscription path and fail closed with OpenRouter/API-key/Bedrock env stripped. OpenRouter Claude was an expensive accidental fallback after Bedrock access ended; do not make it implicit again.
 - (2026-06-29) [subprocess] Always use `subprocess.DEVNULL` (never `None`) for stdin when no stdin_data is supplied. `None` inherits the caller's stdin — harmless in a TTY, but in non-TTY callers (Cursor Composer, CI, pipes) OpenCode sees an open pipe and hangs until the hatch timeout fires.
 - (2026-07-08) [cursor] `cursor-agent -p` is the one-shot hatch path. Pass prompt as argv (stdin hangs). Use `--trust --force`, binary name `cursor-agent` (not `agent`), and model ids like `grok-4.5-fast-xhigh`. Auth is Cursor login; optional `CURSOR_API_KEY`.

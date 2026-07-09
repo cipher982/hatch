@@ -18,7 +18,6 @@ class SurfacedProvider:
 
     backend: str
     label: str
-    tool_name: str
     surface_name: str
     models: dict[str, str]
 
@@ -30,7 +29,6 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
     "codex": SurfacedProvider(
         backend="opencode",
         label="Codex",
-        tool_name="hatch_codex",
         surface_name="hatch codex",
         models={
             "sol": "openai/gpt-5.6-sol",
@@ -45,7 +43,6 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
     "claude": SurfacedProvider(
         backend="claude",
         label="Claude",
-        tool_name="hatch_claude",
         surface_name="hatch claude",
         models={
             "haiku": "haiku",
@@ -57,7 +54,6 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
     "cursor": SurfacedProvider(
         backend="cursor",
         label="Cursor",
-        tool_name="hatch_cursor",
         surface_name="hatch cursor",
         models={
             # Grok 4.5 HiFast via Cursor Agent CLI.
@@ -67,7 +63,6 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
     "openrouter": SurfacedProvider(
         backend="opencode",
         label="OpenRouter",
-        tool_name="hatch_openrouter",
         surface_name="hatch openrouter",
         models={
             "deepseek-v4-pro": OPENROUTER_DEEPSEEK_V4_PRO,
@@ -75,43 +70,15 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
     ),
 }
 
-TOOL_TO_PROVIDER = {
-    spec.tool_name: provider for provider, spec in SURFACED_PROVIDERS.items()
-}
-
-SURFACE_LABELS = {
-    "hatch_gemini": "Gemini",
-    **{spec.tool_name: spec.label for spec in SURFACED_PROVIDERS.values()},
-}
-
-SURFACE_NAMES = {
-    "hatch_gemini": "hatch -b gemini",
-    **{spec.tool_name: spec.surface_name for spec in SURFACED_PROVIDERS.values()},
-}
-
-
 def model_choices(provider: str) -> str:
     """Return a stable comma-separated alias list for errors/help."""
     spec = SURFACED_PROVIDERS[provider]
     return ", ".join(spec.models)
 
 
-def tool_model_choices(tool_name: str) -> str:
-    """Return model aliases for a surfaced MCP tool."""
-    return model_choices(TOOL_TO_PROVIDER[tool_name])
-
-
 def resolve_provider_model(provider: str, model_alias: str) -> str | None:
     """Resolve a CLI provider alias to an OpenCode model ID."""
     return SURFACED_PROVIDERS[provider].models.get(model_alias)
-
-
-def resolve_tool_model(tool_name: str, model_alias: str) -> str | None:
-    """Resolve an MCP tool model alias to an OpenCode model ID."""
-    provider = TOOL_TO_PROVIDER.get(tool_name)
-    if provider is None:
-        return None
-    return resolve_provider_model(provider, model_alias)
 
 
 def opencode_progress_label(model_name: str) -> str:

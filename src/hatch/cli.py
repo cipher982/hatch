@@ -115,16 +115,6 @@ def infer_machine_defaults(argv: Sequence[str], stdout_is_tty: bool) -> tuple[bo
     return True, True
 
 
-def _print_mcp_help() -> None:
-    print(
-        "usage: hatch mcp [doctor ...]\n\n"
-        "  hatch mcp                 Run the hatch MCP server over stdio\n"
-        "  hatch mcp doctor tools    Verify the server exposes the expected tools\n"
-        "  hatch mcp doctor smoke --cwd /abs/path\n",
-        file=sys.stderr,
-    )
-
-
 def create_expert_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hatch expert",
@@ -227,34 +217,9 @@ def _dispatch_expert(raw_argv: Sequence[str]) -> int:
 
 
 def _dispatch_special_command(raw_argv: Sequence[str]) -> int | None:
-    if not raw_argv:
-        return None
-
-    if raw_argv[0] == "expert":
+    if raw_argv and raw_argv[0] == "expert":
         return _dispatch_expert(raw_argv)
-
-    if raw_argv[0] != "mcp":
-        return None
-
-    if len(raw_argv) == 1:
-        from hatch.mcp.server import main as mcp_main
-
-        mcp_main()
-        return EXIT_SUCCESS
-
-    subcommand = raw_argv[1]
-    if subcommand in {"-h", "--help"}:
-        _print_mcp_help()
-        return EXIT_SUCCESS
-
-    if subcommand == "doctor":
-        from hatch.mcp.doctor import main as mcp_doctor_main
-
-        return int(mcp_doctor_main(raw_argv[2:]))
-
-    print(f"Error: unknown hatch mcp subcommand '{subcommand}'", file=sys.stderr)
-    _print_mcp_help()
-    return EXIT_CONFIG_ERROR
+    return None
 
 
 def normalize_argv(argv: Sequence[str] | None) -> list[str]:
@@ -341,7 +306,6 @@ Advanced:
   hatch codex sol --reasoning-effort high "Write unit tests"
   hatch expert --reasoning-effort low "Evaluate this design"
   hatch -b gemini "Summarize this image"
-  hatch mcp              # run the MCP server
   hatch codex sol --json "Analyze this" | jq .output
   hatch --advanced-help   # show raw/backend-specific flags
 
