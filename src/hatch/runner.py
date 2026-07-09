@@ -18,6 +18,8 @@ from hatch.backends import get_config
 from hatch.context import detect_context
 from hatch.credentials import credential_backend_for
 from hatch.credentials import hydrate_backend_kwargs
+from hatch.longhouse_origin import mark_longhouse_automation_env
+from hatch.longhouse_origin import maybe_write_opencode_origin_sidecar_from_line
 from hatch.opencode_stream import OpenCodeStreamAccumulator
 from hatch.opencode_stream import extract_opencode_log_error
 
@@ -389,6 +391,7 @@ def run_opencode_stream_sync(
     stdout_open = True
     stderr_open = True
     timed_out = False
+    sidecar_session_ids: set[str] = set()
 
     while stdout_open or stderr_open:
         elapsed = time.monotonic() - start
@@ -416,6 +419,7 @@ def run_opencode_stream_sync(
 
         if source == "stdout":
             stdout_chunks.append(line)
+            maybe_write_opencode_origin_sidecar_from_line(line, env, sidecar_session_ids)
             if progress_handler:
                 for message in accumulator.handle_line(line):
                     progress_handler(message)
@@ -440,6 +444,7 @@ def run_opencode_stream_sync(
             continue
         if source == "stdout":
             stdout_chunks.append(line)
+            maybe_write_opencode_origin_sidecar_from_line(line, env, sidecar_session_ids)
             accumulator.handle_line(line)
         else:
             stderr_chunks.append(line)
@@ -533,6 +538,7 @@ async def run(
         resolved_backend_kwargs = hydrate_backend_kwargs(credential_backend, backend_kwargs)
     config = get_config(backend, prompt, ctx, **resolved_backend_kwargs)
     env = config.build_env()
+    mark_longhouse_automation_env(env)
 
     cwd_str = str(cwd) if cwd else None
 
@@ -545,6 +551,9 @@ async def run(
             cwd_str,
             timeout_s,
         )
+        sidecar_session_ids: set[str] = set()
+        for line in stdout.splitlines():
+            maybe_write_opencode_origin_sidecar_from_line(line, env, sidecar_session_ids)
 
         duration_ms = int((time.monotonic() - start) * 1000)
 

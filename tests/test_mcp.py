@@ -469,7 +469,11 @@ def test_run_surface_claude_uses_local_cli_not_opencode(monkeypatch, tmp_path):
     run_claude.assert_called_once()
     assert run_claude.call_args[0][0][0] == "claude"
     assert run_claude.call_args[0][0][run_claude.call_args[0][0].index("--model") + 1] == "haiku"
-    assert "OPENROUTER_API_KEY" not in run_claude.call_args[0][2]
+    env = run_claude.call_args[0][2]
+    assert "OPENROUTER_API_KEY" not in env
+    assert env["LONGHOUSE_ORIGIN_KIND"] == "hatch_automation"
+    assert env["LONGHOUSE_IS_SIDECHAIN"] == "1"
+    assert env["LONGHOUSE_HATCH_RUN_ID"].startswith("hatch-")
     assert result["ok"] is True
     assert result["status"] == "ok"
     assert result["output"] == "DONE"
@@ -679,10 +683,14 @@ def test_run_env_scopes_provider_credentials(monkeypatch):
     openai_env = _build_run_env("openai/gpt-5.4-mini")
     assert openai_env["OPENAI_API_KEY"] == "stable-openai-key"
     assert "OPENROUTER_API_KEY" not in openai_env
+    assert openai_env["LONGHOUSE_ORIGIN_KIND"] == "hatch_automation"
+    assert openai_env["LONGHOUSE_IS_SIDECHAIN"] == "1"
+    assert openai_env["LONGHOUSE_HATCH_RUN_ID"].startswith("hatch-")
 
     openrouter_env = _build_run_env("openrouter/deepseek/deepseek-v4-pro")
     assert openrouter_env["OPENROUTER_API_KEY"] == "openrouter-key"
     assert "OPENAI_API_KEY" not in openrouter_env
+    assert openrouter_env["LONGHOUSE_ORIGIN_KIND"] == "hatch_automation"
 
 
 def test_doctor_lists_expected_tools():

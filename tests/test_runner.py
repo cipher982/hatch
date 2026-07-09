@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 import sys
 from unittest import mock
@@ -253,7 +254,7 @@ class TestClaudeStreamRunSync:
 class TestOpenCodeStreamRunSync:
     """Tests for OpenCode JSON event stream handling."""
 
-    def test_extracts_final_text_and_progress(self):
+    def test_extracts_final_text_progress_and_writes_sidecar(self, tmp_path):
         """Parses JSONL tool events and keeps only the final text."""
         script = "\n".join([
             "import time",
@@ -269,10 +270,16 @@ class TestOpenCodeStreamRunSync:
         ])
 
         progress: list[str] = []
+        env = {
+            "LONGHOUSE_ORIGIN_KIND": "hatch_automation",
+            "LONGHOUSE_HATCH_RUN_ID": "hatch-run-stream",
+            "LONGHOUSE_PARENT_SESSION_ID": "11111111-1111-4111-8111-111111111111",
+            "LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT": str(tmp_path),
+        }
         result = run_opencode_stream_sync(
             cmd=[sys.executable, "-c", script],
             stdin_data=None,
-            env={},
+            env=env,
             cwd=None,
             timeout_s=10,
             progress_label="Codex",
@@ -289,6 +296,11 @@ class TestOpenCodeStreamRunSync:
             "[hatch] bash: Show uncommitted changes (git diff)",
             "[hatch] Codex completed",
         ]
+        sidecar = tmp_path / "ses_12345678.json"
+        assert sidecar.exists()
+        sidecar_payload = json.loads(sidecar.read_text())
+        assert sidecar_payload["origin_kind"] == "hatch_automation"
+        assert sidecar_payload["hatch_run_id"] == "hatch-run-stream"
 
     def test_open_code_progress_prefers_tool_title_and_elapsed_time(self):
         """Tool progress should use OpenCode titles when available."""
@@ -412,6 +424,31 @@ class TestAsyncRun:
         assert result.output == "output text"
         assert result.exit_code == 0
         assert result.status == "ok"
+
+    async def test_run_marks_longhouse_hatch_origin_env(
+        self,
+        mock_subprocess,
+        mock_context,
+        mock_hydrate_backend_kwargs,
+        mock_get_config,
+        mock_zai_key,
+        monkeypatch,
+        tmp_path,
+    ):
+        """Programmatic Hatch runs also emit durable Longhouse automation origin."""
+        monkeypatch.setenv("LONGHOUSE_MANAGED_SESSION_ID", "11111111-1111-4111-8111-111111111111")
+        monkeypatch.setenv("LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT", str(tmp_path))
+        mock_subprocess.return_value = ('{"type":"step_start","sessionID":"ses_runner"}\noutput text', "", 0, False)
+
+        result = await run("test prompt", Backend.ZAI)
+
+        assert result.ok is True
+        env = mock_subprocess.call_args.args[2]
+        assert env["LONGHOUSE_ORIGIN_KIND"] == "hatch_automation"
+        assert env["LONGHOUSE_IS_SIDECHAIN"] == "1"
+        assert env["LONGHOUSE_HATCH_RUN_ID"].startswith("hatch-")
+        assert env["LONGHOUSE_PARENT_SESSION_ID"] == "11111111-1111-4111-8111-111111111111"
+        assert (tmp_path / "ses_runner.json").exists()
 
     async def test_timeout_result(
         self, mock_subprocess, mock_context, mock_hydrate_backend_kwargs, mock_get_config, mock_zai_key

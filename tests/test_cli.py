@@ -6,6 +6,7 @@ import io
 import json
 import os
 import sys
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -23,6 +24,8 @@ from hatch.cli import (
     normalize_argv,
     result_to_exit_code,
 )
+from hatch.longhouse_origin import mark_longhouse_automation_env
+from hatch.longhouse_origin import maybe_write_opencode_origin_sidecar_from_line
 from hatch.runner import AgentResult
 
 
@@ -526,6 +529,61 @@ class TestInferMachineDefaults:
         )
 
 
+class TestLonghouseAutomationEnv:
+    """Tests for Longhouse Hatch-origin propagation."""
+
+    def test_mark_longhouse_automation_env_sets_origin_and_parent_context(self):
+        env = {
+            "LONGHOUSE_MANAGED_SESSION_ID": "11111111-1111-4111-8111-111111111111",
+            "LONGHOUSE_THREAD_ID": "22222222-2222-4222-8222-222222222222",
+            "LONGHOUSE_PROVIDER_SESSION_ID": "provider-parent",
+        }
+
+        with mock.patch("hatch.longhouse_origin.uuid.uuid4", return_value="run-id"):
+            mark_longhouse_automation_env(env)
+
+        assert env["LONGHOUSE_IS_SIDECHAIN"] == "1"
+        assert env["LONGHOUSE_ORIGIN_KIND"] == "hatch_automation"
+        assert env["LONGHOUSE_HATCH_RUN_ID"] == "hatch-run-id"
+        assert env["LONGHOUSE_PARENT_SESSION_ID"] == "11111111-1111-4111-8111-111111111111"
+        assert env["LONGHOUSE_PARENT_THREAD_ID"] == "22222222-2222-4222-8222-222222222222"
+        assert env["LONGHOUSE_PARENT_PROVIDER_SESSION_ID"] == "provider-parent"
+
+    def test_mark_longhouse_automation_env_prefers_managed_session_context(self):
+        env = {
+            "LONGHOUSE_MANAGED_SESSION_ID": "managed-session",
+            "LONGHOUSE_SESSION_ID": "generic-session",
+            "LONGHOUSE_CHANNEL_SESSION_ID": "channel-session",
+        }
+
+        with mock.patch("hatch.longhouse_origin.uuid.uuid4", return_value="run-id"):
+            mark_longhouse_automation_env(env)
+
+        assert env["LONGHOUSE_PARENT_SESSION_ID"] == "managed-session"
+
+    def test_opencode_step_start_writes_sidecar(self, tmp_path):
+        env = {
+            "LONGHOUSE_MANAGED_SESSION_ID": "11111111-1111-4111-8111-111111111111",
+            "LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT": str(tmp_path),
+        }
+        with mock.patch("hatch.longhouse_origin.uuid.uuid4", return_value="run-id"):
+            mark_longhouse_automation_env(env)
+
+        written = maybe_write_opencode_origin_sidecar_from_line(
+            '{"type":"step_start","sessionID":"ses_hatch_child"}\n',
+            env,
+            set(),
+        )
+
+        assert written == Path(tmp_path / "ses_hatch_child.json")
+        payload = json.loads(written.read_text())
+        assert payload["provider"] == "opencode"
+        assert payload["provider_session_id"] == "ses_hatch_child"
+        assert payload["origin_kind"] == "hatch_automation"
+        assert payload["hatch_run_id"] == "hatch-run-id"
+        assert payload["parent_longhouse_session_id"] == "11111111-1111-4111-8111-111111111111"
+
+
 class TestMain:
     """Tests for main function."""
 
@@ -759,6 +817,30 @@ class TestMain:
         data = json.loads(captured.out)
         assert data["ok"] is True
         assert data["output"] == "output"
+
+    def test_automation_run_passes_longhouse_hatch_origin_env(
+        self,
+        mock_run_claude_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        monkeypatch,
+        capsys,
+    ):
+        """Automation mode tells Longhouse this is hidden Hatch automation."""
+        monkeypatch.setenv("LONGHOUSE_MANAGED_SESSION_ID", "11111111-1111-4111-8111-111111111111")
+
+        with mock.patch("hatch.longhouse_origin.uuid.uuid4", return_value="run-id"):
+            exit_code = main(["--json", "--automation", "claude", "haiku", "test prompt"])
+
+        assert exit_code == EXIT_SUCCESS
+        env = mock_run_claude_stream_sync.call_args.args[2]
+        assert env["LONGHOUSE_IS_SIDECHAIN"] == "1"
+        assert env["LONGHOUSE_ORIGIN_KIND"] == "hatch_automation"
+        assert env["LONGHOUSE_HATCH_RUN_ID"] == "hatch-run-id"
+        assert env["LONGHOUSE_PARENT_SESSION_ID"] == "11111111-1111-4111-8111-111111111111"
+        data = json.loads(capsys.readouterr().out)
+        assert data["ok"] is True
 
     def test_timeout_exit_code(
         self,

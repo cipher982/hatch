@@ -32,6 +32,8 @@ from hatch.context import detect_context
 from hatch.credentials import CredentialCache
 from hatch.credentials import credential_status
 from hatch.credentials import ensure_opencode_credentials
+from hatch.longhouse_origin import mark_longhouse_automation_env
+from hatch.longhouse_origin import maybe_write_opencode_origin_sidecar_from_line
 from hatch.models import SURFACE_LABELS
 from hatch.models import SURFACE_NAMES
 from hatch.models import TOOL_TO_PROVIDER
@@ -179,6 +181,7 @@ def _build_server_env() -> dict[str, str]:
 
 def _build_run_env(model: str) -> dict[str, str]:
     env = _build_server_env()
+    mark_longhouse_automation_env(env)
 
     if not model.startswith("openai/"):
         env.pop("OPENAI_API_KEY", None)
@@ -728,12 +731,13 @@ def run_attached_command(
     heartbeat_s: int = 30,
 ) -> OpenCodeRunResult:
     _ensure_runtime_paths()
+    run_env = _build_run_env(model)
     proc = subprocess.Popen(
         cmd,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        env=_build_run_env(model),
+        env=run_env,
         text=True,
         bufsize=1,
     )
@@ -757,6 +761,7 @@ def run_attached_command(
     stdout_open = True
     stderr_open = True
     timed_out = False
+    sidecar_session_ids: set[str] = set()
 
     while stdout_open or stderr_open:
         elapsed = time.monotonic() - start
@@ -784,6 +789,7 @@ def run_attached_command(
 
         if source == "stdout":
             stdout_chunks.append(line)
+            maybe_write_opencode_origin_sidecar_from_line(line, run_env, sidecar_session_ids)
             if progress_handler:
                 for message in accumulator.handle_line(line):
                     progress_handler(message)
@@ -808,6 +814,7 @@ def run_attached_command(
             continue
         if source == "stdout":
             stdout_chunks.append(line)
+            maybe_write_opencode_origin_sidecar_from_line(line, run_env, sidecar_session_ids)
             accumulator.handle_line(line)
         else:
             stderr_chunks.append(line)
@@ -925,10 +932,12 @@ def _run_claude_surface(
             include_partial_messages=True,
         )
         cmd = config.cmd
+        env = config.build_env()
+        mark_longhouse_automation_env(env)
         result = run_claude_stream_sync(
             config.cmd,
             config.stdin_data,
-            config.build_env(),
+            env,
             cwd,
             timeout_s,
             progress_handler=progress_handler,
@@ -1102,10 +1111,12 @@ def _run_cursor_surface(
         cmd = config.cmd
         if progress_handler:
             progress_handler(f"[hatch] Cursor started ({resolved_model})")
+        env = config.build_env()
+        mark_longhouse_automation_env(env)
         stdout, stderr, return_code, timed_out = run_sync(
             config.cmd,
             config.stdin_data,
-            config.build_env(),
+            env,
             cwd,
             timeout_s,
         )

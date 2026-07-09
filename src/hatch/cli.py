@@ -20,6 +20,7 @@ from hatch.credentials import credential_backend_for
 from hatch.credentials import hydrate_backend_kwargs
 from hatch.expert import DEFAULT_EXPERT_MODEL
 from hatch.expert import run_expert_sync
+from hatch.longhouse_origin import mark_longhouse_automation_env
 from hatch.models import SURFACED_PROVIDERS
 from hatch.models import model_choices
 from hatch.models import opencode_progress_label
@@ -734,7 +735,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Build environment
     env = config.build_env()
     if getattr(args, "automation", False):
-        env["LONGHOUSE_IS_SIDECHAIN"] = "1"
+        mark_longhouse_automation_env(env)
     cwd = args.cwd
 
     if backend != Backend.CLAUDE and backend != Backend.CURSOR:
