@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 from dataclasses import dataclass
 from dataclasses import field
 from enum import Enum
@@ -29,12 +28,31 @@ _ROULETTE_ENV = [
     "HATCH_ROULETTE_AWS_REGION",
 ]
 
+_DCG_BYPASS_ENV = ["DCG_BYPASS"]
+
+
+def _dcg_required() -> bool:
+    """Return Agent Home's explicit required-state declaration."""
+    declaration = Path.home() / "git" / "me" / "config" / "dcg" / "release.json"
+    if not declaration.is_file():
+        return False
+    try:
+        return json.loads(declaration.read_text()).get("required") is True
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"invalid Agent Home DCG declaration: {declaration}") from exc
+
 
 def _dcg_binary() -> str | None:
     """Return the reviewed DCG binary when Agent Home integration is active."""
-    if os.environ.get("HATCH_DISABLE_DCG") == "1":
-        return None
-    return shutil.which("dcg")
+    binary = Path.home() / ".local" / "bin" / "dcg"
+    if binary.is_file() and os.access(binary, os.X_OK):
+        return str(binary)
+    if _dcg_required():
+        raise RuntimeError(
+            f"Agent Home requires DCG but {binary} is missing or not executable; "
+            "run `agents guard install`"
+        )
+    return None
 
 
 def _dcg_claude_settings() -> str | None:
@@ -62,6 +80,9 @@ def _dcg_opencode_env() -> dict[str, str] | None:
     return {
         "DCG_BIN": dcg,
         "XDG_CONFIG_HOME": str(root / "xdg"),
+        "XDG_DATA_HOME": str(root / "data"),
+        "XDG_CACHE_HOME": str(root / "cache"),
+        "XDG_STATE_HOME": str(root / "state"),
         "OPENCODE_CONFIG_DIR": str(root / "opencode"),
         "OPENCODE_DISABLE_PROJECT_CONFIG": "1",
     }
@@ -142,6 +163,11 @@ class BackendConfig:
         """Build final environment dict."""
         # Start with current environment
         result = dict(os.environ)
+
+        # Never inherit DCG's emergency shell bypass into autonomous agents.
+        for key in _DCG_BYPASS_ENV:
+            result.pop(key, None)
+        result["DCG_NO_SELF_HEAL"] = "1"
 
         # Remove vars that need to be unset
         for key in self.env_unset:
@@ -361,6 +387,9 @@ def configure_codex(
         # Ensure headless runs don't hang on interactive tool approvals.
         # Newer Codex CLIs reject combining this with the legacy --full-auto flag.
         cmd.append("--dangerously-bypass-approvals-and-sandbox")
+        # Hatch vets the Agent Home hook source, so automation can dispatch it
+        # without an interactive trust prompt.
+        cmd.append("--dangerously-bypass-hook-trust")
 
     # Model override if specified
     if model:
@@ -412,6 +441,7 @@ def configure_gemini(
         "--model",
         model,
         "--yolo",
+        "--skip-trust",
         "-p",
         "-",  # Read prompt from stdin
     ]

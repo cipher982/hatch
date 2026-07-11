@@ -20,6 +20,7 @@ from hatch.backends import (
     configure_zai,
     get_config,
 )
+from hatch.backends import _dcg_binary as real_dcg_binary
 from hatch.context import ExecutionContext
 
 
@@ -94,6 +95,13 @@ class TestBackendConfig:
             )
             env = config.build_env()
             assert env["OVERRIDE_ME"] == "new_value"
+
+    def test_build_env_strips_dcg_bypass(self, monkeypatch):
+        monkeypatch.setenv("DCG_BYPASS", "1")
+        config = BackendConfig(cmd=["test"], env={})
+
+        assert "DCG_BYPASS" not in config.build_env()
+        assert config.build_env()["DCG_NO_SELF_HEAL"] == "1"
 
     def test_stdin_data_default_none(self):
         """stdin_data defaults to None."""
@@ -319,8 +327,11 @@ class TestConfigureOpenCode:
         plugin.parent.mkdir(parents=True)
         plugin.write_text("export const DcgGuard = async () => ({});\n")
         monkeypatch.setenv("HOME", str(home))
-        monkeypatch.delenv("HATCH_DISABLE_DCG")
-        monkeypatch.setattr("hatch.backends.shutil.which", lambda name: "/opt/dcg" if name == "dcg" else None)
+        monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
+        binary = home / ".local" / "bin" / "dcg"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("#!/bin/sh\n")
+        binary.chmod(0o755)
 
         config = configure_opencode(
             "test prompt",
@@ -330,8 +341,11 @@ class TestConfigureOpenCode:
         )
 
         assert "--pure" not in config.cmd
-        assert config.env["DCG_BIN"] == "/opt/dcg"
+        assert config.env["DCG_BIN"] == str(binary)
         assert config.env["XDG_CONFIG_HOME"] == str(home / ".config" / "hatch" / "dcg" / "xdg")
+        assert config.env["XDG_DATA_HOME"] == str(home / ".config" / "hatch" / "dcg" / "data")
+        assert config.env["XDG_CACHE_HOME"] == str(home / ".config" / "hatch" / "dcg" / "cache")
+        assert config.env["XDG_STATE_HOME"] == str(home / ".config" / "hatch" / "dcg" / "state")
         assert config.env["OPENCODE_CONFIG_DIR"] == str(home / ".config" / "hatch" / "dcg" / "opencode")
         assert config.env["OPENCODE_DISABLE_PROJECT_CONFIG"] == "1"
 
@@ -491,10 +505,14 @@ class TestConfigureClaude:
             "low",
         ]
 
-    def test_dcg_settings_overlay_preserves_local_only_sources(self, monkeypatch, laptop_context):
+    def test_dcg_settings_overlay_preserves_local_only_sources(self, monkeypatch, tmp_path, laptop_context):
         """Claude receives only the explicit guard overlay, not full user settings."""
-        monkeypatch.delenv("HATCH_DISABLE_DCG")
-        monkeypatch.setattr("hatch.backends.shutil.which", lambda name: "/opt/dcg" if name == "dcg" else None)
+        monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        binary = tmp_path / ".local" / "bin" / "dcg"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("#!/bin/sh\n")
+        binary.chmod(0o755)
 
         config = configure_claude("test prompt", laptop_context, model="haiku")
 
@@ -502,7 +520,18 @@ class TestConfigureClaude:
         assert config.cmd[source_index + 1] == "local"
         settings_index = config.cmd.index("--settings")
         settings = json.loads(config.cmd[settings_index + 1])
-        assert settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == "/opt/dcg"
+        assert settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == str(binary)
+
+    def test_required_dcg_missing_fails_closed(self, monkeypatch, tmp_path, laptop_context):
+        declaration = tmp_path / "git" / "me" / "config" / "dcg" / "release.json"
+        declaration.parent.mkdir(parents=True)
+        declaration.write_text('{"required": true}\n')
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
+        monkeypatch.setenv("PATH", "/tmp/path-containing-a-different-dcg")
+
+        with pytest.raises(RuntimeError, match="agents guard install"):
+            configure_claude("test prompt", laptop_context, model="haiku")
 
     def test_command_with_stream_json(self, laptop_context):
         """Claude MCP mode uses stream-json with partial messages."""
@@ -633,6 +662,7 @@ class TestConfigureCodex:
             "codex",
             "exec",
             "--dangerously-bypass-approvals-and-sandbox",
+            "--dangerously-bypass-hook-trust",
         ]
 
     def test_command_structure_no_full_auto(self, mock_openai_key, laptop_context):
@@ -691,7 +721,7 @@ class TestConfigureGemini:
     def test_command_structure(self, laptop_context):
         """Command has correct structure."""
         config = configure_gemini("test prompt", laptop_context)
-        assert config.cmd == ["gemini", "--model", "gemini-3-pro-preview", "--yolo", "-p", "-"]
+        assert config.cmd == ["gemini", "--model", "gemini-3-pro-preview", "--yolo", "--skip-trust", "-p", "-"]
 
     def test_no_api_key_required(self, clean_env, laptop_context):
         """Does not require API key (uses OAuth)."""

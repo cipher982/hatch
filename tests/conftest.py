@@ -22,7 +22,7 @@ def clear_cache():
 @pytest.fixture(autouse=True)
 def disable_local_dcg(monkeypatch):
     """Keep backend unit tests independent of the developer's installed guard."""
-    monkeypatch.setenv("HATCH_DISABLE_DCG", "1")
+    monkeypatch.setattr("hatch.backends._dcg_binary", lambda: None)
 
 
 @pytest.fixture
