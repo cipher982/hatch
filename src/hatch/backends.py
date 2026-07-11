@@ -39,7 +39,7 @@ def _dcg_required() -> bool:
     try:
         return json.loads(declaration.read_text()).get("required") is True
     except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"invalid Agent Home DCG declaration: {declaration}") from exc
+        raise ValueError(f"invalid Agent Home DCG declaration: {declaration}") from exc
 
 
 def _dcg_binary() -> str | None:
@@ -48,7 +48,7 @@ def _dcg_binary() -> str | None:
     if binary.is_file() and os.access(binary, os.X_OK):
         return str(binary)
     if _dcg_required():
-        raise RuntimeError(
+        raise ValueError(
             f"Agent Home requires DCG but {binary} is missing or not executable; "
             "run `agents guard install`"
         )
@@ -78,14 +78,18 @@ def _dcg_opencode_env() -> dict[str, str] | None:
     source = Path.home() / "git" / "me" / "config" / "dcg" / "opencode-plugin.js"
     if not dcg:
         return None
-    valid_plugin = (
-        plugin.is_symlink()
-        and source.is_file()
-        and plugin.resolve() == source.resolve()
-    )
+    try:
+        valid_plugin = (
+            plugin.is_symlink()
+            and not source.is_symlink()
+            and source.is_file()
+            and os.readlink(plugin) == str(source)
+        )
+    except OSError:
+        valid_plugin = False
     if not valid_plugin:
         if _dcg_required():
-            raise RuntimeError(
+            raise ValueError(
                 f"Agent Home requires the reviewed OpenCode DCG plugin at {plugin}; "
                 "run `agents guard install`"
             )

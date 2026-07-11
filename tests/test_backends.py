@@ -369,7 +369,37 @@ class TestConfigureOpenCode:
         monkeypatch.setenv("HOME", str(home))
         monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
 
-        with pytest.raises(RuntimeError, match="agents guard install"):
+        with pytest.raises(ValueError, match="agents guard install"):
+            configure_opencode(
+                "test prompt", laptop_context, model="openai/gpt-5.4", api_key="sk-test",
+            )
+
+    @pytest.mark.parametrize("symlink_source", [False, True])
+    def test_required_dcg_rejects_indirect_or_symlinked_plugin_source(
+        self, monkeypatch, tmp_path, laptop_context, symlink_source,
+    ):
+        home = tmp_path / "home"
+        source = home / "git" / "me" / "config" / "dcg" / "opencode-plugin.js"
+        source.parent.mkdir(parents=True)
+        real_source = tmp_path / "real-plugin.js"
+        real_source.write_text("export const DcgGuard = true;\n")
+        if symlink_source:
+            source.symlink_to(real_source)
+        else:
+            source.write_text(real_source.read_text())
+        declaration = source.with_name("release.json")
+        declaration.write_text('{"required": true}\n')
+        binary = home / ".local" / "bin" / "dcg"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("#!/bin/sh\n")
+        binary.chmod(0o755)
+        plugin = home / ".config" / "hatch" / "dcg" / "opencode" / "plugins" / "dcg-guard.js"
+        plugin.parent.mkdir(parents=True)
+        plugin.symlink_to(real_source if not symlink_source else source)
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
+
+        with pytest.raises(ValueError, match="agents guard install"):
             configure_opencode(
                 "test prompt", laptop_context, model="openai/gpt-5.4", api_key="sk-test",
             )
@@ -555,7 +585,7 @@ class TestConfigureClaude:
         monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
         monkeypatch.setenv("PATH", "/tmp/path-containing-a-different-dcg")
 
-        with pytest.raises(RuntimeError, match="agents guard install"):
+        with pytest.raises(ValueError, match="agents guard install"):
             configure_claude("test prompt", laptop_context, model="haiku")
 
     def test_command_with_stream_json(self, laptop_context):
