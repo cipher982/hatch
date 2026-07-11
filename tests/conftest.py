@@ -19,6 +19,12 @@ def clear_cache():
     clear_context_cache()
 
 
+@pytest.fixture(autouse=True)
+def disable_local_dcg(monkeypatch):
+    """Keep backend unit tests independent of the developer's installed guard."""
+    monkeypatch.setenv("HATCH_DISABLE_DCG", "1")
+
+
 @pytest.fixture
 def laptop_context() -> ExecutionContext:
     """Context for laptop environment (not in container, writable home)."""

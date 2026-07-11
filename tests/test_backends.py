@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from unittest import mock
 
@@ -311,6 +312,29 @@ class TestConfigureOpenCode:
         assert config.env["OPENAI_API_KEY"] == "sk-test"
         assert config.stdin_data is None
 
+    def test_dcg_uses_isolated_config_without_pure(self, monkeypatch, tmp_path, laptop_context):
+        """DCG loads from a dedicated XDG/config root without user or project plugins."""
+        home = tmp_path / "home"
+        plugin = home / ".config" / "hatch" / "dcg" / "opencode" / "plugins" / "dcg-guard.js"
+        plugin.parent.mkdir(parents=True)
+        plugin.write_text("export const DcgGuard = async () => ({});\n")
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.delenv("HATCH_DISABLE_DCG")
+        monkeypatch.setattr("hatch.backends.shutil.which", lambda name: "/opt/dcg" if name == "dcg" else None)
+
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="openai/gpt-5.4",
+            api_key="sk-test",
+        )
+
+        assert "--pure" not in config.cmd
+        assert config.env["DCG_BIN"] == "/opt/dcg"
+        assert config.env["XDG_CONFIG_HOME"] == str(home / ".config" / "hatch" / "dcg" / "xdg")
+        assert config.env["OPENCODE_CONFIG_DIR"] == str(home / ".config" / "hatch" / "dcg" / "opencode")
+        assert config.env["OPENCODE_DISABLE_PROJECT_CONFIG"] == "1"
+
     def test_command_structure_for_openrouter(self, laptop_context):
         """OpenRouter-backed OpenCode models receive the OpenRouter API key."""
         config = configure_opencode(
@@ -466,6 +490,19 @@ class TestConfigureClaude:
             "--effort",
             "low",
         ]
+
+    def test_dcg_settings_overlay_preserves_local_only_sources(self, monkeypatch, laptop_context):
+        """Claude receives only the explicit guard overlay, not full user settings."""
+        monkeypatch.delenv("HATCH_DISABLE_DCG")
+        monkeypatch.setattr("hatch.backends.shutil.which", lambda name: "/opt/dcg" if name == "dcg" else None)
+
+        config = configure_claude("test prompt", laptop_context, model="haiku")
+
+        source_index = config.cmd.index("--setting-sources")
+        assert config.cmd[source_index + 1] == "local"
+        settings_index = config.cmd.index("--settings")
+        settings = json.loads(config.cmd[settings_index + 1])
+        assert settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == "/opt/dcg"
 
     def test_command_with_stream_json(self, laptop_context):
         """Claude MCP mode uses stream-json with partial messages."""

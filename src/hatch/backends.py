@@ -6,10 +6,13 @@ for its respective CLI tool.
 
 from __future__ import annotations
 
+import json
 import os
+import shutil
 from dataclasses import dataclass
 from dataclasses import field
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from hatch.aws_preflight import DEFAULT_BEDROCK_AWS_PROFILE
@@ -25,6 +28,43 @@ _ROULETTE_ENV = [
     "HATCH_ROULETTE_AWS_PROFILE",
     "HATCH_ROULETTE_AWS_REGION",
 ]
+
+
+def _dcg_binary() -> str | None:
+    """Return the reviewed DCG binary when Agent Home integration is active."""
+    if os.environ.get("HATCH_DISABLE_DCG") == "1":
+        return None
+    return shutil.which("dcg")
+
+
+def _dcg_claude_settings() -> str | None:
+    """Build a DCG-only Claude settings overlay without loading user settings."""
+    dcg = _dcg_binary()
+    if not dcg:
+        return None
+    return json.dumps({
+        "hooks": {
+            "PreToolUse": [{
+                "matcher": "Bash",
+                "hooks": [{"type": "command", "command": dcg}],
+            }],
+        },
+    }, separators=(",", ":"))
+
+
+def _dcg_opencode_env() -> dict[str, str] | None:
+    """Return an isolated OpenCode config that loads only Agent Home's DCG plugin."""
+    dcg = _dcg_binary()
+    root = Path.home() / ".config" / "hatch" / "dcg"
+    plugin = root / "opencode" / "plugins" / "dcg-guard.js"
+    if not dcg or not plugin.is_file():
+        return None
+    return {
+        "DCG_BIN": dcg,
+        "XDG_CONFIG_HOME": str(root / "xdg"),
+        "OPENCODE_CONFIG_DIR": str(root / "opencode"),
+        "OPENCODE_DISABLE_PROJECT_CONFIG": "1",
+    }
 
 
 def _build_simple_claude_headless_cmd(
@@ -58,6 +98,12 @@ def _build_simple_claude_headless_cmd(
         "--dangerously-skip-permissions",
         "--setting-sources",
         "local",
+    ])
+
+    if dcg_settings := _dcg_claude_settings():
+        cmd.extend(["--settings", dcg_settings])
+
+    cmd.extend([
         "--no-session-persistence",
         "--tools",
         tools,
@@ -487,6 +533,11 @@ def configure_opencode(
         env["AWS_REGION"] = aws_region or DEFAULT_BEDROCK_AWS_REGION
 
     apply_observatory_trust_env(env)
+
+    dcg_env = _dcg_opencode_env()
+    if dcg_env:
+        env.update(dcg_env)
+        pure = False
 
     cmd = ["opencode", "run", "--dangerously-skip-permissions"]
 
