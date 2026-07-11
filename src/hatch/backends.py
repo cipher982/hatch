@@ -37,17 +37,23 @@ def _dcg_required() -> bool:
     if not declaration.is_file():
         return False
     try:
-        return json.loads(declaration.read_text()).get("required") is True
+        value = json.loads(declaration.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"invalid Agent Home DCG declaration: {declaration}") from exc
+    if not isinstance(value, dict) or not isinstance(value.get("required"), bool):
+        raise ValueError(
+            f"invalid Agent Home DCG declaration: {declaration} must contain boolean `required`"
+        )
+    return value["required"]
 
 
 def _dcg_binary() -> str | None:
     """Return the reviewed DCG binary when Agent Home integration is active."""
+    required = _dcg_required()
     binary = Path.home() / ".local" / "bin" / "dcg"
     if binary.is_file() and os.access(binary, os.X_OK):
         return str(binary)
-    if _dcg_required():
+    if required:
         raise ValueError(
             f"Agent Home requires DCG but {binary} is missing or not executable; "
             "run `agents guard install`"

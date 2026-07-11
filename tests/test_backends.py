@@ -588,6 +588,19 @@ class TestConfigureClaude:
         with pytest.raises(ValueError, match="agents guard install"):
             configure_claude("test prompt", laptop_context, model="haiku")
 
+    @pytest.mark.parametrize("declaration_value", ["null", "[]", '"yes"', "{}", '{"required":"true"}'])
+    def test_malformed_dcg_declaration_fails_closed(
+        self, monkeypatch, tmp_path, laptop_context, declaration_value,
+    ):
+        declaration = tmp_path / "git" / "me" / "config" / "dcg" / "release.json"
+        declaration.parent.mkdir(parents=True)
+        declaration.write_text(declaration_value + "\n")
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
+
+        with pytest.raises(ValueError, match="boolean `required`"):
+            configure_claude("test prompt", laptop_context, model="haiku")
+
     def test_command_with_stream_json(self, laptop_context):
         """Claude MCP mode uses stream-json with partial messages."""
         config = configure_claude(
