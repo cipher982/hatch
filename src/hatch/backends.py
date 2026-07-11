@@ -81,6 +81,7 @@ def _dcg_opencode_env() -> dict[str, str] | None:
     dcg = _dcg_binary()
     root = Path.home() / ".config" / "hatch" / "dcg"
     plugin = root / "opencode" / "plugins" / "dcg-guard.js"
+    isolated_binary = root / "bin" / "dcg"
     source = Path.home() / "git" / "me" / "config" / "dcg" / "opencode-plugin.js"
     if not dcg:
         return None
@@ -90,6 +91,8 @@ def _dcg_opencode_env() -> dict[str, str] | None:
             and not source.is_symlink()
             and source.is_file()
             and os.readlink(plugin) == str(source)
+            and isolated_binary.is_symlink()
+            and os.readlink(isolated_binary) == dcg
         )
     except OSError:
         valid_plugin = False
@@ -409,9 +412,6 @@ def configure_codex(
         # Ensure headless runs don't hang on interactive tool approvals.
         # Newer Codex CLIs reject combining this with the legacy --full-auto flag.
         cmd.append("--dangerously-bypass-approvals-and-sandbox")
-        # Hatch vets the Agent Home hook source, so automation can dispatch it
-        # without an interactive trust prompt.
-        cmd.append("--dangerously-bypass-hook-trust")
 
     # Model override if specified
     if model:

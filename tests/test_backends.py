@@ -335,6 +335,9 @@ class TestConfigureOpenCode:
         binary.parent.mkdir(parents=True)
         binary.write_text("#!/bin/sh\n")
         binary.chmod(0o755)
+        isolated_binary = home / ".config" / "hatch" / "dcg" / "bin" / "dcg"
+        isolated_binary.parent.mkdir(parents=True)
+        isolated_binary.symlink_to(binary)
 
         config = configure_opencode(
             "test prompt",
@@ -363,6 +366,9 @@ class TestConfigureOpenCode:
         binary.parent.mkdir(parents=True)
         binary.write_text("#!/bin/sh\n")
         binary.chmod(0o755)
+        isolated_binary = home / ".config" / "hatch" / "dcg" / "bin" / "dcg"
+        isolated_binary.parent.mkdir(parents=True)
+        isolated_binary.symlink_to(binary)
         plugin = home / ".config" / "hatch" / "dcg" / "opencode" / "plugins" / "dcg-guard.js"
         plugin.parent.mkdir(parents=True)
         plugin.write_text("export const Foreign = true;\n")
@@ -393,6 +399,9 @@ class TestConfigureOpenCode:
         binary.parent.mkdir(parents=True)
         binary.write_text("#!/bin/sh\n")
         binary.chmod(0o755)
+        isolated_binary = home / ".config" / "hatch" / "dcg" / "bin" / "dcg"
+        isolated_binary.parent.mkdir(parents=True)
+        isolated_binary.symlink_to(binary)
         plugin = home / ".config" / "hatch" / "dcg" / "opencode" / "plugins" / "dcg-guard.js"
         plugin.parent.mkdir(parents=True)
         plugin.symlink_to(real_source if not symlink_source else source)
@@ -730,7 +739,6 @@ class TestConfigureCodex:
             "codex",
             "exec",
             "--dangerously-bypass-approvals-and-sandbox",
-            "--dangerously-bypass-hook-trust",
         ]
 
     def test_command_structure_no_full_auto(self, mock_openai_key, laptop_context):
