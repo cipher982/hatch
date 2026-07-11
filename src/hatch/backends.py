@@ -75,10 +75,22 @@ def _dcg_opencode_env() -> dict[str, str] | None:
     dcg = _dcg_binary()
     root = Path.home() / ".config" / "hatch" / "dcg"
     plugin = root / "opencode" / "plugins" / "dcg-guard.js"
-    if not dcg or not plugin.is_file():
+    source = Path.home() / "git" / "me" / "config" / "dcg" / "opencode-plugin.js"
+    if not dcg:
+        return None
+    valid_plugin = (
+        plugin.is_symlink()
+        and source.is_file()
+        and plugin.resolve() == source.resolve()
+    )
+    if not valid_plugin:
+        if _dcg_required():
+            raise RuntimeError(
+                f"Agent Home requires the reviewed OpenCode DCG plugin at {plugin}; "
+                "run `agents guard install`"
+            )
         return None
     return {
-        "DCG_BIN": dcg,
         "XDG_CONFIG_HOME": str(root / "xdg"),
         "XDG_DATA_HOME": str(root / "data"),
         "XDG_CACHE_HOME": str(root / "cache"),

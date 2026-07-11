@@ -325,7 +325,10 @@ class TestConfigureOpenCode:
         home = tmp_path / "home"
         plugin = home / ".config" / "hatch" / "dcg" / "opencode" / "plugins" / "dcg-guard.js"
         plugin.parent.mkdir(parents=True)
-        plugin.write_text("export const DcgGuard = async () => ({});\n")
+        source = home / "git" / "me" / "config" / "dcg" / "opencode-plugin.js"
+        source.parent.mkdir(parents=True)
+        source.write_text("export const DcgGuard = async () => ({});\n")
+        plugin.symlink_to(source)
         monkeypatch.setenv("HOME", str(home))
         monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
         binary = home / ".local" / "bin" / "dcg"
@@ -341,13 +344,35 @@ class TestConfigureOpenCode:
         )
 
         assert "--pure" not in config.cmd
-        assert config.env["DCG_BIN"] == str(binary)
+        assert "DCG_BIN" not in config.env
         assert config.env["XDG_CONFIG_HOME"] == str(home / ".config" / "hatch" / "dcg" / "xdg")
         assert config.env["XDG_DATA_HOME"] == str(home / ".config" / "hatch" / "dcg" / "data")
         assert config.env["XDG_CACHE_HOME"] == str(home / ".config" / "hatch" / "dcg" / "cache")
         assert config.env["XDG_STATE_HOME"] == str(home / ".config" / "hatch" / "dcg" / "state")
         assert config.env["OPENCODE_CONFIG_DIR"] == str(home / ".config" / "hatch" / "dcg" / "opencode")
         assert config.env["OPENCODE_DISABLE_PROJECT_CONFIG"] == "1"
+
+    def test_required_dcg_rejects_missing_or_foreign_opencode_plugin(
+        self, monkeypatch, tmp_path, laptop_context,
+    ):
+        home = tmp_path / "home"
+        declaration = home / "git" / "me" / "config" / "dcg" / "release.json"
+        declaration.parent.mkdir(parents=True)
+        declaration.write_text('{"required": true}\n')
+        binary = home / ".local" / "bin" / "dcg"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("#!/bin/sh\n")
+        binary.chmod(0o755)
+        plugin = home / ".config" / "hatch" / "dcg" / "opencode" / "plugins" / "dcg-guard.js"
+        plugin.parent.mkdir(parents=True)
+        plugin.write_text("export const Foreign = true;\n")
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setattr("hatch.backends._dcg_binary", real_dcg_binary)
+
+        with pytest.raises(RuntimeError, match="agents guard install"):
+            configure_opencode(
+                "test prompt", laptop_context, model="openai/gpt-5.4", api_key="sk-test",
+            )
 
     def test_command_structure_for_openrouter(self, laptop_context):
         """OpenRouter-backed OpenCode models receive the OpenRouter API key."""
