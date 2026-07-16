@@ -24,6 +24,7 @@ Public surface:
 Default tiers:
 - Start with `sonnet` for Claude and `sol` for Codex
 - Use `terra` for a lower-cost balance or `luna` for efficient high-volume work
+- GPT-5.6 reasoning accepts `none`, `low`, `medium`, `high`, `xhigh`, and `max`
 - Use `fable` for Fable-class Claude (higher capability, always-on adaptive thinking)
 - Use `cursor grok` for Grok 4.5 HiFast via Cursor
 - Use `openrouter deepseek-v4-pro` as the non-OpenAI/non-Anthropic third option

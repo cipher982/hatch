@@ -123,9 +123,9 @@ def create_expert_parser() -> argparse.ArgumentParser:
     parser.add_argument("prompt", nargs="*", metavar="PROMPT")
     parser.add_argument(
         "--reasoning-effort",
-        choices=["low", "medium"],
+        choices=["none", "low", "medium", "high", "xhigh", "max"],
         default="medium",
-        help="Reasoning effort for expert calls: low is fastest, medium is the default",
+        help="Reasoning effort for expert calls (default: medium)",
     )
     search_group = parser.add_mutually_exclusive_group()
     search_group.add_argument(
@@ -300,7 +300,7 @@ Surfaces:
   claude tiers    haiku, sonnet, opus, fable
   cursor          grok (Grok 4.5 HiFast via Cursor Agent)
   openrouter      deepseek-v4-pro
-  expert          one synchronous GPT pro Responses API call
+  expert          one synchronous GPT-5.6 Responses API call
 
 Advanced:
   hatch codex sol --reasoning-effort high "Write unit tests"
@@ -356,7 +356,7 @@ Environment Variables:
 
     parser.add_argument(
         "--reasoning-effort",
-        choices=["low", "medium", "high", "xhigh"],
+        choices=["none", "low", "medium", "high", "xhigh", "max"],
         help="Optional reasoning effort for Codex/OpenAI models",
     )
 
@@ -653,6 +653,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     backend_kwargs: dict = {}
     if args.model:
         backend_kwargs["model"] = args.model
+    if args.cwd:
+        backend_kwargs["cwd"] = args.cwd
     if args.api_key:
         backend_kwargs["api_key"] = args.api_key
     if args.reasoning_effort:

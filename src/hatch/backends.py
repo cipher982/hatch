@@ -538,9 +538,7 @@ def _map_opencode_variant(model: str, reasoning_effort: str | None) -> str | Non
         return None
 
     if model.startswith("openai/"):
-        # GPT-5 family supports minimal/low/medium/high. Codex xhigh maps to high.
-        if reasoning_effort == "xhigh":
-            return "high"
+        # GPT-5.6 exposes the full reasoning ladder directly.
         return reasoning_effort
 
     return None
@@ -551,6 +549,7 @@ def configure_opencode(
     ctx: ExecutionContext | None = None,
     *,
     model: str | None = None,
+    cwd: str | None = None,
     api_key: str | None = None,
     reasoning_effort: str | None = None,
     agent: str | None = None,
@@ -592,6 +591,12 @@ def configure_opencode(
         pure = False
 
     cmd = ["opencode", "run", "--dangerously-skip-permissions"]
+
+    # In the DCG-isolated runtime, OpenCode does not reliably infer its
+    # workspace from the subprocess cwd. Tell it explicitly so tool paths and
+    # project discovery remain rooted at Hatch's -C/--cwd target.
+    if cwd:
+        cmd.extend(["--dir", cwd])
 
     if pure:
         cmd.append("--pure")

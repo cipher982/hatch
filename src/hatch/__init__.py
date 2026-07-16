@@ -9,7 +9,7 @@ Usage:
     result = await run(
         prompt="Fix the bug",
         backend=Backend.OPENCODE,
-        model="openai/gpt-5.4-mini",
+        model="openai/gpt-5.6-sol",
         cwd="/path/to/workspace",
         timeout_s=300,
     )

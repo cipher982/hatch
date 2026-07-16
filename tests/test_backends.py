@@ -424,6 +424,16 @@ class TestConfigureOpenCode:
         assert config.cmd[config.cmd.index("-m") + 1] == "openrouter/deepseek/deepseek-v4-pro"
         assert config.env["OPENROUTER_API_KEY"] == "sk-or-test"
 
+    def test_opencode_explicitly_sets_workspace_directory(self, laptop_context):
+        """OpenCode must retain the requested workspace under isolated config."""
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="openai/gpt-5.6-terra",
+            cwd="/workspace/project",
+        )
+        assert config.cmd[config.cmd.index("--dir") + 1] == "/workspace/project"
+
     def test_reasoning_effort_maps_to_variant(self, laptop_context):
         """OpenAI reasoning effort maps onto OpenCode variants."""
         config = configure_opencode(
@@ -445,7 +455,7 @@ class TestConfigureOpenCode:
             "-m",
             "openai/gpt-5.4",
             "--variant",
-            "high",
+            "xhigh",
             "test prompt",
         ]
 

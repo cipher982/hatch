@@ -18,8 +18,8 @@ from hatch.backends import Backend
 from hatch.credentials import hydrate_backend_kwargs
 
 
-ExpertReasoningEffort = Literal["low", "medium"]
-DEFAULT_EXPERT_MODEL = "gpt-5.5-pro"
+ExpertReasoningEffort = Literal["none", "low", "medium", "high", "xhigh", "max"]
+DEFAULT_EXPERT_MODEL = "gpt-5.6-sol"
 RESPONSES_URL = "https://api.openai.com/v1/responses"
 BACKGROUND_POLL_INTERVAL_S = 15.0
 REQUEST_TIMEOUT_S = 60.0

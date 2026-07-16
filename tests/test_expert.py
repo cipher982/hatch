@@ -32,7 +32,7 @@ def test_build_payload_keeps_expert_sync_and_enables_web_search_by_default():
         background=True,
     )
 
-    assert payload["model"] == "gpt-5.5-pro"
+    assert payload["model"] == "gpt-5.6-sol"
     assert payload["reasoning"] == {"effort": "medium"}
     assert payload["background"] is True
     assert payload["store"] is True
@@ -48,7 +48,7 @@ def test_build_payload_can_disable_web_search():
         background=True,
     )
 
-    assert payload["model"] == "gpt-5.5-pro"
+    assert payload["model"] == "gpt-5.6-sol"
     assert payload["reasoning"] == {"effort": "medium"}
     assert payload["background"] is True
     assert payload["store"] is True
@@ -85,7 +85,7 @@ def test_build_payload_can_enable_web_search():
 def test_run_expert_sync_returns_output_and_metadata():
     response_payload = {
         "id": "resp_123",
-        "model": "gpt-5.5-pro-2026-04-23",
+        "model": "gpt-5.6-sol-2026-04-23",
         "usage": {"total_tokens": 12},
         "output": [
             {
@@ -129,7 +129,7 @@ def test_run_expert_sync_returns_output_and_metadata():
 
     assert result.ok is True
     assert result.output == "Use the simple design."
-    assert result.resolved_model == "gpt-5.5-pro-2026-04-23"
+    assert result.resolved_model == "gpt-5.6-sol-2026-04-23"
     assert result.usage == {"total_tokens": 12}
     assert result.citations == [
         {
@@ -152,12 +152,12 @@ def test_run_expert_sync_polls_background_response():
     create_payload = {
         "id": "resp_123",
         "status": "queued",
-        "model": "gpt-5.5-pro",
+        "model": "gpt-5.6-sol",
     }
     completed_payload = {
         "id": "resp_123",
         "status": "completed",
-        "model": "gpt-5.5-pro-2026-04-23",
+        "model": "gpt-5.6-sol-2026-04-23",
         "output": [
             {
                 "type": "message",
@@ -193,7 +193,7 @@ def test_run_expert_sync_timeout_leaves_background_response_running(monkeypatch,
     create_payload = {
         "id": "resp_123",
         "status": "queued",
-        "model": "gpt-5.5-pro",
+        "model": "gpt-5.6-sol",
     }
 
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))

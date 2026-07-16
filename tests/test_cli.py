@@ -1108,6 +1108,19 @@ class TestMain:
         call_args = mock_run_opencode_stream_sync.call_args[0]
         assert call_args[3] == "/tmp"
 
+    def test_surfaced_codex_passes_cwd_to_opencode_config(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+    ):
+        """OpenCode receives an explicit workspace as well as subprocess cwd."""
+        with mock.patch("hatch.cli.get_config", return_value=mock_get_config) as get_config:
+            main(["codex", "terra", "--cwd", "/tmp", "test prompt"])
+
+        assert get_config.call_args.kwargs["cwd"] == "/tmp"
+
     def test_surfaced_codex_json_still_passes_progress_handler(
         self,
         mock_run_opencode_stream_sync,
