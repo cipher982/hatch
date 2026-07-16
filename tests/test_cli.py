@@ -192,7 +192,7 @@ class TestCreateParser:
             parser.parse_args(["--help"])
         captured = capsys.readouterr()
         assert 'hatch claude <haiku|sonnet|opus|fable>' in captured.out
-        assert 'hatch codex <nano|mini|max>' in captured.out
+        assert 'hatch codex <sol|terra|luna>' in captured.out
         assert 'hatch cursor grok' in captured.out
 
     def test_help_text_hides_advanced_flags(self, capsys):
@@ -349,12 +349,19 @@ class TestNormalizeArgv:
         assert normalize_argv([]) == []
 
     def test_codex_requires_explicit_model(self):
-        """'hatch codex ...' must name nano, mini, or max explicitly."""
+        """'hatch codex ...' must name a current or compatibility alias."""
         with pytest.raises(ValueError, match="codex requires an explicit model"):
             normalize_argv(["codex"])
 
     def test_codex_model_aliases_work(self):
         """Codex shorthand models map to the surfaced family."""
+        assert normalize_argv(["codex", "sol", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openai/gpt-5.6-sol",
+            "review",
+        ]
         assert normalize_argv(["codex", "nano", "review"]) == [
             "--backend",
             "opencode",
@@ -394,6 +401,20 @@ class TestNormalizeArgv:
 
     def test_all_surfaced_aliases_map_correctly(self):
         """The public alias surface maps to the expected real model names."""
+        assert normalize_argv(["codex", "terra", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openai/gpt-5.6-terra",
+            "review",
+        ]
+        assert normalize_argv(["codex", "luna", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openai/gpt-5.6-luna",
+            "review",
+        ]
         assert normalize_argv(["codex", "mini", "review"]) == [
             "--backend",
             "opencode",

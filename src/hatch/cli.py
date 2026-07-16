@@ -41,7 +41,7 @@ CLAUDE_BACKENDS = {Backend.CLAUDE, Backend.BEDROCK}
 OPENCODE_BACKENDS = {Backend.OPENCODE}
 EXPLICIT_PROVIDER_MSG = (
     "No default model is configured. Choose one of: "
-    "hatch codex <nano|mini|max>, "
+    "hatch codex <sol|terra|luna>, "
     "hatch claude <haiku|sonnet|opus|fable>, "
     "hatch cursor grok, "
     "hatch openrouter deepseek-v4-pro"
@@ -315,7 +315,7 @@ def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
         prog="hatch",
         usage=(
             'hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"\n'
-            '       hatch codex <nano|mini|max> [OPTIONS] "prompt"\n'
+            '       hatch codex <sol|terra|luna> [OPTIONS] "prompt"\n'
             '       hatch cursor grok [OPTIONS] "prompt"\n'
             '       hatch openrouter <deepseek-v4-pro> [OPTIONS] "prompt"\n'
             '       hatch expert [OPTIONS] "prompt"'
@@ -324,25 +324,25 @@ def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Start Here:
-  hatch codex mini "Review this branch"
+  hatch codex sol "Review this branch"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch openrouter deepseek-v4-pro "Review this branch"
   hatch expert "Is this refactor direction sound?"
 
 Surfaces:
-  codex tiers     nano, mini, max
+  codex models    sol, terra, luna (legacy: nano, mini, max)
   claude tiers    haiku, sonnet, opus, fable
   cursor          grok (Grok 4.5 HiFast via Cursor Agent)
   openrouter      deepseek-v4-pro
   expert          one synchronous GPT pro Responses API call
 
 Advanced:
-  hatch codex max --reasoning-effort low "Write unit tests"
+  hatch codex sol --reasoning-effort high "Write unit tests"
   hatch expert --reasoning-effort low "Evaluate this design"
   hatch -b gemini "Summarize this image"
   hatch mcp              # run the MCP server
-  hatch codex mini --json "Analyze this" | jq .output
+  hatch codex sol --json "Analyze this" | jq .output
   hatch --advanced-help   # show raw/backend-specific flags
 
 Environment Variables:

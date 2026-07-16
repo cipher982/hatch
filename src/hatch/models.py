@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-CodexModelAlias = Literal["nano", "mini", "max"]
+CodexModelAlias = Literal["sol", "terra", "luna", "nano", "mini", "max"]
 ClaudeModelAlias = Literal["haiku", "sonnet", "opus", "fable"]
 CursorModelAlias = Literal["grok"]
 OpenRouterModelAlias = Literal["deepseek-v4-pro"]
@@ -33,6 +33,10 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
         tool_name="hatch_codex",
         surface_name="hatch codex",
         models={
+            "sol": "openai/gpt-5.6-sol",
+            "terra": "openai/gpt-5.6-terra",
+            "luna": "openai/gpt-5.6-luna",
+            # Compatibility aliases for prompts written before GPT-5.6.
             "nano": "openai/gpt-5.4-nano",
             "mini": "openai/gpt-5.4-mini",
             "max": "openai/gpt-5.5",

@@ -14,7 +14,7 @@ uv tool install -e ~/git/hatch
 
 Public surface:
 - `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`fable` = Fable-class, higher capability)
-- `hatch codex <nano|mini|max>` → GPT-5 on OpenAI
+- `hatch codex <sol|terra|luna>` → GPT-5.6 on OpenAI (`nano|mini|max` remain compatibility aliases)
 - `hatch cursor grok` → Grok 4.5 HiFast via local Cursor Agent CLI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
@@ -22,9 +22,8 @@ Public surface:
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
 Default tiers:
-- Start with `sonnet` for Claude and `mini` for Codex
-- Drop to `haiku` / `nano` for faster cheaper work
-- Rise to `opus` / `max` when depth matters
+- Start with `sonnet` for Claude and `sol` for Codex
+- Use `terra` for a lower-cost balance or `luna` for efficient high-volume work
 - Use `fable` for Fable-class Claude (higher capability, always-on adaptive thinking)
 - Use `cursor grok` for Grok 4.5 HiFast via Cursor
 - Use `openrouter deepseek-v4-pro` as the non-OpenAI/non-Anthropic third option
@@ -32,15 +31,15 @@ Default tiers:
 Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
 
 ```bash
-hatch codex mini "Review this branch"
+hatch codex sol "Review this branch"
 hatch claude haiku "Summarize this file"
 hatch cursor grok "Review this branch"
 hatch openrouter deepseek-v4-pro "Review this branch"
-hatch codex max --reasoning-effort low "Write unit tests"
+hatch codex sol --reasoning-effort high "Write unit tests"
 hatch claude sonnet "Review this diff"
-hatch codex nano "What is 2+2?"
+hatch codex luna "What is 2+2?"
 hatch expert --reasoning-effort low "Is this refactor direction sound?"
-hatch codex mini --json "Analyze this" | jq .output
+hatch codex sol --json "Analyze this" | jq .output
 ```
 
 Use the same surfaced commands for normal build/edit work and review prompts.
@@ -107,7 +106,7 @@ from hatch import run, Backend
 result = await run(
     prompt="Fix the bug",
     backend=Backend.OPENCODE,
-    model="openai/gpt-5.4-mini",
+    model="openai/gpt-5.6-sol",
 )
 print(result.output if result.ok else result.error)
 ```
