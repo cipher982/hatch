@@ -87,7 +87,7 @@ class TestHydrateBackendKwargs:
 
     def test_cursor_skips_infisical_hydration(self):
         """Cursor uses local login; no Infisical credential policy."""
-        assert credential_backend_for(Backend.CURSOR, {"model": "grok-4.5-fast-xhigh"}) is None
+        assert credential_backend_for(Backend.CURSOR, {"model": "cursor-grok-4.5-high"}) is None
         assert credential_backend_for(Backend.CLAUDE, {"model": "sonnet"}) is None
 
     def test_resolve_env_secret_ignores_whitespace_env(self):

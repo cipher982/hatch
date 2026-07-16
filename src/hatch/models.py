@@ -23,7 +23,7 @@ class SurfacedProvider:
 
 
 OPENROUTER_DEEPSEEK_V4_PRO = "openrouter/deepseek/deepseek-v4-pro"
-CURSOR_GROK = "grok-4.5-fast-xhigh"
+CURSOR_GROK = "cursor-grok-4.5-high"
 
 SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
     "codex": SurfacedProvider(
@@ -56,7 +56,7 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
         label="Cursor",
         surface_name="hatch cursor",
         models={
-            # Grok 4.5 HiFast via Cursor Agent CLI.
+            # Grok 4.5 High via Cursor Agent CLI.
             "grok": CURSOR_GROK,
         },
     ),

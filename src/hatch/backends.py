@@ -480,7 +480,7 @@ def configure_cursor(
     prompt: str,
     ctx: ExecutionContext | None = None,
     *,
-    model: str = "grok-4.5-fast-xhigh",
+    model: str = "cursor-grok-4.5-high",
     api_key: str | None = None,
     force: bool = True,
     **_: Any,

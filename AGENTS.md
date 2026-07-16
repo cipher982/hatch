@@ -16,7 +16,7 @@ uv tool install -e ~/git/hatch
 Public surface:
 - `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`fable` = Fable-class, higher capability)
 - `hatch codex <sol|terra|luna>` → GPT-5.6 on OpenAI (`nano|mini|max` remain compatibility aliases)
-- `hatch cursor grok` → Grok 4.5 HiFast via local Cursor Agent CLI
+- `hatch cursor grok` → Grok 4.5 High via local Cursor Agent CLI
 - `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
@@ -26,7 +26,7 @@ Default tiers:
 - Use `terra` for a lower-cost balance or `luna` for efficient high-volume work
 - GPT-5.6 reasoning accepts `none`, `low`, `medium`, `high`, `xhigh`, and `max`
 - Use `fable` for Fable-class Claude (higher capability, always-on adaptive thinking)
-- Use `cursor grok` for Grok 4.5 HiFast via Cursor
+- Use `cursor grok` for Grok 4.5 High via Cursor
 - Use `openrouter deepseek-v4-pro` as the non-OpenAI/non-Anthropic third option
 
 Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
@@ -35,6 +35,8 @@ Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in sh
 hatch codex sol "Review this branch"
 hatch claude haiku "Summarize this file"
 hatch cursor grok "Review this branch"
+hatch cursor grok --model cursor-grok-4.5-high "Review with a raw Cursor model ID"
+hatch doctor
 hatch openrouter deepseek-v4-pro "Review this branch"
 hatch codex sol --reasoning-effort high "Write unit tests"
 hatch claude sonnet "Review this diff"
@@ -118,7 +120,7 @@ print(result.output if result.ok else result.error)
 3. **Core deps should stay minimal** - the CLI currently needs no runtime Python dependencies; add one only when it removes more complexity than it creates
 4. **Credential loading lives in `credentials.py`** - do not fetch secrets inside backend config builders
 5. **Surfaced `claude` must not use OpenRouter implicitly** - `hatch claude` uses local Claude Code OAuth/subscription and strips `OPENROUTER_API_KEY`; OpenRouter Claude models require an explicit OpenRouter surface if ever re-added
-6. **Surfaced `cursor` uses Cursor Agent CLI** - `cursor-agent -p --trust --force --model ...`; auth is Cursor login (or optional `CURSOR_API_KEY`). Prefer the `cursor-agent` binary name over the `agent` symlink to avoid PATH collisions.
+6. **Surfaced `cursor` uses Cursor Agent CLI** - `cursor-agent -p --trust --force --model ...`; auth is Cursor login (or optional `CURSOR_API_KEY`). Prefer the `cursor-agent` binary name over the `agent` symlink to avoid PATH collisions. Run `hatch doctor` after Cursor upgrades to verify that the stable `grok` alias still targets an available account model.
 
 ---
 
@@ -142,4 +144,4 @@ print(result.output if result.ok else result.error)
 - (2026-05-27) [opencode] Surfaced Hatch/OpenCode runs must pass `--dangerously-skip-permissions`; keep `--dir` for repo context instead of broadening by omitting cwd.
 - (2026-07-07) [routing] `hatch claude` must use the official local Claude Code CLI OAuth/subscription path and fail closed with OpenRouter/API-key/Bedrock env stripped. OpenRouter Claude was an expensive accidental fallback after Bedrock access ended; do not make it implicit again.
 - (2026-06-29) [subprocess] Always use `subprocess.DEVNULL` (never `None`) for stdin when no stdin_data is supplied. `None` inherits the caller's stdin — harmless in a TTY, but in non-TTY callers (Cursor Composer, CI, pipes) OpenCode sees an open pipe and hangs until the hatch timeout fires.
-- (2026-07-08) [cursor] `cursor-agent -p` is the one-shot hatch path. Pass prompt as argv (stdin hangs). Use `--trust --force`, binary name `cursor-agent` (not `agent`), and model ids like `grok-4.5-fast-xhigh`. Auth is Cursor login; optional `CURSOR_API_KEY`.
+- (2026-07-16) [cursor] `cursor-agent -p` is the one-shot hatch path. Pass prompt as argv (stdin hangs). Use `--trust --force`, binary name `cursor-agent` (not `agent`), and verify the pinned model with `hatch doctor` because Cursor model IDs can be retired. Auth is Cursor login; optional `CURSOR_API_KEY`.

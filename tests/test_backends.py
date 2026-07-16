@@ -683,14 +683,14 @@ class TestConfigureCursor:
         config = configure_cursor(
             "test prompt",
             laptop_context,
-            model="grok-4.5-fast-xhigh",
+            model="cursor-grok-4.5-high",
         )
         assert config.cmd == [
             "cursor-agent",
             "--print",
             "--trust",
             "--model",
-            "grok-4.5-fast-xhigh",
+            "cursor-grok-4.5-high",
             "--output-format",
             "text",
             "--force",
@@ -867,10 +867,10 @@ class TestGetConfig:
             Backend.CURSOR,
             "test",
             laptop_context,
-            model="grok-4.5-fast-xhigh",
+            model="cursor-grok-4.5-high",
         )
         assert config.cmd[0] == "cursor-agent"
-        assert config.cmd[config.cmd.index("--model") + 1] == "grok-4.5-fast-xhigh"
+        assert config.cmd[config.cmd.index("--model") + 1] == "cursor-grok-4.5-high"
 
     def test_dispatches_to_codex(self, mock_openai_key, laptop_context):
         """Dispatches to configure_codex for CODEX backend."""

@@ -443,7 +443,7 @@ class TestNormalizeArgv:
             "--backend",
             "cursor",
             "--model",
-            "grok-4.5-fast-xhigh",
+            "cursor-grok-4.5-high",
             "review",
         ]
 
@@ -467,8 +467,23 @@ class TestNormalizeArgv:
             normalize_argv(["claude", "4.6", "review"])
         with pytest.raises(ValueError, match="invalid openrouter model 'deepseek'"):
             normalize_argv(["openrouter", "deepseek", "review"])
-        with pytest.raises(ValueError, match="invalid cursor model 'fast'"):
+        with pytest.raises(
+            ValueError,
+            match=r"hatch cursor grok --model <cursor-model-id>",
+        ):
             normalize_argv(["cursor", "fast", "review"])
+
+    def test_cursor_raw_model_override(self):
+        """A raw Cursor model ID can explicitly override the stable alias."""
+        assert normalize_argv(
+            ["cursor", "grok", "--model", "cursor-grok-4.5-low", "review"]
+        ) == [
+            "--backend",
+            "cursor",
+            "--model",
+            "cursor-grok-4.5-low",
+            "review",
+        ]
 
     def test_openrouter_requires_explicit_model(self):
         """OpenRouter surface should fail clearly without a model alias."""

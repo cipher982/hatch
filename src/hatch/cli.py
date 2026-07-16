@@ -18,6 +18,7 @@ from hatch.backends import get_config
 from hatch.context import detect_context
 from hatch.credentials import credential_backend_for
 from hatch.credentials import hydrate_backend_kwargs
+from hatch.doctor import run_doctor
 from hatch.expert import DEFAULT_EXPERT_MODEL
 from hatch.expert import run_expert_sync
 from hatch.longhouse_origin import mark_longhouse_automation_env
@@ -219,6 +220,21 @@ def _dispatch_expert(raw_argv: Sequence[str]) -> int:
 def _dispatch_special_command(raw_argv: Sequence[str]) -> int | None:
     if raw_argv and raw_argv[0] == "expert":
         return _dispatch_expert(raw_argv)
+    if raw_argv and raw_argv[0] == "doctor":
+        parser = argparse.ArgumentParser(
+            prog="hatch doctor",
+            description="Check live Hatch provider contracts",
+        )
+        parser.add_argument("--json", action="store_true", dest="json_output")
+        args = parser.parse_args(raw_argv[1:])
+        checks = run_doctor()
+        ok = all(check.ok for check in checks)
+        if args.json_output:
+            print(json.dumps({"ok": ok, "checks": [check.to_dict() for check in checks]}))
+        else:
+            for check in checks:
+                print(f"{'PASS' if check.ok else 'FAIL'} {check.name}: {check.detail}")
+        return EXIT_SUCCESS if ok else EXIT_CONFIG_ERROR
     return None
 
 
@@ -263,7 +279,13 @@ def normalize_argv(argv: Sequence[str] | None) -> list[str]:
     resolved_model = resolve_provider_model(provider, model_alias)
     if not resolved_model:
         choices = model_choices(provider)
-        raise ValueError(f"invalid {provider} model '{model_alias}'. Choose one of: {choices}")
+        message = f"invalid {provider} model '{model_alias}'. Choose one of: {choices}"
+        if provider == "cursor":
+            message += (
+                ". For a raw Cursor model ID, use: "
+                "hatch cursor grok --model <cursor-model-id> \"prompt\""
+            )
+        raise ValueError(message)
     after = after[1:]
 
     rewritten = [*before, "--backend", provider_spec.backend]
@@ -298,12 +320,13 @@ Start Here:
 Surfaces:
   codex models    sol, terra, luna (legacy: nano, mini, max)
   claude tiers    haiku, sonnet, opus, fable
-  cursor          grok (Grok 4.5 HiFast via Cursor Agent)
+  cursor          grok (Grok 4.5 High via Cursor Agent)
   openrouter      deepseek-v4-pro
   expert          one synchronous GPT-5.6 Responses API call
 
 Advanced:
   hatch codex sol --reasoning-effort high "Write unit tests"
+  hatch doctor
   hatch expert --reasoning-effort low "Evaluate this design"
   hatch -b gemini "Summarize this image"
   hatch codex sol --json "Analyze this" | jq .output
