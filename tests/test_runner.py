@@ -6,6 +6,8 @@ import asyncio
 import json
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -253,6 +255,42 @@ class TestClaudeStreamRunSync:
 
 class TestOpenCodeStreamRunSync:
     """Tests for OpenCode JSON event stream handling."""
+
+    def test_parallel_runs_use_disposable_isolated_sqlite_roots(self):
+        """Concurrent one-shot runs must never share OpenCode's writable DB."""
+        script = "\n".join([
+            "import json, os, sqlite3, time",
+            "from pathlib import Path",
+            'root = Path(os.environ["XDG_DATA_HOME"])',
+            'db_dir = root / "opencode"',
+            "db_dir.mkdir(parents=True)",
+            'conn = sqlite3.connect(db_dir / "opencode.db", timeout=0)',
+            'conn.execute("CREATE TABLE probe (value TEXT)")',
+            'conn.execute("BEGIN IMMEDIATE")',
+            'conn.execute("INSERT INTO probe VALUES (?)", (str(root),))',
+            "time.sleep(0.05)",
+            "conn.commit()",
+            "conn.close()",
+            'print(json.dumps({"type":"text","part":{"text":str(root),"metadata":{"openai":{"phase":"final_answer"}}}}), flush=True)',
+        ])
+
+        def run_probe(_: int):
+            return run_opencode_stream_sync(
+                cmd=[sys.executable, "-c", script],
+                stdin_data=None,
+                env={"XDG_DATA_HOME": "/shared/would-lock"},
+                cwd=None,
+                timeout_s=10,
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(run_probe, range(8)))
+
+        roots = [result.final_output for result in results]
+        assert all(result.return_code == 0 for result in results)
+        assert len(set(roots)) == 8
+        assert "/shared/would-lock" not in roots
+        assert all(root is not None and not Path(root).exists() for root in roots)
 
     def test_extracts_final_text_progress_and_writes_sidecar(self, tmp_path):
         """Parses JSONL tool events and keeps only the final text."""

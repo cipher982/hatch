@@ -6,6 +6,7 @@ import asyncio
 import json
 import queue
 import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -346,6 +347,46 @@ def run_claude_stream_sync(
 
 
 def run_opencode_stream_sync(
+    cmd: list[str],
+    stdin_data: bytes | None,
+    env: dict[str, str],
+    cwd: str | None,
+    timeout_s: int,
+    *,
+    progress_label: str = "Agent",
+    progress_handler: Callable[[str], None] | None = None,
+    heartbeat_s: int = 30,
+) -> OpenCodeStreamRunResult:
+    """Run OpenCode with per-invocation writable state.
+
+    OpenCode's SQLite store has no busy timeout, so sharing XDG_DATA_HOME
+    between concurrent one-shot Hatch processes can fail immediately with
+    ``database is locked``. Hatch passes provider credentials explicitly and
+    does not resume OpenCode sessions, so its data and state are disposable.
+    Config and cache remain on the reviewed shared paths supplied by callers.
+    """
+    with tempfile.TemporaryDirectory(prefix="hatch-opencode-") as runtime_root:
+        runtime_path = Path(runtime_root)
+        data_path = runtime_path / "data"
+        state_path = runtime_path / "state"
+        data_path.mkdir()
+        state_path.mkdir()
+        isolated_env = dict(env)
+        isolated_env["XDG_DATA_HOME"] = str(data_path)
+        isolated_env["XDG_STATE_HOME"] = str(state_path)
+        return _run_opencode_stream_sync(
+            cmd,
+            stdin_data,
+            isolated_env,
+            cwd,
+            timeout_s,
+            progress_label=progress_label,
+            progress_handler=progress_handler,
+            heartbeat_s=heartbeat_s,
+        )
+
+
+def _run_opencode_stream_sync(
     cmd: list[str],
     stdin_data: bytes | None,
     env: dict[str, str],
