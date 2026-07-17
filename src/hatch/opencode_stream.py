@@ -19,6 +19,7 @@ class OpenCodeStreamAccumulator:
         self._final_answer_chunks: list[str] = []
         self.completed = False
         self.error_message: str | None = None
+        self.session_id: str | None = None
 
     @property
     def final_output(self) -> str | None:
@@ -44,6 +45,7 @@ class OpenCodeStreamAccumulator:
         if payload_type == "step_start" and not self._announced_start:
             session_id = payload.get("sessionID")
             if session_id:
+                self.session_id = str(session_id)
                 messages.append(f"[hatch] {self.progress_label} started (session {session_id[:8]})")
             else:
                 messages.append(f"[hatch] {self.progress_label} started")

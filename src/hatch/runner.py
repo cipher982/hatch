@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import queue
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -35,6 +37,8 @@ class AgentResult:
     duration_ms: int
     error: str | None = None
     stderr: str | None = None
+    artifact_path: str | None = None
+    session_id: str | None = None
 
     @property
     def status(self) -> str:
@@ -57,6 +61,8 @@ class AgentResult:
             "duration_ms": self.duration_ms,
             "error": self.error,
             "stderr": self.stderr,
+            "artifact_path": self.artifact_path,
+            "session_id": self.session_id,
         }
 
 
@@ -81,6 +87,8 @@ class OpenCodeStreamRunResult:
     timed_out: bool
     final_output: str | None = None
     error_message: str | None = None
+    artifact_path: str | None = None
+    session_id: str | None = None
 
 
 class _ClaudeStreamAccumulator:
@@ -365,8 +373,8 @@ def run_opencode_stream_sync(
     does not resume OpenCode sessions, so its data and state are disposable.
     Config and cache remain on the reviewed shared paths supplied by callers.
     """
-    with tempfile.TemporaryDirectory(prefix="hatch-opencode-") as runtime_root:
-        runtime_path = Path(runtime_root)
+    runtime_path = Path(tempfile.mkdtemp(prefix="hatch-opencode-"))
+    try:
         data_path = runtime_path / "data"
         state_path = runtime_path / "state"
         data_path.mkdir()
@@ -374,7 +382,7 @@ def run_opencode_stream_sync(
         isolated_env = dict(env)
         isolated_env["XDG_DATA_HOME"] = str(data_path)
         isolated_env["XDG_STATE_HOME"] = str(state_path)
-        return _run_opencode_stream_sync(
+        result = _run_opencode_stream_sync(
             cmd,
             stdin_data,
             isolated_env,
@@ -384,6 +392,48 @@ def run_opencode_stream_sync(
             progress_handler=progress_handler,
             heartbeat_s=heartbeat_s,
         )
+        if result.timed_out:
+            artifact_root = Path(
+                os.environ.get("HATCH_TIMEOUT_ARTIFACT_ROOT", "~/.local/state/hatch/timeouts")
+            ).expanduser()
+            artifact_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            os.chmod(artifact_root, 0o700)
+            session_label = (result.session_id or "unknown-session").replace("/", "-")
+            destination = artifact_root / f"{int(time.time())}-{session_label}"
+            shutil.move(str(runtime_path), destination)
+            (destination / "stdout.jsonl").write_text(result.stdout, encoding="utf-8")
+            (destination / "stderr.log").write_text(result.stderr, encoding="utf-8")
+            metadata = {
+                "session_id": result.session_id,
+                "cwd": cwd,
+                "timed_out_at": int(time.time()),
+                "environment": {
+                    "XDG_DATA_HOME": str(destination / "data"),
+                    "XDG_STATE_HOME": str(destination / "state"),
+                },
+                "inspect_argv": ["opencode", "export", result.session_id] if result.session_id else None,
+                "resume_argv": (
+                    [
+                        "opencode",
+                        "run",
+                        "--session",
+                        result.session_id,
+                        "Continue the previous task and return only the final answer.",
+                    ]
+                    if result.session_id
+                    else None
+                ),
+            }
+            (destination / "metadata.json").write_text(
+                json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            os.chmod(destination, 0o700)
+            result.artifact_path = str(destination)
+        return result
+    finally:
+        if runtime_path.exists():
+            shutil.rmtree(runtime_path)
 
 
 def _run_opencode_stream_sync(
@@ -505,6 +555,7 @@ def _run_opencode_stream_sync(
         timed_out=timed_out,
         final_output=accumulator.final_output,
         error_message=error_message,
+        session_id=accumulator.session_id,
     )
 
 
@@ -601,10 +652,11 @@ async def run(
         if timed_out:
             return AgentResult(
                 ok=False,
-                output="",
+                output=stdout,
                 exit_code=-1,  # Special code for timeout
                 duration_ms=duration_ms,
                 error=f"Agent timed out after {timeout_s}s",
+                stderr=stderr or None,
             )
 
         if return_code != 0:

@@ -748,6 +748,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Run the agent
     start = time.monotonic()
     opencode_error: str | None = None
+    timeout_artifact_path: str | None = None
+    timeout_session_id: str | None = None
 
     try:
         if use_internal_claude_stream:
@@ -780,6 +782,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return_code = stream_result.return_code
             timed_out = stream_result.timed_out
             opencode_error = stream_result.error_message
+            timeout_artifact_path = stream_result.artifact_path
+            timeout_session_id = stream_result.session_id
         else:
             raw_stdout = ""
             stdout, stderr, return_code, timed_out = run_sync(
@@ -824,10 +828,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if timed_out:
         result = AgentResult(
             ok=False,
-            output="",
+            output=stdout,
             exit_code=-1,
             duration_ms=duration_ms,
             error=f"Agent timed out after {args.timeout}s",
+            stderr=stderr or None,
+            artifact_path=timeout_artifact_path,
+            session_id=timeout_session_id,
         )
     elif return_code != 0:
         result = AgentResult(

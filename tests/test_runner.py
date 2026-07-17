@@ -72,6 +72,8 @@ class TestAgentResult:
         assert d["duration_ms"] == 150
         assert d["error"] is None
         assert d["stderr"] == "some stderr"
+        assert d["artifact_path"] is None
+        assert d["session_id"] is None
 
     def test_to_dict_with_error(self):
         """to_dict includes error field."""
@@ -377,6 +379,45 @@ class TestOpenCodeStreamRunSync:
         assert result.return_code == 0
         assert result.final_output is None
         assert result.error_message == "AWS session expired"
+
+    def test_timeout_preserves_partial_stream_and_isolated_session_state(self, tmp_path, monkeypatch):
+        artifact_root = tmp_path / "timeouts"
+        monkeypatch.setenv("HATCH_TIMEOUT_ARTIFACT_ROOT", str(artifact_root))
+        script = "\n".join(
+            [
+                "import os, time",
+                "from pathlib import Path",
+                'state = Path(os.environ["XDG_DATA_HOME"]) / "opencode"',
+                "state.mkdir(parents=True)",
+                '(state / "session.db").write_text("durable review state")',
+                'print(\'{"type":"step_start","sessionID":"ses_timeout123"}\', flush=True)',
+                'print(\'{"type":"text","part":{"text":"partial finding","metadata":{"openai":{"phase":"commentary"}}}}\', flush=True)',
+                "time.sleep(10)",
+            ]
+        )
+
+        result = run_opencode_stream_sync(
+            cmd=[sys.executable, "-c", script],
+            stdin_data=None,
+            env={},
+            cwd=None,
+            timeout_s=1,
+            progress_label="Codex",
+        )
+
+        assert result.timed_out is True
+        assert result.session_id == "ses_timeout123"
+        assert result.final_output == "partial finding"
+        artifact = Path(result.artifact_path or "")
+        assert artifact.is_dir()
+        assert artifact.parent == artifact_root
+        assert (artifact / "data" / "opencode" / "session.db").read_text() == "durable review state"
+        assert "partial finding" in (artifact / "stdout.jsonl").read_text()
+        metadata = json.loads((artifact / "metadata.json").read_text())
+        assert metadata["session_id"] == "ses_timeout123"
+        assert metadata["resume_argv"][2:4] == ["--session", "ses_timeout123"]
+        assert metadata["environment"]["XDG_DATA_HOME"] == str(artifact / "data")
+        assert (artifact.stat().st_mode & 0o077) == 0
 
     def test_recovers_bedrock_error_from_print_logs_stderr(self):
         """When OpenCode exits 0 with no result, recover the cause from stderr.
