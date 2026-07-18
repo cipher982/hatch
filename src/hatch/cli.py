@@ -45,7 +45,7 @@ EXPLICIT_PROVIDER_MSG = (
     "hatch codex <sol|terra|luna>, "
     "hatch claude <haiku|sonnet|opus|fable>, "
     "hatch cursor grok, "
-    "hatch openrouter deepseek-v4-pro"
+    "hatch openrouter <deepseek-v4-pro|kimi-k3>"
 )
 ZAI_DISABLED_MSG = (
     "z.ai/GLM-5.1 is disabled because the coding plan has no active resource package; "
@@ -304,7 +304,7 @@ def create_parser(*, show_advanced: bool = False) -> argparse.ArgumentParser:
             'hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"\n'
             '       hatch codex <sol|terra|luna> [OPTIONS] "prompt"\n'
             '       hatch cursor grok [OPTIONS] "prompt"\n'
-            '       hatch openrouter <deepseek-v4-pro> [OPTIONS] "prompt"\n'
+            '       hatch openrouter <deepseek-v4-pro|kimi-k3> [OPTIONS] "prompt"\n'
             '       hatch expert [OPTIONS] "prompt"'
         ),
         description="One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls",
@@ -315,13 +315,14 @@ Start Here:
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch openrouter deepseek-v4-pro "Review this branch"
+  hatch openrouter kimi-k3 "Review this branch"
   hatch expert "Is this refactor direction sound?"
 
 Surfaces:
   codex models    sol, terra, luna (legacy: nano, mini, max)
   claude tiers    haiku, sonnet, opus, fable
   cursor          grok (Grok 4.5 High via Cursor Agent)
-  openrouter      deepseek-v4-pro
+  openrouter      deepseek-v4-pro, kimi-k3
   expert          one synchronous GPT-5.6 Responses API call
 
 Advanced:

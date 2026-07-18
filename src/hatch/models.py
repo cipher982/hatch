@@ -9,7 +9,7 @@ from typing import Literal
 CodexModelAlias = Literal["sol", "terra", "luna", "nano", "mini", "max"]
 ClaudeModelAlias = Literal["haiku", "sonnet", "opus", "fable"]
 CursorModelAlias = Literal["grok"]
-OpenRouterModelAlias = Literal["deepseek-v4-pro"]
+OpenRouterModelAlias = Literal["deepseek-v4-pro", "kimi-k3"]
 
 
 @dataclass(frozen=True)
@@ -23,6 +23,7 @@ class SurfacedProvider:
 
 
 OPENROUTER_DEEPSEEK_V4_PRO = "openrouter/deepseek/deepseek-v4-pro"
+OPENROUTER_KIMI_K3 = "openrouter/moonshotai/kimi-k3"
 CURSOR_GROK = "cursor-grok-4.5-high"
 
 SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
@@ -66,6 +67,7 @@ SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {
         surface_name="hatch openrouter",
         models={
             "deepseek-v4-pro": OPENROUTER_DEEPSEEK_V4_PRO,
+            "kimi-k3": OPENROUTER_KIMI_K3,
         },
     ),
 }

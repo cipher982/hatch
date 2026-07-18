@@ -439,6 +439,13 @@ class TestNormalizeArgv:
             "openrouter/deepseek/deepseek-v4-pro",
             "review",
         ]
+        assert normalize_argv(["openrouter", "kimi-k3", "review"]) == [
+            "--backend",
+            "opencode",
+            "--model",
+            "openrouter/moonshotai/kimi-k3",
+            "review",
+        ]
         assert normalize_argv(["cursor", "grok", "review"]) == [
             "--backend",
             "cursor",
@@ -1020,6 +1027,30 @@ class TestMain:
             kwargs = mock_config.call_args[1]
             assert kwargs["api_key"] == "or-key"
             assert kwargs["model"] == "openrouter/deepseek/deepseek-v4-pro"
+
+    def test_openrouter_kimi_k3_uses_openrouter_credential_policy(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_detect_context,
+    ):
+        """Surfaced Kimi K3 OpenRouter CLI calls hydrate the OpenRouter API key."""
+        with mock.patch("hatch.cli.get_config") as mock_config:
+            from hatch.backends import BackendConfig
+
+            mock_config.return_value = BackendConfig(
+                cmd=["test"], env={}, stdin_data=None
+            )
+
+            with mock.patch(
+                "hatch.cli.hydrate_backend_kwargs",
+                side_effect=lambda backend, kwargs: {"api_key": "or-key", **kwargs},
+            ) as mock_hydrate:
+                main(["openrouter", "kimi-k3", "test"])
+
+            assert mock_hydrate.call_args[0][0] == "openrouter"
+            kwargs = mock_config.call_args[1]
+            assert kwargs["api_key"] == "or-key"
+            assert kwargs["model"] == "openrouter/moonshotai/kimi-k3"
 
     def test_timeout_passed(
         self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key

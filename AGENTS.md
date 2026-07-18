@@ -17,7 +17,7 @@ Public surface:
 - `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`fable` = Fable-class, higher capability)
 - `hatch codex <sol|terra|luna>` → GPT-5.6 on OpenAI (`nano|mini|max` remain compatibility aliases)
 - `hatch cursor grok` → Grok 4.5 High via local Cursor Agent CLI
-- `hatch openrouter deepseek-v4-pro` → DeepSeek V4 Pro on OpenRouter
+- `hatch openrouter <deepseek-v4-pro|kimi-k3>` → OpenRouter models via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
@@ -27,7 +27,7 @@ Default tiers:
 - GPT-5.6 reasoning accepts `none`, `low`, `medium`, `high`, `xhigh`, and `max`
 - Use `fable` for Fable-class Claude (higher capability, always-on adaptive thinking)
 - Use `cursor grok` for Grok 4.5 High via Cursor
-- Use `openrouter deepseek-v4-pro` as the non-OpenAI/non-Anthropic third option
+- Use `openrouter deepseek-v4-pro` as the default non-OpenAI/non-Anthropic option; `kimi-k3` for complex coding and long-horizon agentic workflows
 
 Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
 
@@ -38,6 +38,7 @@ hatch cursor grok "Review this branch"
 hatch cursor grok --model cursor-grok-4.5-high "Review with a raw Cursor model ID"
 hatch doctor
 hatch openrouter deepseek-v4-pro "Review this branch"
+hatch openrouter kimi-k3 "Review this branch"
 hatch codex sol --reasoning-effort high "Write unit tests"
 hatch claude sonnet "Review this diff"
 hatch codex luna "What is 2+2?"

@@ -424,6 +424,17 @@ class TestConfigureOpenCode:
         assert config.cmd[config.cmd.index("-m") + 1] == "openrouter/deepseek/deepseek-v4-pro"
         assert config.env["OPENROUTER_API_KEY"] == "sk-or-test"
 
+    def test_command_structure_for_openrouter_kimi_k3(self, laptop_context):
+        """Kimi K3 on OpenRouter receives the OpenRouter API key."""
+        config = configure_opencode(
+            "test prompt",
+            laptop_context,
+            model="openrouter/moonshotai/kimi-k3",
+            api_key="sk-or-test",
+        )
+        assert config.cmd[config.cmd.index("-m") + 1] == "openrouter/moonshotai/kimi-k3"
+        assert config.env["OPENROUTER_API_KEY"] == "sk-or-test"
+
     def test_opencode_explicitly_sets_workspace_directory(self, laptop_context):
         """OpenCode must retain the requested workspace under isolated config."""
         config = configure_opencode(
