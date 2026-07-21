@@ -18,6 +18,7 @@ from hatch.runner import (
     _run_subprocess,
     run,
     run_claude_stream_sync,
+    run_cursor_stream_sync,
     run_opencode_stream_sync,
     run_sync,
 )
@@ -253,6 +254,61 @@ class TestClaudeStreamRunSync:
 
         assert result.return_code == 0
         assert result.final_output == "Fallback text"
+
+
+class TestCursorStreamRunSync:
+    """Tests for Cursor NDJSON subprocess handling."""
+
+    def test_extracts_terminal_result_and_progress(self):
+        script = "\n".join([
+            "import json",
+            'print(json.dumps({"type":"system","subtype":"init","model":"cursor-grok-4.5-high","session_id":"cursor-session"}), flush=True)',
+            'print(json.dumps({"type":"tool_call","subtype":"started","call_id":"call-1","tool_call":{"readToolCall":{"args":{"path":"src/app.py"}}}}), flush=True)',
+            'print(json.dumps({"type":"tool_call","subtype":"started","call_id":"call-1","tool_call":{"readToolCall":{"args":{"path":"src/app.py"}}}}), flush=True)',
+            'print(json.dumps({"type":"tool_call","subtype":"completed","call_id":"call-1","tool_call":{"readToolCall":{}}}), flush=True)',
+            'print(json.dumps({"type":"assistant","message":{"content":[{"type":"text","text":"intermediate"}]}}), flush=True)',
+            'print(json.dumps({"type":"result","subtype":"success","is_error":False,"duration_ms":1250,"result":"complete answer"}), flush=True)',
+        ])
+        progress: list[str] = []
+        result = run_cursor_stream_sync(
+            [sys.executable, "-c", script], None, {}, None, 10, progress_handler=progress.append
+        )
+
+        assert result.return_code == 0
+        assert result.final_output == "complete answer"
+        assert progress == [
+            "[hatch] Cursor started (cursor-grok-4.5-high, session cursor-s)",
+            "[hatch] Cursor readToolCall: src/app.py",
+            "[hatch] Cursor completed in 1.2s",
+        ]
+
+    def test_heartbeat_and_missing_terminal_result(self):
+        script = "import time; time.sleep(0.15); print('\\\"not-json\\\"', flush=True)"
+        progress: list[str] = []
+        result = run_cursor_stream_sync(
+            [sys.executable, "-c", script], None, {}, None, 10,
+            progress_handler=progress.append, heartbeat_s=0.01,
+        )
+
+        assert result.final_output is None
+        assert any("still running" in message for message in progress)
+
+    def test_nonzero_exit_preserves_stderr(self):
+        script = "import sys; print('provider failed', file=sys.stderr); sys.exit(7)"
+        result = run_cursor_stream_sync([sys.executable, "-c", script], None, {}, None, 10)
+
+        assert result.return_code == 7
+        assert result.stderr == "provider failed\n"
+
+    def test_terminal_error_result_is_not_success(self):
+        script = (
+            "import json; print(json.dumps({'type':'result','subtype':'error',"
+            "'is_error':True,'result':'request rejected'}), flush=True)"
+        )
+        result = run_cursor_stream_sync([sys.executable, "-c", script], None, {}, None, 10)
+
+        assert result.final_output is None
+        assert result.error_message == "request rejected"
 
 
 class TestOpenCodeStreamRunSync:

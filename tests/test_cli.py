@@ -650,6 +650,21 @@ class TestMain:
             yield m
 
     @pytest.fixture
+    def mock_run_cursor_stream_sync(self):
+        """Mock Cursor stream runner to avoid actual subprocess calls."""
+        from hatch.runner import CursorStreamRunResult
+
+        with mock.patch("hatch.cli.run_cursor_stream_sync") as m:
+            m.return_value = CursorStreamRunResult(
+                stdout='{"type":"result","result":"output"}\n',
+                stderr="",
+                return_code=0,
+                timed_out=False,
+                final_output="output",
+            )
+            yield m
+
+    @pytest.fixture
     def mock_get_config(self):
         """Mock get_config."""
         from hatch.backends import BackendConfig
@@ -842,6 +857,28 @@ class TestMain:
         data = json.loads(captured.out)
         assert data["ok"] is True
         assert data["output"] == "output"
+
+    def test_surfaced_cursor_streams_progress_and_keeps_json_final_result(
+        self,
+        mock_run_cursor_stream_sync,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        capsys,
+    ):
+        """Cursor uses its stream runner while JSON stdout remains parseable."""
+        from hatch.backends import BackendConfig
+
+        with mock.patch(
+            "hatch.cli.get_config",
+            return_value=BackendConfig(cmd=["cursor-agent"], env={}, stdin_data=None),
+        ):
+            exit_code = main(["--json", "cursor", "grok", "test prompt"])
+
+        assert exit_code == EXIT_SUCCESS
+        mock_run_cursor_stream_sync.assert_called_once()
+        captured = capsys.readouterr()
+        assert json.loads(captured.out)["output"] == "output"
+        assert "[hatch]" not in captured.out
 
     def test_automation_run_passes_longhouse_hatch_origin_env(
         self,

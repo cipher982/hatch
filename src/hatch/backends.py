@@ -510,7 +510,7 @@ def configure_cursor(
         "--model",
         model,
         "--output-format",
-        "text",
+        "stream-json",
     ]
     if force:
         cmd.append("--force")

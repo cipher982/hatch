@@ -91,6 +91,81 @@ class OpenCodeStreamRunResult:
     session_id: str | None = None
 
 
+@dataclass
+class CursorStreamRunResult:
+    """Captured result from a Cursor stream-json subprocess."""
+
+    stdout: str
+    stderr: str
+    return_code: int
+    timed_out: bool
+    final_output: str | None = None
+    error_message: str | None = None
+
+
+class CursorStreamAccumulator:
+    """Parse Cursor NDJSON into a canonical result and terse progress."""
+
+    def __init__(self) -> None:
+        self.final_output: str | None = None
+        self.error_message: str | None = None
+        self._seen_tool_ids: set[str] = set()
+
+    def handle_line(self, line: str) -> list[str]:
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(payload, dict):
+            return []
+
+        payload_type = payload.get("type")
+        if payload_type == "system" and payload.get("subtype") == "init":
+            model = payload.get("model") or "unknown-model"
+            session_id = payload.get("session_id")
+            suffix = f", session {session_id[:8]}" if isinstance(session_id, str) else ""
+            return [f"[hatch] Cursor started ({model}{suffix})"]
+
+        if payload_type == "tool_call" and payload.get("subtype") == "started":
+            call_id = payload.get("call_id")
+            if isinstance(call_id, str):
+                if call_id in self._seen_tool_ids:
+                    return []
+                self._seen_tool_ids.add(call_id)
+            tool_call = payload.get("tool_call")
+            return [_summarize_cursor_tool_call(tool_call if isinstance(tool_call, dict) else {})]
+
+        if payload_type == "result":
+            if payload.get("subtype") != "success" or payload.get("is_error") is True:
+                self.error_message = str(payload.get("result") or "Cursor returned an error result")
+                return []
+            result = payload.get("result")
+            if not isinstance(result, str) or not result.strip():
+                self.error_message = "Cursor result event did not contain output"
+                return []
+            self.final_output = result
+            duration_ms = payload.get("duration_ms")
+            if isinstance(duration_ms, int):
+                return [f"[hatch] Cursor completed in {duration_ms / 1000:.1f}s"]
+            return ["[hatch] Cursor completed"]
+
+        return []
+
+
+def _summarize_cursor_tool_call(tool_call: dict[str, Any]) -> str:
+    """Render a compact Cursor tool-start line without exposing raw event data."""
+    if not tool_call:
+        return "[hatch] Cursor tool"
+    name, details = next(iter(tool_call.items()))
+    args = details.get("args") if isinstance(details, dict) else None
+    if isinstance(args, dict):
+        for key in ("path", "filePath", "command", "query"):
+            value = args.get(key)
+            if value:
+                return f"[hatch] Cursor {name}: {value}"
+    return f"[hatch] Cursor {name}"
+
+
 class _ClaudeStreamAccumulator:
     """Parse Claude stream-json lines into a final output and terse progress."""
 
@@ -351,6 +426,92 @@ def run_claude_stream_sync(
         return_code=-1 if timed_out else proc.returncode,
         timed_out=timed_out,
         final_output=final_output,
+    )
+
+
+def run_cursor_stream_sync(
+    cmd: list[str],
+    stdin_data: bytes | None,
+    env: dict[str, str],
+    cwd: str | None,
+    timeout_s: int,
+    *,
+    progress_handler: Callable[[str], None] | None = None,
+    heartbeat_s: int = 30,
+) -> CursorStreamRunResult:
+    """Run Cursor stream-json and preserve its terminal result event."""
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.PIPE if stdin_data else subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+        cwd=cwd,
+        text=True,
+        bufsize=1,
+    )
+    if stdin_data and proc.stdin:
+        proc.stdin.write(stdin_data.decode("utf-8"))
+        proc.stdin.close()
+    if proc.stdout is None or proc.stderr is None:
+        raise RuntimeError("Cursor process streams were not created")
+
+    output_queue: queue.Queue[tuple[str, str | None]] = queue.Queue()
+    readers = [
+        threading.Thread(target=_stream_reader, args=(proc.stdout, "stdout", output_queue), daemon=True),
+        threading.Thread(target=_stream_reader, args=(proc.stderr, "stderr", output_queue), daemon=True),
+    ]
+    for reader in readers:
+        reader.start()
+
+    stdout_chunks: list[str] = []
+    stderr_chunks: list[str] = []
+    accumulator = CursorStreamAccumulator()
+    start = time.monotonic()
+    last_progress_at = start
+    stdout_open = True
+    stderr_open = True
+    timed_out = False
+    while stdout_open or stderr_open:
+        remaining = timeout_s - (time.monotonic() - start)
+        if remaining <= 0:
+            timed_out = True
+            proc.kill()
+            proc.wait()
+            break
+        try:
+            source, line = output_queue.get(timeout=min(0.1, remaining))
+        except queue.Empty:
+            if progress_handler and proc.poll() is None and (time.monotonic() - last_progress_at) >= heartbeat_s:
+                progress_handler(f"[hatch] Cursor still running ({int(time.monotonic() - start)}s)")
+                last_progress_at = time.monotonic()
+            continue
+        if line is None:
+            if source == "stdout":
+                stdout_open = False
+            else:
+                stderr_open = False
+            continue
+        if source == "stdout":
+            stdout_chunks.append(line)
+            for message in accumulator.handle_line(line):
+                if progress_handler:
+                    progress_handler(message)
+                last_progress_at = time.monotonic()
+        else:
+            stderr_chunks.append(line)
+
+    for reader in readers:
+        reader.join(timeout=1)
+    if not timed_out and proc.returncode is None:
+        proc.wait()
+    return CursorStreamRunResult(
+        stdout="".join(stdout_chunks),
+        stderr="".join(stderr_chunks),
+        return_code=-1 if timed_out else proc.returncode,
+        timed_out=timed_out,
+        final_output=accumulator.final_output,
+        error_message=accumulator.error_message,
     )
 
 

@@ -66,7 +66,7 @@ Credentials are resolved explicitly before backend launch:
 Machine callers:
 - non-interactive CLI runs default to JSON output and automation mode automatically
 - set `HATCH_DISABLE_SECRET_HELPER=1` when you need tests or subprocesses to fail fast instead of loading secrets from the local helper
-- surfaced Claude/Codex runs stream terse live progress to stderr while preserving only the final answer on stdout/JSON
+- surfaced Claude/Codex/Cursor runs stream terse live progress to stderr while preserving only the final answer on stdout/JSON
 
 ## Architecture
 

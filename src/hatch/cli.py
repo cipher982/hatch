@@ -28,6 +28,7 @@ from hatch.models import opencode_progress_label
 from hatch.models import resolve_provider_model
 from hatch.runner import AgentResult
 from hatch.runner import run_claude_stream_sync
+from hatch.runner import run_cursor_stream_sync
 from hatch.runner import run_opencode_stream_sync
 from hatch.runner import run_sync
 
@@ -688,6 +689,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.resume:
         backend_kwargs["resume"] = args.resume
     use_internal_claude_stream = backend in CLAUDE_BACKENDS and args.output_format == "text"
+    use_internal_cursor_stream = backend == Backend.CURSOR
     use_internal_opencode_stream = backend in OPENCODE_BACKENDS
     if use_internal_claude_stream:
         backend_kwargs["output_format"] = "stream-json"
@@ -749,6 +751,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Run the agent
     start = time.monotonic()
     opencode_error: str | None = None
+    cursor_error: str | None = None
     timeout_artifact_path: str | None = None
     timeout_session_id: str | None = None
 
@@ -767,6 +770,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             stderr = stream_result.stderr
             return_code = stream_result.return_code
             timed_out = stream_result.timed_out
+        elif use_internal_cursor_stream:
+            stream_result = run_cursor_stream_sync(
+                config.cmd,
+                config.stdin_data,
+                env,
+                cwd,
+                args.timeout,
+                progress_handler=lambda message: print(message, file=sys.stderr, flush=True),
+            )
+            stdout = stream_result.final_output or ""
+            raw_stdout = stream_result.stdout
+            stderr = stream_result.stderr
+            return_code = stream_result.return_code
+            timed_out = stream_result.timed_out
+            cursor_error = stream_result.error_message
         elif use_internal_opencode_stream:
             stream_result = run_opencode_stream_sync(
                 config.cmd,
@@ -855,7 +873,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             error=opencode_error,
             stderr=stderr,
         )
-    elif (use_internal_claude_stream or use_internal_opencode_stream) and not stdout.strip() and raw_stdout.strip():
+    elif use_internal_cursor_stream and cursor_error:
+        result = AgentResult(
+            ok=False,
+            output=raw_stdout,
+            exit_code=0,
+            duration_ms=duration_ms,
+            error=cursor_error,
+            stderr=stderr,
+        )
+    elif (use_internal_claude_stream or use_internal_opencode_stream or use_internal_cursor_stream) and not stdout.strip() and raw_stdout.strip():
         result = AgentResult(
             ok=False,
             output=raw_stdout,

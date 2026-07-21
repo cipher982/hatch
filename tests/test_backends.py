@@ -703,7 +703,7 @@ class TestConfigureCursor:
             "--model",
             "cursor-grok-4.5-high",
             "--output-format",
-            "text",
+            "stream-json",
             "--force",
             "test prompt",
         ]
