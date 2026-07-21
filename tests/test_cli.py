@@ -17,6 +17,7 @@ from hatch.cli import (
     EXIT_NOT_FOUND,
     EXIT_SUCCESS,
     EXIT_TIMEOUT,
+    create_expert_parser,
     create_parser,
     get_prompt,
     infer_machine_defaults,
@@ -70,8 +71,14 @@ class TestCreateParser:
         assert args.backend == "invalid"
 
     def test_timeout_default(self):
-        """Default timeout is 900."""
+        """Agent hard timeout defaults to 30 minutes."""
         parser = create_parser()
+        args = parser.parse_args(["test"])
+        assert args.timeout == 1800
+
+    def test_expert_timeout_default_remains_900(self):
+        """Server-persisted expert calls keep their existing timeout."""
+        parser = create_expert_parser()
         args = parser.parse_args(["test"])
         assert args.timeout == 900
 
@@ -927,6 +934,34 @@ class TestMain:
 
         assert exit_code == EXIT_TIMEOUT
 
+    def test_opencode_timeout_prints_recovery_details(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        capsys,
+    ):
+        """Human timeout output points directly at preserved evidence and recovery."""
+        from hatch.runner import OpenCodeStreamRunResult
+
+        mock_run_opencode_stream_sync.return_value = OpenCodeStreamRunResult(
+            stdout="",
+            stderr="",
+            return_code=-1,
+            timed_out=True,
+            artifact_path="/tmp/hatch-timeout",
+            session_id="ses_timeout",
+            resume_command="env XDG_DATA_HOME=/tmp/data opencode run --session ses_timeout",
+        )
+
+        exit_code = main(["codex", "mini", "test prompt"])
+
+        assert exit_code == EXIT_TIMEOUT
+        captured = capsys.readouterr()
+        assert "Artifact: /tmp/hatch-timeout" in captured.err
+        assert "Resume: env XDG_DATA_HOME=/tmp/data" in captured.err
+
     def test_missing_api_key(self, clean_env, mock_detect_context, capsys):
         """z.ai is disabled before credential loading."""
         exit_code = main(["-b", "zai", "test prompt"])
@@ -1215,6 +1250,18 @@ class TestMain:
         main(["codex", "mini", "--json", "test prompt"])
 
         assert mock_run_opencode_stream_sync.call_args.kwargs["progress_handler"] is not None
+
+    def test_surfaced_codex_passes_model_to_timeout_artifacts(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+    ):
+        """Timeout artifacts record the exact provider model without secrets."""
+        main(["codex", "terra", "test prompt"])
+
+        assert mock_run_opencode_stream_sync.call_args.kwargs["model"] == "openai/gpt-5.6-terra"
 
     def test_invalid_cwd(self, capsys):
         """Invalid cwd returns config error."""

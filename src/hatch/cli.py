@@ -361,9 +361,9 @@ Environment Variables:
         "-t",
         "--timeout",
         type=int,
-        default=900,
+        default=1800,
         metavar="SECONDS",
-        help="Timeout in seconds (default: 900)",
+        help="Hard timeout in seconds (default: 1800)",
     )
 
     parser.add_argument(
@@ -792,6 +792,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 env,
                 cwd,
                 args.timeout,
+                model=model_name,
                 progress_label=opencode_progress_label(model_name),
                 progress_handler=lambda message: print(message, file=sys.stderr, flush=True),
             )
@@ -854,6 +855,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             stderr=stderr or None,
             artifact_path=timeout_artifact_path,
             session_id=timeout_session_id,
+            resume_command=stream_result.resume_command if use_internal_opencode_stream else None,
         )
     elif return_code != 0:
         result = AgentResult(
@@ -920,6 +922,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"Error: {result.error}", file=sys.stderr)
             if result.output:
                 print(result.output, file=sys.stderr)
+            if result.artifact_path:
+                print(f"Artifact: {result.artifact_path}", file=sys.stderr)
+            if result.resume_command:
+                print(f"Resume: {result.resume_command}", file=sys.stderr)
 
     return result_to_exit_code(result)
 

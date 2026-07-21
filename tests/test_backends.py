@@ -9,6 +9,7 @@ from unittest import mock
 import pytest
 
 from hatch.backends import (
+    BOUNDED_RUN_CONTRACT,
     Backend,
     BackendConfig,
     configure_bedrock,
@@ -19,6 +20,7 @@ from hatch.backends import (
     configure_opencode,
     configure_zai,
     get_config,
+    prepare_agent_prompt,
 )
 from hatch.backends import _dcg_binary as real_dcg_binary
 from hatch.context import ExecutionContext
@@ -909,6 +911,34 @@ class TestGetConfig:
         )
         assert config.cmd[config.cmd.index("-m") + 1] == "openai/gpt-5.4-mini"
         assert config.cmd[config.cmd.index("--agent") + 1] == "review"
+
+    def test_wraps_every_dispatched_agent_prompt(self, mock_openai_key, laptop_context):
+        """All agent backends receive the same bounded-run contract."""
+        bedrock = get_config(Backend.BEDROCK, "review this", laptop_context)
+        claude = get_config(Backend.CLAUDE, "review this", laptop_context)
+        cursor = get_config(Backend.CURSOR, "review this", laptop_context)
+        codex = get_config(Backend.CODEX, "review this", laptop_context)
+        gemini = get_config(Backend.GEMINI, "review this", laptop_context)
+        opencode = get_config(
+            Backend.OPENCODE,
+            "review this",
+            laptop_context,
+            model="openai/gpt-5.4",
+        )
+
+        for config in (bedrock, claude, codex, gemini):
+            assert config.stdin_data is not None
+            assert config.stdin_data.decode().startswith(BOUNDED_RUN_CONTRACT)
+        assert cursor.cmd[-1].startswith(BOUNDED_RUN_CONTRACT)
+        assert opencode.cmd[-1].startswith(BOUNDED_RUN_CONTRACT)
+
+    def test_bounded_contract_preserves_explicit_depth_request(self):
+        """The contract stays additive when the user explicitly asks for depth."""
+        prompt = "Perform an exhaustive, deep review of this protocol."
+        wrapped = prepare_agent_prompt(prompt)
+
+        assert "honor that instead" in wrapped
+        assert wrapped.endswith(prompt)
 
 
 class TestUnicodePrompts:

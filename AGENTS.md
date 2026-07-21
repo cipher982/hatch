@@ -29,7 +29,10 @@ Default tiers:
 - Use `cursor grok` for Grok 4.5 High via Cursor
 - Use `openrouter deepseek-v4-pro` as the default non-OpenAI/non-Anthropic option; `kimi-k3` for complex coding and long-horizon agentic workflows
 
-Defaults to a 15 minute internal timeout. Do not wrap normal `hatch` calls in short outer shell timeouts.
+Agent runs target a concise result within about 15 minutes and have a 30 minute
+hard timeout by default. `hatch expert` remains at 15 minutes because its
+background response is server-persisted. Do not wrap normal `hatch` calls in
+short outer shell timeouts.
 
 ```bash
 hatch codex sol "Review this branch"
@@ -65,6 +68,8 @@ Credentials are resolved explicitly before backend launch:
 
 Machine callers:
 - non-interactive CLI runs default to JSON output and automation mode automatically
+- agent prompts automatically receive a bounded-run contract: stay within scope,
+  investigate proportionally, and synthesize once evidence is sufficient
 - set `HATCH_DISABLE_SECRET_HELPER=1` when you need tests or subprocesses to fail fast instead of loading secrets from the local helper
 - surfaced Claude/Codex/Cursor runs stream terse live progress to stderr while preserving only the final answer on stdout/JSON
 
@@ -147,3 +152,4 @@ print(result.output if result.ok else result.error)
 - (2026-06-29) [subprocess] Always use `subprocess.DEVNULL` (never `None`) for stdin when no stdin_data is supplied. `None` inherits the caller's stdin — harmless in a TTY, but in non-TTY callers (Cursor Composer, CI, pipes) OpenCode sees an open pipe and hangs until the hatch timeout fires.
 - (2026-07-16) [cursor] `cursor-agent -p` is the one-shot hatch path. Pass prompt as argv (stdin hangs). Use `--trust --force`, binary name `cursor-agent` (not `agent`), and verify the pinned model with `hatch doctor` because Cursor model IDs can be retired. Auth is Cursor login; optional `CURSOR_API_KEY`.
 - (2026-07-17) [timeouts] A surfaced Codex/OpenCode timeout preserves partial JSONL, stderr, isolated session state, session id, and inspect/resume argv under `~/.local/state/hatch/timeouts/`; never collapse a long review timeout to empty output.
+- (2026-07-21) [timeouts] Agent runs carry a provider-neutral 15-minute behavioral contract with a 30-minute hard backstop. Timeout artifacts record an env-complete manual resume command plus non-secret model/provider/credential-name metadata; never persist credential values or echo reasoning content.

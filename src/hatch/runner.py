@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import queue
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -39,6 +40,7 @@ class AgentResult:
     stderr: str | None = None
     artifact_path: str | None = None
     session_id: str | None = None
+    resume_command: str | None = None
 
     @property
     def status(self) -> str:
@@ -63,6 +65,7 @@ class AgentResult:
             "stderr": self.stderr,
             "artifact_path": self.artifact_path,
             "session_id": self.session_id,
+            "resume_command": self.resume_command,
         }
 
 
@@ -89,6 +92,7 @@ class OpenCodeStreamRunResult:
     error_message: str | None = None
     artifact_path: str | None = None
     session_id: str | None = None
+    resume_command: str | None = None
 
 
 @dataclass
@@ -522,6 +526,7 @@ def run_opencode_stream_sync(
     cwd: str | None,
     timeout_s: int,
     *,
+    model: str | None = None,
     progress_label: str = "Agent",
     progress_handler: Callable[[str], None] | None = None,
     heartbeat_s: int = 30,
@@ -564,26 +569,65 @@ def run_opencode_stream_sync(
             shutil.move(str(runtime_path), destination)
             (destination / "stdout.jsonl").write_text(result.stdout, encoding="utf-8")
             (destination / "stderr.log").write_text(result.stderr, encoding="utf-8")
+            provider = model.split("/", 1)[0] if model and "/" in model else None
+            credential_env_var = {
+                "openai": "OPENAI_API_KEY",
+                "openrouter": "OPENROUTER_API_KEY",
+                "amazon-bedrock": "AWS_PROFILE",
+            }.get(provider)
+            resume_argv = None
+            resume_command = None
+            inspect_argv = None
+            if result.session_id:
+                saved_environment = [
+                    f"XDG_DATA_HOME={destination / 'data'}",
+                    f"XDG_STATE_HOME={destination / 'state'}",
+                ]
+                inspect_argv = [
+                    "env",
+                    *saved_environment,
+                    "opencode",
+                    "export",
+                    result.session_id,
+                ]
+                resume_argv = [
+                    "env",
+                    *saved_environment,
+                    "opencode",
+                    "run",
+                    "--dangerously-skip-permissions",
+                ]
+                if cwd:
+                    resume_argv.extend(["--dir", cwd])
+                resume_argv.extend([
+                    "--print-logs",
+                    "--log-level",
+                    "ERROR",
+                    "--format",
+                    "json",
+                ])
+                if model:
+                    resume_argv.extend(["-m", model])
+                resume_argv.extend([
+                    "--session",
+                    result.session_id,
+                    "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.",
+                ])
+                resume_command = shlex.join(resume_argv)
             metadata = {
                 "session_id": result.session_id,
                 "cwd": cwd,
+                "model": model,
+                "provider": provider,
+                "credential_env_var": credential_env_var,
                 "timed_out_at": int(time.time()),
                 "environment": {
                     "XDG_DATA_HOME": str(destination / "data"),
                     "XDG_STATE_HOME": str(destination / "state"),
                 },
-                "inspect_argv": ["opencode", "export", result.session_id] if result.session_id else None,
-                "resume_argv": (
-                    [
-                        "opencode",
-                        "run",
-                        "--session",
-                        result.session_id,
-                        "Continue the previous task and return only the final answer.",
-                    ]
-                    if result.session_id
-                    else None
-                ),
+                "inspect_argv": inspect_argv,
+                "resume_argv": resume_argv,
+                "resume_command": resume_command,
             }
             (destination / "metadata.json").write_text(
                 json.dumps(metadata, indent=2, sort_keys=True) + "\n",
@@ -591,6 +635,7 @@ def run_opencode_stream_sync(
             )
             os.chmod(destination, 0o700)
             result.artifact_path = str(destination)
+            result.resume_command = resume_command
         return result
     finally:
         if runtime_path.exists():
@@ -753,7 +798,7 @@ async def run(
     backend: Backend,
     *,
     cwd: str | Path | None = None,
-    timeout_s: int = 900,
+    timeout_s: int = 1800,
     **backend_kwargs: Any,
 ) -> AgentResult:
     """Run an agent CLI and return the result.
@@ -762,7 +807,7 @@ async def run(
         prompt: The prompt to send to the agent
         backend: Which backend to use (bedrock, codex, gemini, opencode)
         cwd: Working directory for the agent
-        timeout_s: Timeout in seconds (default 15 minutes)
+        timeout_s: Hard timeout in seconds (default 30 minutes)
         **backend_kwargs: Backend-specific options (api_key, model, etc.)
 
     Returns:

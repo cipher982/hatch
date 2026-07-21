@@ -30,6 +30,14 @@ _ROULETTE_ENV = [
 
 _DCG_BYPASS_ENV = ["DCG_BYPASS"]
 
+BOUNDED_RUN_CONTRACT = """Hatch execution contract:
+This is a single bounded, non-interactive run with a time budget of about 15 minutes. Complete the requested scope and nothing more. Investigate proportionally to the question; once you have sufficient evidence, stop using tools and write your answer. Return a concise, decision-ready result. If you are blocked or running low on budget, return your best current findings and state what is uncertain rather than continuing to investigate. If the request explicitly asks for exhaustive or deep work, honor that instead."""
+
+
+def prepare_agent_prompt(prompt: str) -> str:
+    """Add Hatch's bounded-run contract without weakening the user task."""
+    return f"{BOUNDED_RUN_CONTRACT}\n\nUser task:\n{prompt}"
+
 
 def _dcg_required() -> bool:
     """Return Agent Home's explicit required-state declaration."""
@@ -655,4 +663,4 @@ def get_config(
     if backend == Backend.ZAI:
         raise ValueError("z.ai/GLM-5.1 is disabled; choose OpenAI, Anthropic, or OpenRouter models")
     configurator = BACKEND_CONFIGURATORS[backend]
-    return configurator(prompt, ctx, **kwargs)
+    return configurator(prepare_agent_prompt(prompt), ctx, **kwargs)

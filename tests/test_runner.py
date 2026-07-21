@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import subprocess
 import sys
@@ -75,6 +76,7 @@ class TestAgentResult:
         assert d["stderr"] == "some stderr"
         assert d["artifact_path"] is None
         assert d["session_id"] is None
+        assert d["resume_command"] is None
 
     def test_to_dict_with_error(self):
         """to_dict includes error field."""
@@ -88,6 +90,10 @@ class TestAgentResult:
         d = result.to_dict()
         assert d["ok"] is False
         assert d["error"] == "Something failed"
+
+    def test_library_hard_timeout_defaults_to_30_minutes(self):
+        """Library callers receive the same hard timeout as the CLI."""
+        assert inspect.signature(run).parameters["timeout_s"].default == 1800
 
 
 class TestRunSubprocess:
@@ -458,6 +464,7 @@ class TestOpenCodeStreamRunSync:
             env={},
             cwd=None,
             timeout_s=1,
+            model="openrouter/moonshotai/kimi-k3",
             progress_label="Codex",
         )
 
@@ -471,7 +478,17 @@ class TestOpenCodeStreamRunSync:
         assert "partial finding" in (artifact / "stdout.jsonl").read_text()
         metadata = json.loads((artifact / "metadata.json").read_text())
         assert metadata["session_id"] == "ses_timeout123"
-        assert metadata["resume_argv"][2:4] == ["--session", "ses_timeout123"]
+        assert metadata["model"] == "openrouter/moonshotai/kimi-k3"
+        assert metadata["provider"] == "openrouter"
+        assert metadata["credential_env_var"] == "OPENROUTER_API_KEY"
+        assert metadata["resume_argv"][:3] == [
+            "env",
+            f"XDG_DATA_HOME={artifact / 'data'}",
+            f"XDG_STATE_HOME={artifact / 'state'}",
+        ]
+        assert metadata["resume_argv"][-3:-1] == ["--session", "ses_timeout123"]
+        assert metadata["resume_command"] == result.resume_command
+        assert "OPENROUTER_API_KEY=" not in metadata["resume_command"]
         assert metadata["environment"]["XDG_DATA_HOME"] == str(artifact / "data")
         assert (artifact.stat().st_mode & 0o077) == 0
 
