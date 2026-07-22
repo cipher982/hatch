@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type invocation struct {
@@ -74,6 +75,9 @@ func main() {
 	case "malformed_then_text":
 		fmt.Fprintln(os.Stdout, "{not-json")
 		fmt.Fprintln(os.Stdout, "fake provider output")
+	case "hang":
+		fmt.Fprintln(os.Stdout, "partial output")
+		time.Sleep(10 * time.Second)
 	default:
 		fmt.Fprintf(os.Stderr, "testprovider: unknown scenario %q\n", os.Getenv("HATCH_TEST_SCENARIO"))
 		os.Exit(96)
