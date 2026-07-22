@@ -76,6 +76,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
+	applyHostContext(&invocation, request.Backend, DetectContext())
 	root, err := runner.DefaultRoot()
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
@@ -93,7 +94,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 	result := coordinator.Execute(runner.Request{
 		Surface: surface, Provider: providerName, Model: request.Model, CWD: request.CWD,
 		Prompt: prompt, Timeout: time.Duration(request.TimeoutSeconds) * time.Second,
-		Invocation: invocation, CredentialNames: credentialNames,
+		Invocation: invocation, CredentialNames: credentialNames, Automation: request.Automation,
 	})
 	if request.JSON {
 		encoder := json.NewEncoder(stdout)

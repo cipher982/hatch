@@ -12,6 +12,9 @@ import (
 )
 
 func TestCoordinatorRawSuccess(t *testing.T) {
+	t.Setenv("LONGHOUSE_MANAGED_SESSION_ID", "parent-session")
+	t.Setenv("LONGHOUSE_THREAD_ID", "parent-thread")
+	t.Setenv("LONGHOUSE_PROVIDER_SESSION_ID", "parent-provider")
 	fake := buildTestProvider(t)
 	record := filepath.Join(t.TempDir(), "record.json")
 	invocation := provider.Invocation{
@@ -22,7 +25,7 @@ func TestCoordinatorRawSuccess(t *testing.T) {
 	coordinator := NewCoordinator(NewStore(root))
 	result := coordinator.Execute(Request{
 		Surface: "gemini.raw", Provider: "google", Model: "gemini-3-pro-preview",
-		Prompt: "oracle prompt", Timeout: 5 * time.Second, Invocation: invocation,
+		Prompt: "oracle prompt", Timeout: 5 * time.Second, Invocation: invocation, Automation: true,
 	})
 	if !result.OK || result.Output != "fake provider output\n" || result.Run == nil {
 		t.Fatalf("unexpected result: %#v", result)
@@ -45,6 +48,12 @@ func TestCoordinatorRawSuccess(t *testing.T) {
 	}
 	if observed.Environment["LONGHOUSE_HATCH_RUN_ID"] != result.Run.RunID {
 		t.Fatalf("Longhouse run id = %q, manifest = %q", observed.Environment["LONGHOUSE_HATCH_RUN_ID"], result.Run.RunID)
+	}
+	if observed.Environment["LONGHOUSE_IS_SIDECHAIN"] != "1" || observed.Environment["LONGHOUSE_ORIGIN_KIND"] != "hatch_automation" ||
+		observed.Environment["LONGHOUSE_PARENT_SESSION_ID"] != "parent-session" ||
+		observed.Environment["LONGHOUSE_PARENT_THREAD_ID"] != "parent-thread" ||
+		observed.Environment["LONGHOUSE_PARENT_PROVIDER_SESSION_ID"] != "parent-provider" {
+		t.Fatalf("Longhouse automation environment missing: %#v", observed.Environment)
 	}
 	if observed.Environment["DCG_NO_SELF_HEAL"] != "1" {
 		t.Fatalf("guard environment missing: %#v", observed.Environment)

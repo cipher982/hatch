@@ -28,6 +28,7 @@ type Request struct {
 	Timeout         time.Duration
 	Invocation      provider.Invocation
 	CredentialNames []string
+	Automation      bool
 }
 
 func NewCoordinator(store Store) Coordinator {
@@ -70,7 +71,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	cmd := exec.Command(req.Invocation.Argv[0], req.Invocation.Argv[1:]...)
 	configureProcess(cmd)
 	cmd.Dir = req.CWD
-	cmd.Env = buildEnvironment(req.Invocation, artifact.Manifest.RunID)
+	cmd.Env = buildEnvironment(req.Invocation, artifact.Manifest.RunID, req.Automation)
 	if req.Invocation.Stdin != nil {
 		cmd.Stdin = bytes.NewReader(req.Invocation.Stdin)
 	}
@@ -193,7 +194,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	return result
 }
 
-func buildEnvironment(invocation provider.Invocation, runID string) []string {
+func buildEnvironment(invocation provider.Invocation, runID string, automation bool) []string {
 	values := make(map[string]string)
 	for _, entry := range os.Environ() {
 		if index := strings.IndexByte(entry, '='); index >= 0 {
@@ -203,6 +204,20 @@ func buildEnvironment(invocation provider.Invocation, runID string) []string {
 	delete(values, "DCG_BYPASS")
 	values["DCG_NO_SELF_HEAL"] = "1"
 	values["LONGHOUSE_HATCH_RUN_ID"] = runID
+	if automation {
+		values["LONGHOUSE_IS_SIDECHAIN"] = "1"
+		values["LONGHOUSE_ORIGIN_KIND"] = "hatch_automation"
+		copyFirstEnvironment(values, "LONGHOUSE_PARENT_SESSION_ID", "LONGHOUSE_MANAGED_SESSION_ID", "LONGHOUSE_SESSION_ID", "LONGHOUSE_CHANNEL_SESSION_ID")
+		copyFirstEnvironment(values, "LONGHOUSE_PARENT_THREAD_ID", "LONGHOUSE_THREAD_ID")
+		copyFirstEnvironment(values, "LONGHOUSE_PARENT_PROVIDER_SESSION_ID", "LONGHOUSE_PROVIDER_SESSION_ID")
+		if strings.TrimSpace(values["LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT"]) == "" {
+			home := strings.TrimSpace(values["LONGHOUSE_HOME"])
+			if home == "" {
+				home = filepath.Join(strings.TrimSpace(values["HOME"]), ".longhouse")
+			}
+			values["LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT"] = filepath.Join(home, "provider-session-metadata", "opencode")
+		}
+	}
 	for _, name := range invocation.UnsetEnv {
 		delete(values, name)
 	}
@@ -214,6 +229,15 @@ func buildEnvironment(invocation provider.Invocation, runID string) []string {
 		result = append(result, name+"="+value)
 	}
 	return result
+}
+
+func copyFirstEnvironment(values map[string]string, target string, sources ...string) {
+	for _, source := range sources {
+		if value := strings.TrimSpace(values[source]); value != "" {
+			values[target] = value
+			return
+		}
+	}
 }
 
 func redactArgv(argv []string) []string {

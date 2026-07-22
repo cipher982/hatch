@@ -134,6 +134,12 @@ func selectedEnvironment() map[string]string {
 		"GEMINI_API_KEY",
 		"HATCH_AUTOMATION",
 		"LONGHOUSE_HATCH_RUN_ID",
+		"LONGHOUSE_IS_SIDECHAIN",
+		"LONGHOUSE_ORIGIN_KIND",
+		"LONGHOUSE_PARENT_SESSION_ID",
+		"LONGHOUSE_PARENT_THREAD_ID",
+		"LONGHOUSE_PARENT_PROVIDER_SESSION_ID",
+		"LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT",
 	} {
 		if value, ok := os.LookupEnv(name); ok {
 			result[name] = value
