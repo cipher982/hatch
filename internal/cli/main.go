@@ -109,6 +109,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 		Surface: surface, Provider: providerName, Model: request.Model, CWD: request.CWD,
 		Prompt: prompt, Timeout: time.Duration(request.TimeoutSeconds) * time.Second,
 		Invocation: invocation, CredentialNames: credentialNames, Automation: request.Automation,
+		ProgressLabel: progressLabel(surface), Progress: func(message string) { fmt.Fprintln(stderr, message) },
 	})
 	if request.JSON {
 		encoder := json.NewEncoder(stdout)
@@ -123,6 +124,23 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 		fmt.Fprintf(stderr, "Error: %s\n", strings.TrimRight(*result.Error, "\n"))
 	}
 	return result.CLIExitCode()
+}
+
+func progressLabel(surface string) string {
+	switch {
+	case strings.HasPrefix(surface, "claude."):
+		return "Claude"
+	case strings.HasPrefix(surface, "cursor."):
+		return "Cursor"
+	case strings.HasPrefix(surface, "openrouter."):
+		return "OpenRouter"
+	case strings.HasPrefix(surface, "codex."):
+		return "Codex"
+	case strings.HasPrefix(surface, "gemini."):
+		return "Gemini"
+	default:
+		return "Agent"
+	}
 }
 
 func runDoctor(args []string, stdout, stderr io.Writer) int {

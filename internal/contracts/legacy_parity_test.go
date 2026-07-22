@@ -11,7 +11,7 @@ import (
 	"github.com/cipher982/hatch/internal/provider"
 )
 
-func TestLegacyParity(t *testing.T) {
+func TestLegacyParityCommandBuilders(t *testing.T) {
 	paths, err := filepath.Glob(filepath.Join(repoRoot(t), "testdata", "contracts", "cases", "*.json"))
 	if err != nil {
 		t.Fatal(err)

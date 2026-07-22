@@ -29,6 +29,8 @@ type Request struct {
 	Invocation      provider.Invocation
 	CredentialNames []string
 	Automation      bool
+	Progress        func(string)
+	ProgressLabel   string
 }
 
 func NewCoordinator(store Store) Coordinator {
@@ -47,6 +49,12 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		return failedResult(-3, started, c.Now(), fmt.Sprintf("prepare durable run: %v", err), nil)
 	}
 	artifactPath := artifact.Path
+	if req.Progress != nil {
+		req.Progress(fmt.Sprintf("[hatch] run %s artifact %s", artifact.Manifest.RunID, artifact.Path))
+		if req.ProgressLabel != "" {
+			req.Progress(fmt.Sprintf("[hatch] %s started", req.ProgressLabel))
+		}
+	}
 	stderrText := ""
 	warnings := []Warning{}
 
@@ -200,6 +208,9 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		artifact.Manifest.Capture.State = "degraded"
 		artifact.Manifest.Warnings = append(artifact.Manifest.Warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 		_ = c.Store.writeManifest(artifact)
+	}
+	if req.Progress != nil && req.ProgressLabel != "" {
+		req.Progress(fmt.Sprintf("[hatch] %s completed", req.ProgressLabel))
 	}
 	return result
 }

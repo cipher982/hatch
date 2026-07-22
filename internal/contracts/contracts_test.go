@@ -1,10 +1,17 @@
 package contracts
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/cipher982/hatch/internal/cli"
+	runner "github.com/cipher982/hatch/internal/run"
 )
 
 type ledger struct {
@@ -82,6 +89,122 @@ func TestContractCorpus(t *testing.T) {
 			seen[value.Name] = true
 		})
 	}
+}
+
+type contractCase struct {
+	Name             string            `json:"name"`
+	ProviderBinaries []string          `json:"provider_binaries"`
+	Arguments        []string          `json:"arguments"`
+	Stdin            string            `json:"stdin"`
+	Scenario         string            `json:"scenario"`
+	Environment      map[string]string `json:"environment"`
+	Expected         struct {
+		ExitCode int `json:"exit_code"`
+		Result   struct {
+			OK       bool    `json:"ok"`
+			Status   string  `json:"status"`
+			Output   string  `json:"output"`
+			ExitCode int     `json:"exit_code"`
+			Error    *string `json:"error"`
+			Stderr   *string `json:"stderr"`
+		} `json:"result"`
+		ProviderArgv        []string `json:"provider_argv"`
+		ProviderStdinSHA256 string   `json:"provider_stdin_sha256"`
+		ProviderStdinBytes  int      `json:"provider_stdin_bytes"`
+		StderrContains      []string `json:"stderr_contains"`
+	} `json:"expected"`
+}
+
+func TestLegacyParity(t *testing.T) {
+	root := repoRoot(t)
+	fake := filepath.Join(t.TempDir(), "testprovider")
+	command := exec.Command("go", "build", "-o", fake, "./internal/testprovider")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("build fake provider: %v\n%s", err, output)
+	}
+	paths, err := filepath.Glob(filepath.Join(root, "testdata", "contracts", "cases", "*.json"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("contract corpus: %v, count=%d", err, len(paths))
+	}
+	for _, path := range paths {
+		var testCase contractCase
+		readJSON(t, path, &testCase)
+		t.Run(testCase.Name, func(t *testing.T) {
+			directory := t.TempDir()
+			for _, binary := range testCase.ProviderBinaries {
+				if err := os.Symlink(fake, filepath.Join(directory, binary)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			home := filepath.Join(directory, "home")
+			if err := os.Mkdir(home, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			record := filepath.Join(directory, "invocation.json")
+			t.Setenv("HOME", home)
+			t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+			t.Setenv("HATCH_RUN_ARTIFACT_ROOT", filepath.Join(directory, "artifacts"))
+			t.Setenv("HATCH_TEST_RECORD", record)
+			t.Setenv("HATCH_TEST_SCENARIO", testCase.Scenario)
+			t.Setenv("HATCH_CREDENTIAL_HELPER", "")
+			t.Setenv("OPENAI_API_KEY", "")
+			t.Setenv("OPENROUTER_API_KEY", "")
+			for name, value := range testCase.Environment {
+				t.Setenv(name, value)
+			}
+			var stdout, stderr bytes.Buffer
+			exit := cli.Main(testCase.Arguments, bytes.NewBufferString(testCase.Stdin), &stdout, &stderr, true)
+			if exit != testCase.Expected.ExitCode {
+				t.Fatalf("exit=%d want=%d stderr=%s stdout=%s", exit, testCase.Expected.ExitCode, stderr.String(), stdout.String())
+			}
+			for _, fragment := range testCase.Expected.StderrContains {
+				if !bytes.Contains(stderr.Bytes(), []byte(fragment)) {
+					t.Errorf("stderr lacks %q: %s", fragment, stderr.String())
+				}
+			}
+			var result runner.PublicResult
+			if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+				t.Fatalf("result JSON: %v\n%s", err, stdout.String())
+			}
+			if result.OK != testCase.Expected.Result.OK || result.Status != testCase.Expected.Result.Status ||
+				result.Output != testCase.Expected.Result.Output || result.ExitCode != testCase.Expected.Result.ExitCode ||
+				!reflect.DeepEqual(result.Error, testCase.Expected.Result.Error) || !reflect.DeepEqual(result.Stderr, testCase.Expected.Result.Stderr) {
+				t.Errorf("legacy result mismatch: %#v expected %#v", result, testCase.Expected.Result)
+			}
+			if result.ArtifactPath == nil || result.Run == nil || result.Run.RunID == "" || result.Run.Capture.State != "durable" {
+				t.Fatalf("target durability missing: %#v", result)
+			}
+			var invocation struct {
+				Argv        []string          `json:"argv"`
+				StdinSHA256 string            `json:"stdin_sha256"`
+				StdinBytes  int               `json:"stdin_bytes"`
+				Environment map[string]string `json:"environment"`
+			}
+			readJSON(t, record, &invocation)
+			prepared := strings.TrimSuffix(string(mustRead(t, filepath.Join(root, "testdata", "contracts", "fixtures", "oracle_prepared_prompt.txt"))), "\n")
+			for index, arg := range invocation.Argv {
+				if arg == prepared {
+					invocation.Argv[index] = "$PREPARED_PROMPT"
+				}
+			}
+			if !reflect.DeepEqual(invocation.Argv, testCase.Expected.ProviderArgv) || invocation.StdinSHA256 != testCase.Expected.ProviderStdinSHA256 || invocation.StdinBytes != testCase.Expected.ProviderStdinBytes {
+				t.Errorf("provider boundary = argv %#v stdin %s/%d", invocation.Argv, invocation.StdinSHA256, invocation.StdinBytes)
+			}
+			if invocation.Environment["DCG_NO_SELF_HEAL"] != "1" {
+				t.Error("DCG_NO_SELF_HEAL missing")
+			}
+		})
+	}
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
 func readJSON(t *testing.T, path string, target any) {
