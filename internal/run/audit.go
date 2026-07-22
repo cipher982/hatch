@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -69,10 +70,9 @@ func AuditFieldEvidence(root string, minimumTotal, minimumSurface int) (FieldAud
 		if os.IsNotExist(manifestInfoErr) {
 			continue
 		}
-		runInfo, infoErr := entry.Info()
-		if manifestInfoErr != nil || !manifestInfo.Mode().IsRegular() || infoErr != nil || !privateMode(runInfo.Mode()) || !privateMode(manifestInfo.Mode()) {
+		if manifestInfoErr != nil || !manifestInfo.Mode().IsRegular() {
 			audit.Observed++
-			audit.addUnsafe(entry.Name(), "run directory or manifest permissions are unsafe")
+			audit.addUnsafe(entry.Name(), "manifest is missing or unsafe")
 			continue
 		}
 		manifest, err := readAuditManifest(manifestPath)
@@ -91,6 +91,11 @@ func AuditFieldEvidence(root string, minimumTotal, minimumSurface int) (FieldAud
 		}
 		if manifest.Lifecycle != LifecycleTerminal {
 			audit.Incomplete++
+			continue
+		}
+		runInfo, infoErr := entry.Info()
+		if infoErr != nil || !privateMode(runInfo.Mode()) || !privateMode(manifestInfo.Mode()) {
+			audit.addUnsafe(entry.Name(), "run directory or manifest permissions are unsafe")
 			continue
 		}
 		if err := ValidateManifest(manifest); err != nil {
@@ -223,6 +228,20 @@ func verifyClosedEvidence(runDir string, manifest Manifest) error {
 		return fmt.Errorf("evidence manifest digest mismatch")
 	}
 
+	required := map[string]bool{
+		filepath.ToSlash(manifest.Invocation.RequestFile): true,
+		filepath.ToSlash(manifest.Capture.StdoutFile):     true,
+		filepath.ToSlash(manifest.Capture.StderrFile):     true,
+	}
+	if manifest.Result.OutputFile != nil {
+		required[filepath.ToSlash(*manifest.Result.OutputFile)] = true
+	}
+	snapshotPrefixes := []string{}
+	if manifest.ProviderState.SnapshotPath != nil {
+		base := strings.TrimSuffix(filepath.ToSlash(*manifest.ProviderState.SnapshotPath), "/")
+		snapshotPrefixes = []string{base + "/data/", base + "/state/"}
+	}
+
 	listed := []string{}
 	scanner := bufio.NewScanner(strings.NewReader(string(contents)))
 	for scanner.Scan() {
@@ -235,38 +254,28 @@ func verifyClosedEvidence(runDir string, manifest Manifest) error {
 		if err != nil || filepath.ToSlash(filepath.FromSlash(name)) != name || !regularNonSymlinkFile(path) {
 			return fmt.Errorf("unsafe evidence entry %q", name)
 		}
+		allowed := required[name]
+		for _, prefix := range snapshotPrefixes {
+			allowed = allowed || strings.HasPrefix(name, prefix)
+		}
+		if !allowed {
+			return fmt.Errorf("undeclared evidence entry %q", name)
+		}
 		fileDigest, err := hashFile(path)
 		if err != nil || fileDigest != line[:64] {
 			return fmt.Errorf("evidence hash mismatch for %q", name)
 		}
+		if len(listed) > 0 && listed[len(listed)-1] >= name {
+			return fmt.Errorf("evidence manifest is unsorted or contains duplicates")
+		}
 		listed = append(listed, name)
+		delete(required, name)
 	}
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-	if !sort.StringsAreSorted(listed) || hasDuplicate(listed) {
-		return fmt.Errorf("evidence manifest is unsorted or contains duplicates")
-	}
-
-	expected := []string{manifest.Invocation.RequestFile, manifest.Capture.StdoutFile, manifest.Capture.StderrFile}
-	if manifest.Result.OutputFile != nil {
-		expected = append(expected, *manifest.Result.OutputFile)
-	}
-	if manifest.ProviderState.SnapshotPath != nil {
-		for _, subtree := range []string{"data", "state"} {
-			base := filepath.Join(runDir, *manifest.ProviderState.SnapshotPath, subtree)
-			if err := appendRegularFiles(runDir, base, &expected); err != nil && !os.IsNotExist(err) {
-				return err
-			}
-		}
-	}
-	for index := range expected {
-		expected[index] = filepath.ToSlash(expected[index])
-	}
-	sort.Strings(expected)
-	expected = compactStrings(expected)
-	if !equalStrings(listed, expected) {
-		return fmt.Errorf("evidence membership does not match manifest")
+	if len(required) != 0 {
+		return fmt.Errorf("evidence manifest omits required files")
 	}
 
 	actual := []string{}
@@ -305,8 +314,7 @@ func verifyClosedEvidence(runDir string, manifest Manifest) error {
 		return err
 	}
 	sort.Strings(actual)
-	actual = compactStrings(actual)
-	if !equalStrings(listed, actual) {
+	if !slices.Equal(listed, actual) {
 		return fmt.Errorf("artifact contains undeclared evidence")
 	}
 	return nil
@@ -337,29 +345,6 @@ func readBoundedAuditFile(path string) ([]byte, error) {
 	return data, nil
 }
 
-func appendRegularFiles(runDir, base string, names *[]string) error {
-	return filepath.WalkDir(base, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return fmt.Errorf("provider snapshot contains symlink %q", path)
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil || !info.Mode().IsRegular() {
-			return fmt.Errorf("provider snapshot contains non-regular file %q", path)
-		}
-		relative, err := filepath.Rel(runDir, path)
-		if err == nil {
-			*names = append(*names, relative)
-		}
-		return err
-	})
-}
-
 func hashFile(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -371,40 +356,6 @@ func hashFile(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
-func hasDuplicate(values []string) bool {
-	for index := 1; index < len(values); index++ {
-		if values[index] == values[index-1] {
-			return true
-		}
-	}
-	return false
-}
-
-func compactStrings(values []string) []string {
-	if len(values) == 0 {
-		return values
-	}
-	result := values[:1]
-	for _, value := range values[1:] {
-		if value != result[len(result)-1] {
-			result = append(result, value)
-		}
-	}
-	return result
-}
-
-func equalStrings(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for index := range left {
-		if left[index] != right[index] {
-			return false
-		}
-	}
-	return true
 }
 
 func fieldSurface(surface string) (string, bool) {
