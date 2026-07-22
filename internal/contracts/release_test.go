@@ -64,31 +64,12 @@ func TestReleaseInstall(t *testing.T) {
 func TestReleaseArchiveBuildHasCleanIdentity(t *testing.T) {
 	root := repoRoot(t)
 	archiveRoot := t.TempDir()
-	archive := exec.Command("git", "archive", "HEAD")
-	archive.Dir = root
-	tar := exec.Command("tar", "-x", "-C", archiveRoot)
-	var archiveStderr bytes.Buffer
-	archive.Stderr = &archiveStderr
-	pipe, err := archive.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
+	for _, directory := range []string{"cmd", "internal", "scripts"} {
+		if err := os.CopyFS(filepath.Join(archiveRoot, directory), os.DirFS(filepath.Join(root, directory))); err != nil {
+			t.Fatal(err)
+		}
 	}
-	tar.Stdin = pipe
-	if err := tar.Start(); err != nil {
-		t.Fatal(err)
-	}
-	if err := archive.Start(); err != nil {
-		t.Fatal(err)
-	}
-	if err := archive.Wait(); err != nil {
-		t.Fatalf("git archive: %v\n%s", err, archiveStderr.Bytes())
-	}
-	if err := tar.Wait(); err != nil {
-		t.Fatal(err)
-	}
-	// Exercise the script under test even when this test is first introduced in
-	// an uncommitted working tree; after commit it is byte-identical to HEAD.
-	if err := os.WriteFile(filepath.Join(archiveRoot, "scripts", "build-release.sh"), mustRead(t, filepath.Join(root, "scripts", "build-release.sh")), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(archiveRoot, "go.mod"), mustRead(t, filepath.Join(root, "go.mod")), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
