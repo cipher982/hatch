@@ -5,8 +5,10 @@ repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 version=${VERSION:-0.1.0-go-preview}
 commit=${COMMIT:-$(git -C "$repo_dir" rev-parse HEAD)}
 dirty=false
-if ! git -C "$repo_dir" diff --quiet --ignore-submodules -- || ! git -C "$repo_dir" diff --cached --quiet --ignore-submodules --; then
-  dirty=true
+if git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if ! git -C "$repo_dir" diff --quiet --ignore-submodules -- || ! git -C "$repo_dir" diff --cached --quiet --ignore-submodules --; then
+    dirty=true
+  fi
 fi
 go_version=$(go version | awk '{print $3}')
 dist_dir=${DIST_DIR:-"$repo_dir/dist"}

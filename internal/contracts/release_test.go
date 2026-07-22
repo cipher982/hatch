@@ -60,3 +60,48 @@ func TestReleaseInstall(t *testing.T) {
 		t.Fatalf("local install smoke: %v\n%s", err, output)
 	}
 }
+
+func TestReleaseArchiveBuildHasCleanIdentity(t *testing.T) {
+	root := repoRoot(t)
+	archiveRoot := t.TempDir()
+	archive := exec.Command("git", "archive", "HEAD")
+	archive.Dir = root
+	tar := exec.Command("tar", "-x", "-C", archiveRoot)
+	var archiveStderr bytes.Buffer
+	archive.Stderr = &archiveStderr
+	pipe, err := archive.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tar.Stdin = pipe
+	if err := tar.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := archive.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := archive.Wait(); err != nil {
+		t.Fatalf("git archive: %v\n%s", err, archiveStderr.Bytes())
+	}
+	if err := tar.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	// Exercise the script under test even when this test is first introduced in
+	// an uncommitted working tree; after commit it is byte-identical to HEAD.
+	if err := os.WriteFile(filepath.Join(archiveRoot, "scripts", "build-release.sh"), mustRead(t, filepath.Join(root, "scripts", "build-release.sh")), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	dist := filepath.Join(archiveRoot, "dist")
+	build := exec.Command("sh", filepath.Join(archiveRoot, "scripts", "build-release.sh"))
+	build.Dir = archiveRoot
+	build.Env = append(os.Environ(), "DIST_DIR="+dist, "VERSION=archive-test", "COMMIT=archive-commit")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("archive release build: %v\n%s", err, output)
+	}
+	binary := filepath.Join(dist, "hatch_archive-test_"+runtime.GOOS+"_"+runtime.GOARCH, "hatch")
+	output, err := exec.Command(binary, "--version").CombinedOutput()
+	if err != nil || !bytes.Contains(output, []byte("commit=archive-commit")) || !bytes.Contains(output, []byte("dirty=false")) {
+		t.Fatalf("archive version=%q err=%v", output, err)
+	}
+}

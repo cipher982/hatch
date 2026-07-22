@@ -40,6 +40,6 @@
     {"id":"entrypoint.subprocess","requirement":"Surfaced and raw subprocess commands produce the common canonical nested run projection.","proofs":["internal/cli.TestMainRawGeminiVerticalSlice","internal/run.TestCoordinatorStructuredProviders","internal/contracts.TestContractLegacyParity"]},
     {"id":"entrypoint.http","requirement":"Expert produces the same canonical run axes without fake process evidence.","proofs":["internal/cli.TestMainExpertJSON","internal/run.TestCoordinatorHTTPSuccess"]},
     {"id":"compatibility.python","requirement":"Every frozen Python behavior remains recorded with an executable Go proof or explicit retired/obsolete disposition after Python source retirement.","proofs":["internal/contracts.TestMigrationLedger","internal/contracts.TestContractLegacyParity"]},
-    {"id":"release.reproducible","requirement":"Supported release targets build reproducibly and install without Python.","proofs":["internal/contracts.TestReleaseInstall"]}
+    {"id":"release.reproducible","requirement":"Supported release targets and clean source archives build reproducibly with accurate identity and install without Python.","proofs":["internal/contracts.TestReleaseInstall","internal/contracts.TestReleaseArchiveBuildHasCleanIdentity"]}
   ]
 }
