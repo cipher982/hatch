@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "name": "claude_success",
+  "provider_binaries": ["claude"],
+  "arguments": ["claude", "haiku", "--json", "-"],
+  "stdin": "oracle prompt",
+  "scenario": "success_claude",
+  "expected": {
+    "exit_code": 0,
+    "stderr_contains": ["[hatch] Claude started", "[hatch] Claude completed"],
+    "result": {
+      "ok": true,
+      "status": "ok",
+      "output": "fake claude output",
+      "exit_code": 0,
+      "error": null,
+      "stderr": "",
+      "artifact_path": null,
+      "session_id": null,
+      "resume_command": null
+    },
+    "provider_argv": [
+      "claude", "--verbose", "--print", "-", "--output-format", "stream-json",
+      "--model", "haiku", "--dangerously-skip-permissions", "--setting-sources",
+      "local", "--no-session-persistence", "--tools", "default", "--effort", "low",
+      "--include-partial-messages"
+    ],
+    "provider_stdin_sha256": "0eb7749ad17c17ce3323e0628fc9a6fc040d640d95edb7d6839f983ac354ee54",
+    "provider_stdin_bytes": 570
+  }
+}

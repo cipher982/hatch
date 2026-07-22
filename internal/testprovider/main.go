@@ -37,6 +37,37 @@ func main() {
 	switch os.Getenv("HATCH_TEST_SCENARIO") {
 	case "", "success_text":
 		fmt.Fprintln(os.Stdout, "fake provider output")
+	case "success_claude":
+		emitJSON(map[string]any{
+			"type": "system", "subtype": "init", "model": "haiku",
+			"session_id": "claude-session-oracle",
+		})
+		emitJSON(map[string]any{
+			"type": "result", "result": "fake claude output", "duration_ms": 42,
+		})
+	case "success_cursor":
+		emitJSON(map[string]any{
+			"type": "system", "subtype": "init", "model": "cursor-grok-4.5-high",
+			"session_id": "cursor-session-oracle",
+		})
+		emitJSON(map[string]any{
+			"type": "result", "subtype": "success", "is_error": false,
+			"duration_ms": 1250, "result": "fake cursor output",
+		})
+	case "success_opencode":
+		emitJSON(map[string]any{
+			"type": "step_start", "sessionID": "ses_oracle1234",
+		})
+		emitJSON(map[string]any{
+			"type": "text",
+			"part": map[string]any{
+				"text":     "fake opencode output",
+				"metadata": map[string]any{"openai": map[string]any{"phase": "final_answer"}},
+			},
+		})
+		emitJSON(map[string]any{
+			"type": "step_finish", "part": map[string]any{"reason": "stop"},
+		})
 	case "stderr_nonzero":
 		fmt.Fprintln(os.Stderr, "fake provider failure")
 		os.Exit(23)
@@ -46,6 +77,13 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "testprovider: unknown scenario %q\n", os.Getenv("HATCH_TEST_SCENARIO"))
 		os.Exit(96)
+	}
+}
+
+func emitJSON(value any) {
+	if err := json.NewEncoder(os.Stdout).Encode(value); err != nil {
+		fmt.Fprintf(os.Stderr, "testprovider: encode output: %v\n", err)
+		os.Exit(95)
 	}
 }
 

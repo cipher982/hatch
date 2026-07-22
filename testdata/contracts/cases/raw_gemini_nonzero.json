@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "name": "raw_gemini_success",
+  "name": "raw_gemini_nonzero",
   "provider_binaries": ["gemini"],
   "arguments": ["-b", "gemini", "--json", "-"],
   "stdin": "oracle prompt",
-  "scenario": "success_text",
+  "scenario": "stderr_nonzero",
   "expected": {
-    "exit_code": 0,
+    "exit_code": 1,
     "result": {
-      "ok": true,
-      "status": "ok",
-      "output": "fake provider output\n",
-      "exit_code": 0,
-      "error": null,
-      "stderr": "",
+      "ok": false,
+      "status": "error",
+      "output": "",
+      "exit_code": 23,
+      "error": "fake provider failure\n",
+      "stderr": "fake provider failure\n",
       "artifact_path": null,
       "session_id": null,
       "resume_command": null
