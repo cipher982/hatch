@@ -8,8 +8,9 @@ OpenRouter, and expert calls.
 ## Install
 
 ```bash
-./scripts/build-release.sh
-./scripts/install-local.sh --select go
+VERSION=0.2.0 ./scripts/build-release.sh
+./scripts/install-local.sh \
+  --go-binary ./dist/hatch_0.2.0_darwin_arm64/hatch --select go
 ```
 
 The installer keeps the frozen Python 0.1.0 release available as

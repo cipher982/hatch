@@ -7,9 +7,9 @@ Build and select Go:
 
 ```bash
 dist=$(mktemp -d)
-DIST_DIR="$dist" VERSION=0.1.0-go-preview scripts/build-release.sh
+DIST_DIR="$dist" VERSION=0.2.0 scripts/build-release.sh
 scripts/install-local.sh \
-  --go-binary "$dist/hatch_0.1.0-go-preview_darwin_arm64/hatch" \
+  --go-binary "$dist/hatch_0.2.0_darwin_arm64/hatch" \
   --select go
 ```
 
