@@ -15,7 +15,7 @@ import (
 )
 
 type Coordinator struct {
-	Store Store
+	Store RunStore
 	Now   func() time.Time
 }
 
@@ -33,7 +33,7 @@ type Request struct {
 	ProgressLabel   string
 }
 
-func NewCoordinator(store Store) Coordinator {
+func NewCoordinator(store RunStore) Coordinator {
 	return Coordinator{Store: store, Now: time.Now}
 }
 
@@ -63,10 +63,10 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		message := fmt.Sprintf("open durable streams: %v", err)
 		return failedResult(-3, started, c.Now(), message, &artifactPath)
 	}
-	defer stdoutFile.Close()
-	defer stderrFile.Close()
 	cleanupProviderState, err := prepareProviderState(artifact, &req.Invocation)
 	if err != nil {
+		_ = stdoutFile.Close()
+		_ = stderrFile.Close()
 		message := fmt.Sprintf("prepare provider state: %v", err)
 		return failedResult(-3, started, c.Now(), message, &artifactPath)
 	}
@@ -84,10 +84,14 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		cmd.Stdin = bytes.NewReader(req.Invocation.Stdin)
 	}
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = io.MultiWriter(stdoutFile, &stdout)
-	cmd.Stderr = io.MultiWriter(stderrFile, &stderr)
+	stdoutCapture := &captureWriter{memory: &stdout, sink: stdoutFile}
+	stderrCapture := &captureWriter{memory: &stderr, sink: stderrFile}
+	cmd.Stdout = stdoutCapture
+	cmd.Stderr = stderrCapture
 
 	if err := cmd.Start(); err != nil {
+		_ = stdoutFile.Close()
+		_ = stderrFile.Close()
 		message := err.Error()
 		outcome := OutcomeLaunch
 		resultState := Result{Output: "absent", TerminalMarker: "not_applicable", Error: &message}
@@ -118,8 +122,22 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	} else {
 		waitErr = <-waited
 	}
-	_ = stdoutFile.Sync()
-	_ = stderrFile.Sync()
+	for _, capture := range []*captureWriter{stdoutCapture, stderrCapture} {
+		if capture.sinkErr != nil {
+			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: capture.sinkErr.Error()})
+			artifact.Manifest.Capture.State = "degraded"
+		}
+	}
+	for _, file := range []StreamSink{stdoutFile, stderrFile} {
+		if err := file.Sync(); err != nil {
+			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+			artifact.Manifest.Capture.State = "degraded"
+		}
+		if err := file.Close(); err != nil {
+			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+			artifact.Manifest.Capture.State = "degraded"
+		}
+	}
 	stderrText = stderr.String()
 	exitCode := processExitCode(waitErr)
 	if timedOut {
@@ -203,16 +221,37 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		DurationMS: c.Now().Sub(started).Milliseconds(), Error: resultErr,
 		Stderr: &stderrCopy, ArtifactPath: &artifactPath, Run: &artifact.Manifest,
 	}
+	if artifact.Manifest.Capture.State != "durable" {
+		result.ArtifactPath = nil
+	}
 	result.SessionID = state.NativeID
 	if err := c.Store.WritePublicProjection(artifact, result); err != nil {
-		artifact.Manifest.Capture.State = "degraded"
-		artifact.Manifest.Warnings = append(artifact.Manifest.Warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
-		_ = c.Store.writeManifest(artifact)
+		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		result.ArtifactPath = nil
 	}
 	if req.Progress != nil && req.ProgressLabel != "" {
 		req.Progress(fmt.Sprintf("[hatch] %s completed", req.ProgressLabel))
 	}
 	return result
+}
+
+type captureWriter struct {
+	memory  *bytes.Buffer
+	sink    io.Writer
+	sinkErr error
+}
+
+func (w *captureWriter) Write(data []byte) (int, error) {
+	_, _ = w.memory.Write(data)
+	if w.sinkErr == nil {
+		if written, err := w.sink.Write(data); err != nil {
+			w.sinkErr = err
+		} else if written != len(data) {
+			w.sinkErr = io.ErrShortWrite
+		}
+	}
+	// Storage degradation must not make os/exec stop draining provider output.
+	return len(data), nil
 }
 
 func buildEnvironment(invocation provider.Invocation, runID string, automation bool) []string {

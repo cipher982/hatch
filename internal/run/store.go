@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,6 +18,22 @@ type Store struct {
 	Root  string
 	Now   func() time.Time
 	IDGen func(time.Time) (string, error)
+}
+
+type StreamSink interface {
+	io.Writer
+	Sync() error
+	Close() error
+}
+
+type RunStore interface {
+	Prepare(PreparedRun) (*Artifact, error)
+	OpenStreams(*Artifact) (StreamSink, StreamSink, error)
+	MarkRunning(*Artifact, int, time.Time) error
+	WriteResult(*Artifact, []byte) (string, error)
+	CommitTerminal(*Artifact, Outcome, int, Result, State, []Warning) error
+	WritePublicProjection(*Artifact, PublicResult) error
+	MarkCaptureDegraded(*Artifact, Warning) error
 }
 
 type Artifact struct {
@@ -126,6 +143,10 @@ func (s Store) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int,
 	artifact.Manifest.Result = result
 	artifact.Manifest.ProviderState = state
 	artifact.Manifest.Warnings = append([]Warning(nil), warnings...)
+	if artifact.Manifest.Capture.State == "degraded" && outcome == OutcomeSucceeded {
+		updated := OutcomeSucceededWarnings
+		artifact.Manifest.Outcome = &updated
+	}
 	if artifact.Manifest.Process != nil {
 		artifact.Manifest.Process.ExitedAt = &now
 		artifact.Manifest.Process.ExitCode = &exitCode
@@ -137,7 +158,7 @@ func (s Store) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int,
 	if state.SnapshotPath != nil {
 		for _, subtree := range []string{"data", "state"} {
 			base := filepath.Join(artifact.Path, *state.SnapshotPath, subtree)
-			_ = filepath.WalkDir(base, func(path string, entry os.DirEntry, walkErr error) error {
+			err := filepath.WalkDir(base, func(path string, entry os.DirEntry, walkErr error) error {
 				if walkErr != nil || entry.IsDir() {
 					return walkErr
 				}
@@ -147,16 +168,30 @@ func (s Store) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int,
 				}
 				return err
 			})
+			if err != nil && !os.IsNotExist(err) {
+				s.markCaptureDegraded(artifact, outcome, fmt.Errorf("walk provider evidence: %w", err))
+			}
 		}
 	}
 	digest, err := evidenceDigest(artifact.Path, evidence)
 	if err == nil {
 		artifact.Manifest.Capture.EvidenceSHA256 = &digest
+	} else {
+		s.markCaptureDegraded(artifact, outcome, fmt.Errorf("hash evidence: %w", err))
 	}
 	return s.writeManifest(artifact)
 }
 
-func (s Store) OpenStreams(artifact *Artifact) (*os.File, *os.File, error) {
+func (s Store) markCaptureDegraded(artifact *Artifact, outcome Outcome, err error) {
+	artifact.Manifest.Capture.State = "degraded"
+	artifact.Manifest.Warnings = append(artifact.Manifest.Warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+	if outcome == OutcomeSucceeded {
+		updated := OutcomeSucceededWarnings
+		artifact.Manifest.Outcome = &updated
+	}
+}
+
+func (s Store) OpenStreams(artifact *Artifact) (StreamSink, StreamSink, error) {
 	stdout, err := openPrivate(filepath.Join(artifact.Path, artifact.Manifest.Capture.StdoutFile))
 	if err != nil {
 		return nil, nil, err
@@ -167,6 +202,17 @@ func (s Store) OpenStreams(artifact *Artifact) (*os.File, *os.File, error) {
 		return nil, nil, err
 	}
 	return stdout, stderr, nil
+}
+
+func (s Store) MarkCaptureDegraded(artifact *Artifact, warning Warning) error {
+	artifact.Manifest.Capture.State = "degraded"
+	artifact.Manifest.Warnings = append(artifact.Manifest.Warnings, warning)
+	if artifact.Manifest.Outcome != nil && *artifact.Manifest.Outcome == OutcomeSucceeded {
+		outcome := OutcomeSucceededWarnings
+		artifact.Manifest.Outcome = &outcome
+	}
+	artifact.Manifest.UpdatedAt = s.Now().UTC()
+	return s.writeManifest(artifact)
 }
 
 func (s Store) writeManifest(artifact *Artifact) error {
@@ -188,8 +234,21 @@ func newRunID(now time.Time) (string, error) {
 }
 
 func secureMkdirAll(path string) error {
+	if info, err := os.Lstat(path); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("artifact root must not be a symlink: %s", path)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("artifact root is not a directory: %s", path)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	if err := os.MkdirAll(path, 0o700); err != nil {
 		return err
+	}
+	if info, err := os.Lstat(path); err != nil || info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf("artifact root is not a private directory: %s", path)
 	}
 	return os.Chmod(path, 0o700)
 }
@@ -260,12 +319,31 @@ func evidenceDigest(root string, names []string) (string, error) {
 	sort.Strings(names)
 	hash := sha256.New()
 	for _, name := range names {
-		data, err := os.ReadFile(filepath.Join(root, name))
+		path, err := evidencePath(root, name)
 		if err != nil {
 			return "", err
 		}
-		fileDigest := sha256.Sum256(data)
-		fmt.Fprintf(hash, "%s  %s\n", hex.EncodeToString(fileDigest[:]), name)
+		file, err := os.Open(path)
+		if err != nil {
+			return "", err
+		}
+		fileHash := sha256.New()
+		_, copyErr := io.Copy(fileHash, file)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return "", copyErr
+		}
+		if closeErr != nil {
+			return "", closeErr
+		}
+		fmt.Fprintf(hash, "%s  %s\n", hex.EncodeToString(fileHash.Sum(nil)), filepath.ToSlash(name))
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func evidencePath(root, name string) (string, error) {
+	if name == "" || filepath.IsAbs(name) || filepath.Clean(name) != name || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("unsafe evidence path %q", name)
+	}
+	return filepath.Join(root, name), nil
 }

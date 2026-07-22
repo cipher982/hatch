@@ -2,6 +2,7 @@ package run
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,8 +58,8 @@ func TestStoreLifecycleAndEvidenceDigest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stdout.WriteString("answer\n")
-	stderr.WriteString("warning\n")
+	_, _ = io.WriteString(stdout, "answer\n")
+	_, _ = io.WriteString(stderr, "warning\n")
 	stdout.Close()
 	stderr.Close()
 	started := time.Now()
@@ -88,6 +89,46 @@ func TestStoreFailsBeforeLaunchWhenRootIsAFile(t *testing.T) {
 	store := NewStore(root)
 	if _, err := store.Prepare(PreparedRun{Surface: "raw", Provider: "unknown", Request: "prompt"}); err == nil {
 		t.Fatal("Prepare succeeded with an unusable root")
+	}
+}
+
+func TestStoreRejectsSymlinkArtifactRoot(t *testing.T) {
+	parent := t.TempDir()
+	target := filepath.Join(parent, "target")
+	if err := os.Mkdir(target, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(parent, "runs")
+	if err := os.Symlink(target, root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewStore(root).Prepare(PreparedRun{Request: "prompt"}); err == nil {
+		t.Fatal("Prepare followed a symlink artifact root")
+	}
+}
+
+func TestTerminalHashFailureDegradesCapture(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), "runs"))
+	store.IDGen = func(time.Time) (string, error) { return "hatch_missing_streams", nil }
+	artifact, err := store.Prepare(PreparedRun{Request: "prompt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultFile, err := store.WriteResult(artifact, []byte("answer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CommitTerminal(artifact, OutcomeSucceeded, 0, Result{Output: "present", TerminalMarker: "not_applicable", OutputFile: &resultFile}, State{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if artifact.Manifest.Capture.State != "degraded" || artifact.Manifest.Outcome == nil || *artifact.Manifest.Outcome != OutcomeSucceededWarnings || len(artifact.Manifest.Warnings) == 0 {
+		t.Fatalf("manifest = %#v", artifact.Manifest)
+	}
+}
+
+func TestEvidenceDigestRejectsTraversal(t *testing.T) {
+	if _, err := evidenceDigest(t.TempDir(), []string{"../secret"}); err == nil {
+		t.Fatal("traversal evidence path accepted")
 	}
 }
 

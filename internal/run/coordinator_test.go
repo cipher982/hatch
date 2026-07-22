@@ -1,7 +1,9 @@
 package run
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -57,6 +59,50 @@ func TestCoordinatorRawSuccess(t *testing.T) {
 	}
 	if observed.Environment["DCG_NO_SELF_HEAL"] != "1" {
 		t.Fatalf("guard environment missing: %#v", observed.Environment)
+	}
+}
+
+type alwaysFailWriter struct{}
+
+func (alwaysFailWriter) Write([]byte) (int, error) { return 0, errors.New("sink failed") }
+
+type failingStreamSink struct{}
+
+func (failingStreamSink) Write([]byte) (int, error) { return 0, errors.New("stream sink failed") }
+func (failingStreamSink) Sync() error               { return nil }
+func (failingStreamSink) Close() error              { return nil }
+
+type failingStreamStore struct{ Store }
+
+func (f failingStreamStore) OpenStreams(*Artifact) (StreamSink, StreamSink, error) {
+	return failingStreamSink{}, failingStreamSink{}, nil
+}
+
+func TestCaptureWriterPreservesAnswerAfterSinkFailure(t *testing.T) {
+	var memory bytes.Buffer
+	w := &captureWriter{memory: &memory, sink: alwaysFailWriter{}}
+	data := []byte("complete provider answer")
+	written, err := w.Write(data)
+	if err != nil || written != len(data) || memory.String() != string(data) || w.sinkErr == nil {
+		t.Fatalf("write=%d err=%v memory=%q sinkErr=%v", written, err, memory.String(), w.sinkErr)
+	}
+	more := []byte(" and more")
+	_, _ = w.Write(more)
+	if memory.String() != string(append(data, more...)) {
+		t.Fatalf("continued capture = %q", memory.String())
+	}
+}
+
+func TestCoordinatorReturnsAnswerWhenArtifactStreamFails(t *testing.T) {
+	fake := buildTestProvider(t)
+	store := failingStreamStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
+	result := NewCoordinator(store).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
+	})
+	if !result.OK || result.Output != "fake provider output\n" || result.ArtifactPath != nil || result.Run == nil ||
+		result.Run.Capture.State != "degraded" || result.Run.Outcome == nil || *result.Run.Outcome != OutcomeSucceededWarnings {
+		t.Fatalf("result = %#v", result)
 	}
 }
 
