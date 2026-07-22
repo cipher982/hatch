@@ -13,6 +13,7 @@ type Request struct {
 	CWD             string
 	TimeoutSeconds  int
 	ReasoningEffort string
+	APIKey          string
 	JSON            bool
 	Automation      bool
 	Help            bool
@@ -52,7 +53,7 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 			req.JSON = true
 		case "--automation":
 			req.Automation = true
-		case "-b", "--backend", "--model", "-C", "--cwd", "-t", "--timeout", "--reasoning-effort":
+		case "-b", "--backend", "--model", "-C", "--cwd", "-t", "--timeout", "--reasoning-effort", "--api-key":
 			if i+1 >= len(normalized) {
 				return Request{}, fmt.Errorf("%s requires a value", arg)
 			}
@@ -72,6 +73,8 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 				}
 			case "--reasoning-effort":
 				req.ReasoningEffort = value
+			case "--api-key":
+				req.APIKey = value
 			}
 		default:
 			if strings.HasPrefix(arg, "-") && arg != "-" {

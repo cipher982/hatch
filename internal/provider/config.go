@@ -14,6 +14,7 @@ type Request struct {
 	Prompt          string
 	CWD             string
 	ReasoningEffort string
+	APIKey          string
 }
 
 type Invocation struct {
@@ -64,12 +65,20 @@ func Build(req Request) (Invocation, error) {
 			argv = append(argv, "--variant", req.ReasoningEffort)
 		}
 		argv = append(argv, prompt)
-		return Invocation{
-			Argv: argv,
+		invocation := Invocation{
+			Argv:   argv,
+			SetEnv: map[string]string{},
 			UnsetEnv: []string{
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "OPENAI_API_KEY", "CODEX_API_KEY",
 			},
-		}, nil
+		}
+		if strings.HasPrefix(req.Model, "openai/") && req.APIKey != "" {
+			invocation.SetEnv["OPENAI_API_KEY"] = req.APIKey
+		}
+		if strings.HasPrefix(req.Model, "openrouter/") && req.APIKey != "" {
+			invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
+		}
+		return invocation, nil
 	case "gemini":
 		model := req.Model
 		if model == "" {

@@ -1,0 +1,143 @@
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/cipher982/hatch/internal/provider"
+	runner "github.com/cipher982/hatch/internal/run"
+)
+
+var Version = "0.1.0-go-dev"
+var Commit = "unknown"
+
+func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bool) int {
+	request, err := Parse(args, stdoutTTY)
+	if err != nil {
+		return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, err)
+	}
+	if request.Help {
+		fmt.Fprint(stdout, Help)
+		return 0
+	}
+	if request.Version {
+		fmt.Fprintf(stdout, "hatch %s (%s)\n", Version, Commit)
+		return 0
+	}
+	if request.Backend == "" {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("No default model is configured; choose an explicit provider"))
+	}
+	prompt, err := readPrompt(request.PromptArgs, stdin)
+	if err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
+	apiKey := request.APIKey
+	if apiKey == "" {
+		if strings.HasPrefix(request.Model, "openrouter/") {
+			apiKey = strings.TrimSpace(os.Getenv("OPENROUTER_API_KEY"))
+		} else if strings.HasPrefix(request.Model, "openai/") {
+			apiKey = strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+		}
+	}
+	if strings.HasPrefix(request.Model, "openrouter/") && apiKey == "" {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENROUTER_API_KEY not set and no credential helper is configured"))
+	}
+	if strings.HasPrefix(request.Model, "openai/") && apiKey == "" {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENAI_API_KEY not set and no credential helper is configured"))
+	}
+	invocation, err := provider.Build(provider.Request{
+		Backend: request.Backend, Model: request.Model, Prompt: prompt, CWD: request.CWD,
+		ReasoningEffort: request.ReasoningEffort, APIKey: apiKey,
+	})
+	if err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
+	root, err := runner.DefaultRoot()
+	if err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
+	surface, providerName := identity(request.Backend, request.Model)
+	credentialNames := []string{}
+	if strings.HasPrefix(request.Model, "openrouter/") {
+		credentialNames = append(credentialNames, "OPENROUTER_API_KEY")
+	} else if strings.HasPrefix(request.Model, "openai/") {
+		credentialNames = append(credentialNames, "OPENAI_API_KEY")
+	}
+	coordinator := runner.NewCoordinator(runner.NewStore(root))
+	result := coordinator.Execute(runner.Request{
+		Surface: surface, Provider: providerName, Model: request.Model, CWD: request.CWD,
+		Prompt: prompt, Timeout: time.Duration(request.TimeoutSeconds) * time.Second,
+		Invocation: invocation, CredentialNames: credentialNames,
+	})
+	if request.JSON {
+		encoder := json.NewEncoder(stdout)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(result); err != nil {
+			fmt.Fprintf(stderr, "Error: encode result: %v\n", err)
+			return 1
+		}
+	} else if result.OK {
+		fmt.Fprintln(stdout, strings.TrimRight(result.Output, "\n"))
+	} else if result.Error != nil {
+		fmt.Fprintf(stderr, "Error: %s\n", strings.TrimRight(*result.Error, "\n"))
+	}
+	return result.CLIExitCode()
+}
+
+func readPrompt(args []string, input io.Reader) (string, error) {
+	if len(args) == 0 || (len(args) == 1 && args[0] == "-") {
+		data, err := io.ReadAll(input)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(string(data)) == "" {
+			return "", fmt.Errorf("Empty prompt")
+		}
+		return string(data), nil
+	}
+	return strings.Join(args, " "), nil
+}
+
+func renderConfigError(jsonOutput bool, stdout, stderr io.Writer, err error) int {
+	if jsonOutput {
+		_ = json.NewEncoder(stdout).Encode(map[string]any{
+			"ok": false, "status": "config_error", "output": "", "exit_code": 4,
+			"duration_ms": 0, "error": err.Error(), "stderr": nil,
+		})
+	} else {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+	}
+	return 4
+}
+
+func identity(backend, model string) (string, string) {
+	switch backend {
+	case "claude":
+		return "claude." + model, "anthropic"
+	case "cursor":
+		return "cursor.grok", "cursor"
+	case "gemini":
+		return "gemini.raw", "google"
+	case "opencode":
+		if strings.HasPrefix(model, "openrouter/") {
+			return "openrouter." + strings.TrimPrefix(model[strings.LastIndex(model, "/"):], "/"), "openrouter"
+		}
+		if strings.HasPrefix(model, "openai/") {
+			return "codex." + strings.TrimPrefix(model, "openai/gpt-5.6-"), "openai"
+		}
+	}
+	return backend + ".raw", "unknown"
+}
+
+const Help = `usage: hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
+       hatch codex <sol|terra|luna> [OPTIONS] "prompt"
+       hatch cursor grok [OPTIONS] "prompt"
+       hatch openrouter <deepseek-v4-pro|kimi-k3> [OPTIONS] "prompt"
+       hatch expert [OPTIONS] "prompt"
+
+One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls
+`
