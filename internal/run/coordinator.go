@@ -19,6 +19,8 @@ type Coordinator struct {
 	Now   func() time.Time
 }
 
+const publicCaptureLimit = 32 << 20
+
 type Request struct {
 	Surface         string
 	Provider        string
@@ -86,8 +88,9 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	if req.Invocation.Stdin != nil {
 		cmd.Stdin = bytes.NewReader(req.Invocation.Stdin)
 	}
-	var stdout, stderr bytes.Buffer
-	stdoutCapture := &captureWriter{memory: &stdout, sink: stdoutFile}
+	stdout := newBoundedCapture(publicCaptureLimit)
+	stderr := newBoundedCapture(publicCaptureLimit)
+	stdoutCapture := &captureWriter{memory: stdout, sink: stdoutFile}
 	if req.Progress != nil && req.Invocation.Adapter != "" && req.Invocation.Adapter != "raw" {
 		progress := provider.NewProgressParser(req.Invocation.Adapter, req.ProgressLabel)
 		stdoutCapture.observeLine = func(line []byte) {
@@ -96,7 +99,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			}
 		}
 	}
-	stderrCapture := &captureWriter{memory: &stderr, sink: stderrFile}
+	stderrCapture := &captureWriter{memory: stderr, sink: stderrFile}
 	cmd.Stdout = stdoutCapture
 	cmd.Stderr = stderrCapture
 
@@ -155,6 +158,11 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 
 	interpretation := provider.Interpret(req.Invocation.Adapter, stdout.Bytes(), stderr.Bytes())
+	if stdout.Overflowed() {
+		interpretation.Output = nil
+		interpretation.Error = fmt.Sprintf("provider stdout exceeded the %d MiB public interpretation limit; full raw evidence is retained in the run artifact", publicCaptureLimit>>20)
+		interpretation.TerminalMarker = "not_applicable"
+	}
 	for _, warning := range interpretation.Warnings {
 		warnings = append(warnings, Warning{Code: warning.Code, Message: warning.Message})
 	}
@@ -344,12 +352,39 @@ func shellJoin(argv []string) string {
 }
 
 type captureWriter struct {
-	memory      *bytes.Buffer
+	memory      io.Writer
 	sink        io.Writer
 	sinkErr     error
 	observeLine func([]byte)
 	pending     []byte
 }
+
+type boundedCapture struct {
+	buffer   bytes.Buffer
+	limit    int
+	overflow bool
+}
+
+func newBoundedCapture(limit int) *boundedCapture { return &boundedCapture{limit: limit} }
+
+func (b *boundedCapture) Write(data []byte) (int, error) {
+	remaining := b.limit - b.buffer.Len()
+	if remaining > 0 {
+		keep := len(data)
+		if keep > remaining {
+			keep = remaining
+		}
+		_, _ = b.buffer.Write(data[:keep])
+	}
+	if len(data) > remaining {
+		b.overflow = true
+	}
+	return len(data), nil
+}
+
+func (b *boundedCapture) Bytes() []byte    { return b.buffer.Bytes() }
+func (b *boundedCapture) String() string   { return b.buffer.String() }
+func (b *boundedCapture) Overflowed() bool { return b.overflow }
 
 func (w *captureWriter) Write(data []byte) (int, error) {
 	_, _ = w.memory.Write(data)
@@ -361,6 +396,11 @@ func (w *captureWriter) Write(data []byte) (int, error) {
 		}
 	}
 	if w.observeLine != nil {
+		if len(w.pending)+len(data) > publicCaptureLimit {
+			w.pending = nil
+			w.observeLine = nil
+			return len(data), nil
+		}
 		w.pending = append(w.pending, data...)
 		for {
 			index := bytes.IndexByte(w.pending, '\n')

@@ -408,6 +408,24 @@ func TestCoordinatorPreservesInvalidUTF8Evidence(t *testing.T) {
 	}
 }
 
+func TestCoordinatorBoundsPublicMemoryWhilePreservingLargeRawEvidence(t *testing.T) {
+	fake := buildTestProvider(t)
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 10 * time.Second,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "large_output"}},
+	})
+	if result.OK || result.Error == nil || !strings.Contains(*result.Error, "public interpretation limit") || result.ArtifactPath == nil {
+		t.Fatalf("result=%#v", result)
+	}
+	info, err := os.Stat(filepath.Join(*result.ArtifactPath, "stdout.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Size() != 34*1024*1024 {
+		t.Fatalf("raw evidence size=%d", info.Size())
+	}
+}
+
 func TestCoordinatorRedactsPromptAndCredentialValues(t *testing.T) {
 	fake := buildTestProvider(t)
 	secret := "sk-secret-never-persist"

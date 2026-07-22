@@ -125,6 +125,14 @@ func main() {
 		time.Sleep(10 * time.Second)
 	case "invalid_utf8":
 		_, _ = os.Stdout.Write([]byte{'o', 'k', ':', 0xff, 0xfe, '\n'})
+	case "large_output":
+		chunk := make([]byte, 1024*1024)
+		for index := range chunk {
+			chunk[index] = 'x'
+		}
+		for range 34 {
+			_, _ = os.Stdout.Write(chunk)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "testprovider: unknown scenario %q\n", os.Getenv("HATCH_TEST_SCENARIO"))
 		os.Exit(96)
