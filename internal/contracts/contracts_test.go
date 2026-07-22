@@ -33,6 +33,48 @@ type ledger struct {
 	} `json:"tests"`
 }
 
+type traceability struct {
+	SchemaVersion int    `json:"schema_version"`
+	Specification string `json:"specification"`
+	Requirements  []struct {
+		ID          string   `json:"id"`
+		Requirement string   `json:"requirement"`
+		Proofs      []string `json:"proofs"`
+	} `json:"requirements"`
+}
+
+func TestContractV1Traceability(t *testing.T) {
+	var trace traceability
+	readJSON(t, filepath.Join(repoRoot(t), "testdata", "contracts", "v1-traceability.json"), &trace)
+	if trace.SchemaVersion != 1 || trace.Specification != "docs/durable-run-contract.md" {
+		t.Fatalf("invalid traceability identity: %#v", trace)
+	}
+	seen := map[string]bool{}
+	for _, requirement := range trace.Requirements {
+		if requirement.ID == "" || requirement.Requirement == "" || seen[requirement.ID] {
+			t.Fatalf("empty or duplicate requirement %q", requirement.ID)
+		}
+		seen[requirement.ID] = true
+		if len(requirement.Proofs) == 0 {
+			t.Errorf("%s has no executable proof", requirement.ID)
+		}
+		for _, proof := range requirement.Proofs {
+			if !goProofExists(t, proof) {
+				t.Errorf("%s names non-executable proof %q", requirement.ID, proof)
+			}
+		}
+	}
+	for _, prefix := range []string{"identity.", "state.", "schema.", "storage.", "security.", "provider.", "failure.", "inspection.", "entrypoint.", "compatibility.", "release."} {
+		found := false
+		for id := range seen {
+			found = found || strings.HasPrefix(id, prefix)
+		}
+		if !found {
+			t.Errorf("traceability omits requirement family %s", prefix)
+		}
+	}
+}
+
 func TestContractWarningCodesRemainV1(t *testing.T) {
 	allowed := map[string]bool{
 		"capture_persistence_failed": true,

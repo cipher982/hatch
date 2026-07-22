@@ -2,6 +2,7 @@ package run
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -22,7 +23,9 @@ type Coordinator struct {
 const publicCaptureLimit = 32 << 20
 
 type Request struct {
+	Context         context.Context
 	Surface         string
+	Backend         string
 	Provider        string
 	Model           string
 	CWD             string
@@ -41,12 +44,16 @@ func NewCoordinator(store RunStore) Coordinator {
 
 func (c Coordinator) Execute(req Request) PublicResult {
 	started := c.Now()
+	ctx := req.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	redacted, err := validatedRedactedArgv(req.Invocation)
 	if err != nil {
 		return failedResult(-3, started, c.Now(), err.Error(), nil)
 	}
 	artifact, err := c.Store.Prepare(PreparedRun{
-		Surface: req.Surface, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
+		Surface: req.Surface, Backend: req.Backend, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
 		Request: req.Prompt, RedactedArgv: redacted, CredentialNames: req.CredentialNames,
 		StructuredStdout: req.Invocation.StreamFormat == "jsonl",
 	})
@@ -82,6 +89,11 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		_ = stdoutFile.Close()
 		_ = stderrFile.Close()
 		return c.finalizePrelaunchFailure(artifact, started, -2, OutcomeLaunch, message, nil)
+	}
+	if err := ctx.Err(); err != nil {
+		_ = stdoutFile.Close()
+		_ = stderrFile.Close()
+		return c.finalizePrelaunchFailure(artifact, started, -4, OutcomeCancelled, "Agent cancelled before provider launch", nil)
 	}
 	cmd := exec.Command(req.Invocation.Argv[0], req.Invocation.Argv[1:]...)
 	configureProcess(cmd)
@@ -120,6 +132,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	go func() { waited <- cmd.Wait() }()
 	var waitErr error
 	timedOut := false
+	cancelled := false
 	if req.Timeout > 0 {
 		timer := time.NewTimer(req.Timeout)
 		select {
@@ -129,13 +142,31 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			timedOut = true
 			_ = killProcessGroup(cmd)
 			waitErr = <-waited
-			artifact.Manifest.Process.TimeoutCleanup = &TimeoutCleanup{
-				Signal: "SIGKILL", WaitBounded: true, SurvivorState: "unknown",
-				PipeClosureForced: errors.Is(waitErr, exec.ErrWaitDelay),
-			}
+		case <-ctx.Done():
+			timer.Stop()
+			cancelled = true
+			_ = killProcessGroup(cmd)
+			waitErr = <-waited
 		}
 	} else {
-		waitErr = <-waited
+		select {
+		case waitErr = <-waited:
+		case <-ctx.Done():
+			cancelled = true
+			_ = killProcessGroup(cmd)
+			waitErr = <-waited
+		}
+	}
+	if timedOut || cancelled {
+		cleanup := &TimeoutCleanup{
+			Signal: "SIGKILL", WaitBounded: true, SurvivorState: "unknown",
+			PipeClosureForced: errors.Is(waitErr, exec.ErrWaitDelay),
+		}
+		if timedOut {
+			artifact.Manifest.Process.TimeoutCleanup = cleanup
+		} else {
+			artifact.Manifest.Process.CancelCleanup = cleanup
+		}
 	}
 	for _, capture := range []*captureWriter{stdoutCapture, stderrCapture} {
 		capture.Flush()
@@ -158,6 +189,8 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	exitCode := processExitCode(waitErr)
 	if timedOut {
 		exitCode = -1
+	} else if cancelled {
+		exitCode = -4
 	}
 
 	interpretation := provider.Interpret(req.Invocation.Adapter, stdout.Bytes(), stderr.Bytes())
@@ -167,7 +200,11 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		interpretation.TerminalMarker = "not_applicable"
 	}
 	for _, warning := range interpretation.Warnings {
-		warnings = append(warnings, Warning{Code: warning.Code, Message: warning.Message})
+		evidenceFile := artifact.Manifest.Capture.StdoutFile
+		if warning.Code == "stderr_error_recovered" {
+			evidenceFile = artifact.Manifest.Capture.StderrFile
+		}
+		warnings = append(warnings, Warning{Code: warning.Code, Message: warning.Message, EvidenceFile: &evidenceFile})
 	}
 	output := interpretation.Output
 	resultFile, resultWriteErr := c.Store.WriteResult(artifact, output)
@@ -184,13 +221,18 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 
 	outcome := OutcomeSucceeded
-	ok := exitCode == 0 && !timedOut && interpretation.Error == "" && interpretation.TerminalMarker != "not_observed" && len(output) > 0
+	ok := exitCode == 0 && !timedOut && !cancelled && interpretation.Error == "" && interpretation.TerminalMarker != "not_observed" && len(output) > 0
 	status := "ok"
 	var resultErr *string
 	if timedOut {
 		outcome = OutcomeTimedOut
 		status = "timeout"
 		message := fmt.Sprintf("Agent timed out after %ds", int(req.Timeout.Seconds()))
+		resultErr = &message
+	} else if cancelled {
+		outcome = OutcomeCancelled
+		status = "cancelled"
+		message := "Agent cancelled"
 		resultErr = &message
 	} else if exitCode != 0 {
 		outcome = OutcomeFailed
@@ -241,23 +283,25 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			if req.Invocation.ProviderVersion != "" {
 				state.ProviderVersion = &req.Invocation.ProviderVersion
 			}
-			if state.NativeID != nil {
+			if state.NativeID != nil && req.Invocation.ProviderVersion != "" {
 				dataEnv := "XDG_DATA_HOME=" + filepath.Join(artifact.Path, "provider", "opencode", "data")
 				stateEnv := "XDG_STATE_HOME=" + filepath.Join(artifact.Path, "provider", "opencode", "state")
 				state.InspectHint = &OperatorHint{
 					Argv:         []string{"env", dataEnv, stateEnv, "opencode", "export", *state.NativeID},
 					VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion,
 				}
-				state.Capabilities["inspect"] = versionBoundCapability(req.Invocation.ProviderVersion)
-				if timedOut && req.Invocation.ProviderVersion != "" {
+				state.Capabilities["inspect"] = "supported_same_version"
+				if timedOut {
 					argv := []string{"env", dataEnv, stateEnv, "opencode", "run", "--dangerously-skip-permissions"}
 					if req.CWD != "" {
 						argv = append(argv, "--dir", req.CWD)
 					}
 					argv = append(argv, "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model, "--session", *state.NativeID, "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.")
 					state.RecoveryHint = &OperatorHint{Argv: argv, VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion, RequiresApprovalBypass: true}
-					state.Capabilities["recovery_hint"] = "supported"
+					state.Capabilities["recovery_hint"] = "best_effort_same_version"
 				}
+			} else if state.NativeID != nil {
+				state.Capabilities["inspect"] = "unsupported"
 			}
 		} else {
 			state.Retention = "unavailable"
@@ -316,6 +360,11 @@ func (c Coordinator) finalizePrelaunchFailure(artifact *Artifact, started time.T
 	c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 	artifactPath := artifact.Path
 	result := failedResult(exitCode, started, c.Now(), message, &artifactPath)
+	if outcome == OutcomeCancelled {
+		result.Status = "cancelled"
+	} else if outcome == OutcomeTimedOut {
+		result.Status = "timeout"
+	}
 	result.Run = &artifact.Manifest
 	if artifact.Manifest.Capture.State != "durable" {
 		result.ArtifactPath = nil
@@ -335,13 +384,6 @@ func (c Coordinator) finalizePrelaunchFailure(artifact *Artifact, started time.T
 		_ = c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 	}
 	return result
-}
-
-func versionBoundCapability(version string) string {
-	if version == "" {
-		return "best_effort"
-	}
-	return "supported"
 }
 
 func shellJoin(argv []string) string {

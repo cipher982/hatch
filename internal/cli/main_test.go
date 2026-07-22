@@ -40,12 +40,16 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 			RunID     string `json:"run_id"`
 			Lifecycle string `json:"lifecycle"`
 			Outcome   string `json:"outcome"`
+			Surface   string `json:"surface"`
+			Backend   string `json:"backend"`
+			Provider  string `json:"provider"`
 		} `json:"run"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || result.Output != "fake provider output\n" || result.Run.Lifecycle != "terminal" || result.Run.Outcome != "succeeded" {
+	if !result.OK || result.Output != "fake provider output\n" || result.Run.Lifecycle != "terminal" || result.Run.Outcome != "succeeded" ||
+		result.Run.Surface != "gemini.raw" || result.Run.Backend != "gemini" || result.Run.Provider != "google" {
 		t.Fatalf("unexpected result: %#v", result)
 	}
 	if result.ArtifactPath == "" || result.Run.RunID == "" {
@@ -96,7 +100,9 @@ func TestMainExpertJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result["ok"] != true || result["output"] != "expert answer" || result["artifact_path"] == nil || result["run"] == nil {
+	run, _ := result["run"].(map[string]any)
+	if result["ok"] != true || result["output"] != "expert answer" || result["artifact_path"] == nil ||
+		run["surface"] != "expert" || run["backend"] != "responses" || run["provider"] != "openai" {
 		t.Fatalf("result = %#v", result)
 	}
 }

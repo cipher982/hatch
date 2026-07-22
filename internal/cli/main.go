@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,8 +22,12 @@ var BuildGoVersion = ""
 var BuildTarget = ""
 
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bool) int {
+	return MainContext(context.Background(), args, stdin, stdout, stderr, stdoutTTY)
+}
+
+func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bool) int {
 	if len(args) > 0 && args[0] == "expert" {
-		return runExpert(args[1:], stdin, stdout, stderr)
+		return runExpert(ctx, args[1:], stdin, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "runs" {
 		return runRuns(args[1:], stdout, stderr)
@@ -130,7 +135,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 	}
 	coordinator := runner.NewCoordinator(runner.NewStore(root))
 	result := coordinator.Execute(runner.Request{
-		Surface: surface, Provider: providerName, Model: request.Model, CWD: request.CWD,
+		Context: ctx, Surface: surface, Backend: request.Backend, Provider: providerName, Model: request.Model, CWD: request.CWD,
 		Prompt: prompt, Timeout: time.Duration(request.TimeoutSeconds) * time.Second,
 		Invocation: invocation, CredentialNames: credentialNames, Automation: request.Automation,
 		ProgressLabel: progressLabel(surface), Progress: func(message string) { fmt.Fprintln(stderr, message) },

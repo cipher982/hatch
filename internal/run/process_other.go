@@ -14,3 +14,4 @@ func killProcessGroup(cmd *exec.Cmd) error {
 }
 
 func processStartIdentity(int) string { return "" }
+func processAlive(int) (bool, bool)   { return false, false }

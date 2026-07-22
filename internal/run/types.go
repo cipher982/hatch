@@ -1,6 +1,9 @@
 package run
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Lifecycle string
 type Outcome string
@@ -14,6 +17,7 @@ const (
 	OutcomeSucceededWarnings Outcome = "succeeded_with_warnings"
 	OutcomeFailed            Outcome = "failed"
 	OutcomeTimedOut          Outcome = "timed_out"
+	OutcomeCancelled         Outcome = "cancelled"
 	OutcomeLaunch            Outcome = "launch_failed"
 )
 
@@ -25,6 +29,7 @@ type Manifest struct {
 	Lifecycle     Lifecycle  `json:"lifecycle"`
 	Outcome       *Outcome   `json:"outcome"`
 	Surface       string     `json:"surface"`
+	Backend       string     `json:"backend"`
 	Provider      string     `json:"provider"`
 	Model         string     `json:"model"`
 	CWD           string     `json:"cwd"`
@@ -61,6 +66,7 @@ type Process struct {
 	ExitedAt       *time.Time      `json:"exited_at"`
 	ExitCode       *int            `json:"exit_code"`
 	TimeoutCleanup *TimeoutCleanup `json:"timeout_cleanup,omitempty"`
+	CancelCleanup  *TimeoutCleanup `json:"cancel_cleanup,omitempty"`
 }
 
 type TimeoutCleanup struct {
@@ -79,11 +85,12 @@ type Result struct {
 }
 
 type Capture struct {
-	State          string  `json:"state"`
-	ArtifactPath   string  `json:"artifact_path"`
-	EvidenceSHA256 *string `json:"evidence_sha256"`
-	StdoutFile     string  `json:"stdout_file"`
-	StderrFile     string  `json:"stderr_file"`
+	State                string  `json:"state"`
+	ArtifactPath         string  `json:"artifact_path"`
+	EvidenceManifestFile string  `json:"evidence_manifest_file"`
+	EvidenceSHA256       *string `json:"evidence_sha256"`
+	StdoutFile           string  `json:"stdout_file"`
+	StderrFile           string  `json:"stderr_file"`
 }
 
 type State struct {
@@ -92,9 +99,30 @@ type State struct {
 	NativeIDState   string            `json:"native_id_state"`
 	Capabilities    map[string]string `json:"capabilities"`
 	SnapshotPath    *string           `json:"snapshot_path"`
-	ProviderVersion *string           `json:"provider_version,omitempty"`
+	ProviderVersion *string           `json:"provider_tool_version,omitempty"`
 	InspectHint     *OperatorHint     `json:"inspect_hint,omitempty"`
 	RecoveryHint    *OperatorHint     `json:"recovery_hint,omitempty"`
+}
+
+// UnmarshalJSON accepts the brief Go-preview spelling so artifacts written
+// before the V1 field-name audit remain readable without rewriting them.
+func (s *State) UnmarshalJSON(data []byte) error {
+	type stateWire State
+	var current stateWire
+	if err := json.Unmarshal(data, &current); err != nil {
+		return err
+	}
+	if current.ProviderVersion == nil {
+		var legacy struct {
+			ProviderVersion *string `json:"provider_version"`
+		}
+		if err := json.Unmarshal(data, &legacy); err != nil {
+			return err
+		}
+		current.ProviderVersion = legacy.ProviderVersion
+	}
+	*s = State(current)
+	return nil
 }
 
 type OperatorHint struct {
@@ -138,6 +166,8 @@ func (r PublicResult) CLIExitCode() int {
 		return 2
 	case -2:
 		return 3
+	case -4:
+		return 130
 	default:
 		return 1
 	}

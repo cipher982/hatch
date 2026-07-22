@@ -1,18 +1,18 @@
 package run
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"time"
 )
 
 type HTTPRequest struct {
-	Surface, Provider, Model, CWD, Prompt string
-	Timeout                               time.Duration
-	CredentialNames                       []string
-	Progress                              func(string)
-	Execute                               func(context.Context, func([]byte) error) HTTPOutcome
+	Context                                        context.Context
+	Surface, Backend, Provider, Model, CWD, Prompt string
+	Timeout                                        time.Duration
+	CredentialNames                                []string
+	Progress                                       func(string)
+	Execute                                        func(context.Context, func([]byte) error) HTTPOutcome
 }
 
 type HTTPOutcome struct {
@@ -31,7 +31,7 @@ type HTTPOutcome struct {
 func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 	started := c.Now()
 	artifact, err := c.Store.Prepare(PreparedRun{
-		Surface: req.Surface, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
+		Surface: req.Surface, Backend: req.Backend, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
 		Request: req.Prompt, RedactedArgv: []string{"POST", "<responses-url>"}, CredentialNames: req.CredentialNames,
 		StructuredStdout: true, Execution: "http",
 	})
@@ -51,8 +51,10 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 		artifact.Manifest.Capture.State = "degraded"
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 	}
-	var stdout bytes.Buffer
-	capture := &captureWriter{memory: &stdout, sink: stdoutSink}
+	// Raw response snapshots are authoritative on disk. Keep only a bounded
+	// in-memory copy so a large or unexpectedly chatty HTTP provider cannot grow
+	// the coordinator without limit.
+	capture := &captureWriter{memory: newBoundedCapture(publicCaptureLimit), sink: stdoutSink}
 	record := func(snapshot []byte) error {
 		if len(snapshot) == 0 {
 			return nil
@@ -63,13 +65,17 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 		}
 		return nil
 	}
-	ctx := context.Background()
+	ctx := req.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	cancel := func() {}
 	if req.Timeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, req.Timeout)
 	}
 	defer cancel()
 	outcome := req.Execute(ctx, record)
+	cancelled := ctx.Err() == context.Canceled
 	if ctx.Err() == context.DeadlineExceeded {
 		outcome.TimedOut = true
 	}
@@ -100,13 +106,20 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: writeErr.Error()})
 	}
 	terminalOutcome, exitCode, status := OutcomeSucceeded, 0, "ok"
-	ok := outcome.Error == "" && !outcome.TimedOut && outcome.Output != ""
+	ok := outcome.Error == "" && !outcome.TimedOut && !cancelled && outcome.Output != ""
 	var resultErr *string
 	if outcome.TimedOut {
 		terminalOutcome, exitCode, status = OutcomeTimedOut, -1, "timeout"
 		message := outcome.Error
 		if message == "" {
 			message = fmt.Sprintf("HTTP execution timed out after %ds", int(req.Timeout.Seconds()))
+		}
+		resultErr = &message
+	} else if cancelled {
+		terminalOutcome, exitCode, status = OutcomeCancelled, -4, "cancelled"
+		message := outcome.Error
+		if message == "" {
+			message = "HTTP execution cancelled"
 		}
 		resultErr = &message
 	} else if outcome.Error != "" || outcome.Output == "" {

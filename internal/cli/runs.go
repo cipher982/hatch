@@ -65,7 +65,13 @@ func runRuns(args []string, stdout, stderr io.Writer) int {
 			if manifest.ProviderState.NativeID != nil {
 				fmt.Fprintf(stdout, "Native ID: %s\n", *manifest.ProviderState.NativeID)
 			}
-			fmt.Fprintf(stdout, "Files: %s, %s, %s\n", manifest.Invocation.RequestFile, manifest.Capture.StdoutFile, manifest.Capture.StderrFile)
+			if record.Observation != nil {
+				fmt.Fprintf(stdout, "Process observed: pid=%d suspected_orphan=%t\n", record.Observation.PID, record.Observation.SuspectedOrphan)
+			}
+			fmt.Fprintln(stdout, "Files:")
+			for _, name := range record.Files {
+				fmt.Fprintf(stdout, "  %s\n", name)
+			}
 		} else {
 			fmt.Fprintf(stdout, "Legacy record: %s\nPath: %s\n", record.Kind, record.Path)
 			encoded, _ := json.MarshalIndent(record.Legacy, "", "  ")

@@ -44,3 +44,14 @@ func processStartIdentity(pid int) string {
 	}
 	return "darwin-ps-lstart:" + strings.Join(strings.Fields(string(output)), " ")
 }
+
+func processAlive(pid int) (bool, bool) {
+	err := syscall.Kill(pid, 0)
+	if err == nil || err == syscall.EPERM {
+		return true, true
+	}
+	if err == syscall.ESRCH {
+		return false, true
+	}
+	return false, false
+}

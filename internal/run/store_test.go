@@ -2,11 +2,14 @@ package run
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -170,6 +173,23 @@ func TestStoreLifecycleAndEvidenceDigest(t *testing.T) {
 	if artifact.Manifest.Lifecycle != LifecycleTerminal || artifact.Manifest.Capture.EvidenceSHA256 == nil {
 		t.Fatalf("terminal manifest incomplete: %#v", artifact.Manifest)
 	}
+	manifestPath := filepath.Join(artifact.Path, artifact.Manifest.Capture.EvidenceManifestFile)
+	manifest, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertMode(t, manifestPath, 0o600)
+	lines := strings.Split(strings.TrimSuffix(string(manifest), "\n"), "\n")
+	if len(lines) != 4 || !strings.HasSuffix(lines[0], "  request.txt") ||
+		!strings.HasSuffix(lines[1], "  result.txt") ||
+		!strings.HasSuffix(lines[2], "  stderr.log") ||
+		!strings.HasSuffix(lines[3], "  stdout.log") {
+		t.Fatalf("evidence manifest is not the sorted closed set: %q", manifest)
+	}
+	digest := sha256.Sum256(manifest)
+	if got, want := *artifact.Manifest.Capture.EvidenceSHA256, fmt.Sprintf("%x", digest); got != want {
+		t.Fatalf("evidence digest = %s, want %s", got, want)
+	}
 }
 
 func TestStoreFailsBeforeLaunchWhenRootIsAFile(t *testing.T) {
@@ -209,7 +229,8 @@ func TestTerminalHashFailureDegradesCapture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CommitTerminal(artifact, OutcomeSucceeded, 0, Result{Output: "present", TerminalMarker: "not_applicable", OutputFile: &resultFile}, State{}, nil); err != nil {
+	state := State{Retention: "unknown", NativeIDState: "unknown", Capabilities: map[string]string{}}
+	if err := store.CommitTerminal(artifact, OutcomeSucceeded, 0, Result{Output: "present", TerminalMarker: "not_applicable", OutputFile: &resultFile}, state, nil); err != nil {
 		t.Fatal(err)
 	}
 	if artifact.Manifest.Capture.State != "degraded" || artifact.Manifest.Outcome == nil || *artifact.Manifest.Outcome != OutcomeSucceededWarnings || len(artifact.Manifest.Warnings) == 0 {

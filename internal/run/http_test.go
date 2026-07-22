@@ -42,6 +42,28 @@ func TestCoordinatorHTTPTimeoutPreservesRemoteIdentity(t *testing.T) {
 	}
 }
 
+func TestCoordinatorHTTPCancellationPreservesRemoteIdentity(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	coordinator := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs")))
+	resultChannel := make(chan PublicResult, 1)
+	go func() {
+		resultChannel <- coordinator.ExecuteHTTP(HTTPRequest{
+			Context: ctx, Surface: "expert", Backend: "responses", Provider: "openai", Prompt: "question", Timeout: time.Second,
+			Execute: func(ctx context.Context, record func([]byte) error) HTTPOutcome {
+				_ = record([]byte(`{"id":"resp_cancelled","status":"queued"}`))
+				cancel()
+				<-ctx.Done()
+				return HTTPOutcome{Error: "left running server-side", NativeID: "resp_cancelled", NativeIDState: "observed", Retention: "remote_provider", Attempts: 1, LastStatus: 200}
+			},
+		})
+	}()
+	result := <-resultChannel
+	if result.OK || result.Status != "cancelled" || result.ExitCode != -4 || result.CLIExitCode() != 130 || result.SessionID == nil || *result.SessionID != "resp_cancelled" ||
+		result.Run == nil || result.Run.Outcome == nil || *result.Run.Outcome != OutcomeCancelled {
+		t.Fatalf("cancelled HTTP result = %#v", result)
+	}
+}
+
 func TestHTTPStreamOpenFailureReturnsCanonicalRun(t *testing.T) {
 	store := unavailableStreamStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).ExecuteHTTP(HTTPRequest{

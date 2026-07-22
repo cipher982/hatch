@@ -280,6 +280,7 @@ Illustrative V1 shape:
   "capture": {
     "state": "durable",
     "artifact_path": "/home/me/.local/state/hatch/runs/hatch_01K0...",
+    "evidence_manifest_file": "evidence.sha256",
     "evidence_sha256": "...",
     "stdout_file": "stdout.jsonl",
     "stderr_file": "stderr.log"
@@ -356,6 +357,7 @@ Default root:
     stderr.log
     result.txt
     result.json
+    evidence.sha256     # sorted per-file hashes for the closed evidence set
     provider/
     archive-receipt.json
 ```
@@ -565,6 +567,7 @@ depend on Longhouse internals, private endpoints, or a running daemon.
 | Caller/wrapper disconnects | subprocess continues according to existing process ownership; artifact streams remain authoritative; caller can inspect by announced run ID |
 | Hatch is killed | raw files written so far remain; inspection reports the nonterminal record and process evidence without guessing an outcome |
 | Timeout | signal the recorded process group when safely established; preserve streams/state and survivor observations; terminal `timed_out` |
+| Caller cancellation or SIGINT/SIGTERM | signal the recorded process group when safely established; preserve streams/state; terminal `cancelled`; CLI exits 130 |
 | Nonzero exit | terminal `failed`; preserve exit code and both streams |
 | Structured provider error with no result | terminal `failed`; keep structured error plus raw evidence |
 | Intermediate provider error followed by final result | `succeeded_with_warnings`; result remains final |

@@ -2,6 +2,7 @@ package run
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -329,6 +330,11 @@ func TestCoordinatorStructuredFailureAndRecovery(t *testing.T) {
 				result.Run == nil || result.Run.Outcome == nil || *result.Run.Outcome != test.outcome || len(result.Run.Warnings) != test.warnings {
 				t.Fatalf("result = %#v", result)
 			}
+			for _, warning := range result.Run.Warnings {
+				if warning.Code != "capture_persistence_failed" && warning.EvidenceFile == nil {
+					t.Fatalf("warning lacks evidence provenance: %#v", warning)
+				}
+			}
 		})
 	}
 }
@@ -369,6 +375,34 @@ func TestCoordinatorTimeoutKillsProcessGroup(t *testing.T) {
 	}
 }
 
+func TestCoordinatorCancellationKillsProcessGroup(t *testing.T) {
+	fake := buildTestProvider(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(100*time.Millisecond, cancel)
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Context: ctx, Surface: "gemini.raw", Backend: "gemini", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang"}},
+	})
+	if result.OK || result.Status != "cancelled" || result.ExitCode != -4 || result.CLIExitCode() != 130 || result.Run == nil || result.Run.Outcome == nil ||
+		*result.Run.Outcome != OutcomeCancelled || result.Run.Process == nil || result.Run.Process.CancelCleanup == nil ||
+		!result.Run.Process.CancelCleanup.WaitBounded {
+		t.Fatalf("cancelled result = %#v", result)
+	}
+}
+
+func TestCoordinatorCancelledBeforeProviderLaunch(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Context: ctx, Surface: "gemini.raw", Backend: "gemini", Provider: "google", Prompt: "prompt",
+		Invocation: provider.Invocation{Argv: []string{filepath.Join(t.TempDir(), "provider-must-not-start")}},
+	})
+	if result.OK || result.Status != "cancelled" || result.CLIExitCode() != 130 || result.Run == nil || result.Run.Outcome == nil ||
+		*result.Run.Outcome != OutcomeCancelled || result.Run.Process != nil {
+		t.Fatalf("prelaunch cancellation = %#v", result)
+	}
+}
+
 func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 	fake := buildTestProvider(t)
 	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/moonshotai/kimi-k3", Prompt: "prompt", APIKey: "fake"})
@@ -385,13 +419,34 @@ func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 	if result.Status != "timeout" || result.Run == nil || result.Run.ProviderState.RecoveryHint == nil ||
 		result.Run.ProviderState.InspectHint == nil || result.Run.ProviderState.ProviderVersion == nil ||
 		*result.Run.ProviderState.ProviderVersion != "opencode 1.2.3" || result.ResumeCommand == nil ||
-		!result.Run.ProviderState.RecoveryHint.VersionBound || !result.Run.ProviderState.RecoveryHint.RequiresApprovalBypass {
+		!result.Run.ProviderState.RecoveryHint.VersionBound || !result.Run.ProviderState.RecoveryHint.RequiresApprovalBypass ||
+		result.Run.ProviderState.Capabilities["inspect"] != "supported_same_version" ||
+		result.Run.ProviderState.Capabilities["recovery_hint"] != "best_effort_same_version" {
 		t.Fatalf("result = %#v", result)
 	}
 	for _, arg := range result.Run.ProviderState.RecoveryHint.Argv {
 		if strings.Contains(arg, "fake") || strings.Contains(arg, "KEY") {
 			t.Fatalf("credential-like recovery arg: %q", arg)
 		}
+	}
+}
+
+func TestOpenCodeDoesNotClaimInspectionWithoutToolVersion(t *testing.T) {
+	fake := buildTestProvider(t)
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/moonshotai/kimi-k3", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	invocation.Argv[0] = fake
+	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_opencode"
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "openrouter.kimi-k3", Backend: "opencode", Provider: "openrouter", Model: "openrouter/moonshotai/kimi-k3", Prompt: "prompt",
+		Timeout: time.Second, Invocation: invocation,
+	})
+	if !result.OK || result.Run == nil || result.Run.ProviderState.SnapshotPath == nil ||
+		result.Run.ProviderState.InspectHint != nil || result.Run.ProviderState.RecoveryHint != nil ||
+		result.Run.ProviderState.Capabilities["inspect"] != "unsupported" {
+		t.Fatalf("unverified provider capability = %#v", result.Run)
 	}
 }
 

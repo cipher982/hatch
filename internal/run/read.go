@@ -9,16 +9,27 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 const maxMetadataBytes = 4 << 20
 
 type Record struct {
-	Kind     string         `json:"kind"`
-	Path     string         `json:"path"`
-	Manifest *Manifest      `json:"manifest,omitempty"`
-	Legacy   map[string]any `json:"legacy,omitempty"`
-	Raw      map[string]any `json:"-"`
+	Kind        string                 `json:"kind"`
+	Path        string                 `json:"path"`
+	Files       []string               `json:"files,omitempty"`
+	Observation *InspectionObservation `json:"observation,omitempty"`
+	Manifest    *Manifest              `json:"manifest,omitempty"`
+	Legacy      map[string]any         `json:"legacy,omitempty"`
+	Raw         map[string]any         `json:"-"`
+}
+
+type InspectionObservation struct {
+	ObservedAt         time.Time `json:"observed_at"`
+	PID                int       `json:"pid"`
+	ProcessAlive       *bool     `json:"process_alive"`
+	StartIdentityMatch *bool     `json:"start_identity_match"`
+	SuspectedOrphan    bool      `json:"suspected_orphan"`
 }
 
 type Summary struct {
@@ -139,7 +150,73 @@ func ReadRecord(path string) (Record, error) {
 		return Record{}, fmt.Errorf("unsupported manifest schema version %d", manifest.SchemaVersion)
 	}
 	normalizeUnknownEnums(&manifest)
-	return Record{Kind: "hatch_run", Path: path, Manifest: &manifest, Raw: raw}, nil
+	files, err := artifactFiles(path)
+	if err != nil {
+		return Record{}, err
+	}
+	return Record{
+		Kind: "hatch_run", Path: path, Files: files,
+		Observation: inspectNonterminalProcess(&manifest), Manifest: &manifest, Raw: raw,
+	}, nil
+}
+
+func artifactFiles(root string) ([]string, error) {
+	files := []string{}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, filepath.ToSlash(relative))
+		return nil
+	})
+	sort.Strings(files)
+	return files, err
+}
+
+func inspectNonterminalProcess(manifest *Manifest) *InspectionObservation {
+	if manifest.Lifecycle == LifecycleTerminal || manifest.Process == nil || manifest.Process.PID <= 0 {
+		return nil
+	}
+	alive, known := processAlive(manifest.Process.PID)
+	observation := &InspectionObservation{ObservedAt: time.Now().UTC(), PID: manifest.Process.PID}
+	if known {
+		observation.ProcessAlive = &alive
+		observation.SuspectedOrphan = !alive
+	}
+	if manifest.Process.StartIdentity != nil {
+		current := processStartIdentity(manifest.Process.PID)
+		if current != "" {
+			matches := current == *manifest.Process.StartIdentity
+			observation.StartIdentityMatch = &matches
+			if !matches {
+				observation.SuspectedOrphan = true
+			}
+		}
+	}
+	return observation
 }
 
 func normalizeUnknownEnums(manifest *Manifest) {

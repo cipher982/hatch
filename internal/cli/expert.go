@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,7 +25,7 @@ type expertRequest struct {
 	Help            bool
 }
 
-func runExpert(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func runExpert(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	request, err := parseExpert(args)
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
@@ -50,7 +51,7 @@ func runExpert(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "[hatch] expert call started: model=%s reasoning=%s web_search=%t\n", request.Model, request.ReasoningEffort, request.WebSearch)
 	result := expert.Run(expert.Options{
-		Prompt: prompt, Model: request.Model, ReasoningEffort: request.ReasoningEffort, WebSearch: request.WebSearch,
+		Context: ctx, Prompt: prompt, Model: request.Model, ReasoningEffort: request.ReasoningEffort, WebSearch: request.WebSearch,
 		Timeout: time.Duration(request.TimeoutSeconds) * time.Second, APIKey: apiKey,
 		BaseURL: strings.TrimSpace(os.Getenv("HATCH_EXPERT_RESPONSES_URL")), Store: runner.NewStore(root),
 		Progress: func(message string) { fmt.Fprintln(stderr, message) },

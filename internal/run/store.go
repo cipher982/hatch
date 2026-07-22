@@ -44,11 +44,11 @@ type Artifact struct {
 }
 
 type PreparedRun struct {
-	Surface, Provider, Model, CWD, Request string
-	Execution                              string
-	RedactedArgv                           []string
-	CredentialNames                        []string
-	StructuredStdout                       bool
+	Surface, Backend, Provider, Model, CWD, Request string
+	Execution                                       string
+	RedactedArgv                                    []string
+	CredentialNames                                 []string
+	StructuredStdout                                bool
 }
 
 func DefaultRoot() (string, error) {
@@ -96,14 +96,17 @@ func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
 	}
 	manifest := Manifest{
 		SchemaVersion: 1, RunID: runID, CreatedAt: now, UpdatedAt: now,
-		Lifecycle: LifecyclePrepared, Surface: spec.Surface, Provider: spec.Provider,
-		Model: spec.Model, CWD: spec.CWD, Execution: executionOrDefault(spec.Execution),
+		Lifecycle: LifecyclePrepared, Surface: valueOrUnknown(spec.Surface), Backend: valueOrUnknown(spec.Backend), Provider: valueOrUnknown(spec.Provider),
+		Model: valueOrUnknown(spec.Model), CWD: spec.CWD, Execution: executionOrDefault(spec.Execution),
 		Invocation: Invocation{
 			RequestFile: "request.txt", RequestSHA256: hex.EncodeToString(digest[:]),
 			RedactedArgv: append([]string(nil), spec.RedactedArgv...), CredentialEnvNames: append([]string(nil), spec.CredentialNames...),
 		},
-		Result:        Result{Output: "absent", TerminalMarker: "not_observed"},
-		Capture:       Capture{State: "durable", ArtifactPath: path, StdoutFile: stdoutFile, StderrFile: "stderr.log"},
+		Result: Result{Output: "absent", TerminalMarker: "not_observed"},
+		Capture: Capture{
+			State: "durable", ArtifactPath: path, EvidenceManifestFile: "evidence.sha256",
+			StdoutFile: stdoutFile, StderrFile: "stderr.log",
+		},
 		ProviderState: State{Retention: "unknown", NativeIDState: "unknown", Capabilities: map[string]string{}},
 		Archive:       Archive{State: "not_requested"}, Warnings: []Warning{},
 	}
@@ -112,6 +115,13 @@ func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
 		return nil, err
 	}
 	return artifact, nil
+}
+
+func valueOrUnknown(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "unknown"
+	}
+	return value
 }
 
 func executionOrDefault(value string) string {
@@ -199,7 +209,7 @@ func (s Store) StageTerminal(artifact *Artifact, outcome Outcome, exitCode int, 
 			}
 		}
 	}
-	digest, err := evidenceDigest(artifact.Path, evidence)
+	digest, err := persistEvidenceManifest(artifact.Path, artifact.Manifest.Capture.EvidenceManifestFile, evidence)
 	if err == nil {
 		artifact.Manifest.Capture.EvidenceSHA256 = &digest
 	} else {
@@ -241,6 +251,9 @@ func (s Store) MarkCaptureDegraded(artifact *Artifact, warning Warning) error {
 }
 
 func (s Store) writeManifest(artifact *Artifact) error {
+	if err := ValidateManifest(artifact.Manifest); err != nil {
+		return fmt.Errorf("validate manifest: %w", err)
+	}
 	data, err := json.MarshalIndent(artifact.Manifest, "", "  ")
 	if err != nil {
 		return err
@@ -377,29 +390,54 @@ func atomicPrivateWithOps(path string, data []byte, ops atomicFileOps) error {
 }
 
 func evidenceDigest(root string, names []string) (string, error) {
+	contents, err := evidenceManifest(root, names)
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256(contents)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func persistEvidenceManifest(root, manifestName string, names []string) (string, error) {
+	contents, err := evidenceManifest(root, names)
+	if err != nil {
+		return "", err
+	}
+	path, err := evidencePath(root, manifestName)
+	if err != nil {
+		return "", err
+	}
+	if err := atomicPrivate(path, contents); err != nil {
+		return "", fmt.Errorf("persist evidence manifest: %w", err)
+	}
+	digest := sha256.Sum256(contents)
+	return hex.EncodeToString(digest[:]), nil
+}
+
+func evidenceManifest(root string, names []string) ([]byte, error) {
 	sort.Strings(names)
-	hash := sha256.New()
+	var manifest strings.Builder
 	for _, name := range names {
 		path, err := evidencePath(root, name)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		file, err := os.Open(path)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		fileHash := sha256.New()
 		_, copyErr := io.Copy(fileHash, file)
 		closeErr := file.Close()
 		if copyErr != nil {
-			return "", copyErr
+			return nil, copyErr
 		}
 		if closeErr != nil {
-			return "", closeErr
+			return nil, closeErr
 		}
-		fmt.Fprintf(hash, "%s  %s\n", hex.EncodeToString(fileHash.Sum(nil)), filepath.ToSlash(name))
+		fmt.Fprintf(&manifest, "%s  %s\n", hex.EncodeToString(fileHash.Sum(nil)), filepath.ToSlash(name))
 	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	return []byte(manifest.String()), nil
 }
 
 func evidencePath(root, name string) (string, error) {

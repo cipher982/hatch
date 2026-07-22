@@ -43,7 +43,8 @@ func TestListAndInspectCurrentAndLegacyRecords(t *testing.T) {
 		t.Fatalf("summaries = %#v, %v", summaries, err)
 	}
 	current, err := InspectRecord(root, expertCache, "hatch_current")
-	if err != nil || current.Manifest == nil || current.Manifest.RunID != "hatch_current" {
+	if err != nil || current.Manifest == nil || current.Manifest.RunID != "hatch_current" ||
+		!contains(current.Files, "evidence.sha256") || !contains(current.Files, "manifest.json") {
 		t.Fatalf("current = %#v, %v", current, err)
 	}
 	legacy, err := InspectRecord(root, expertCache, "legacy_run")
@@ -54,6 +55,15 @@ func TestListAndInspectCurrentAndLegacyRecords(t *testing.T) {
 	if err != nil || expert.Kind != "legacy_expert" {
 		t.Fatalf("expert = %#v, %v", expert, err)
 	}
+}
+
+func contains(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
 }
 
 func TestReadRecordRetainsRawAndNormalizesUnknownEnums(t *testing.T) {
@@ -69,6 +79,22 @@ func TestReadRecordRetainsRawAndNormalizesUnknownEnums(t *testing.T) {
 	}
 	if record.Manifest.Lifecycle != "unknown" || record.Manifest.Outcome == nil || *record.Manifest.Outcome != "unknown" || record.Manifest.Capture.State != "unknown" || record.Raw["future_field"] == nil {
 		t.Fatalf("record = %#v", record)
+	}
+}
+
+func TestReadRecordAcceptsPreviewProviderVersionField(t *testing.T) {
+	directory := t.TempDir()
+	writeJSONFile(t, filepath.Join(directory, "manifest.json"), map[string]any{
+		"schema_version": 1, "run_id": "hatch_preview", "lifecycle": "terminal",
+		"capture": map[string]any{"state": "durable"},
+		"provider_state": map[string]any{
+			"retention": "hatch_preserved", "provider_version": "opencode preview",
+		},
+	})
+	record, err := ReadRecord(directory)
+	if err != nil || record.Manifest.ProviderState.ProviderVersion == nil ||
+		*record.Manifest.ProviderState.ProviderVersion != "opencode preview" {
+		t.Fatalf("record = %#v, %v", record, err)
 	}
 }
 

@@ -48,7 +48,18 @@ func TestRunsCLIListsAndInspectsCurrentArtifacts(t *testing.T) {
 		t.Fatalf("inspect exit=%d stderr=%s", exit, inspectErr.String())
 	}
 	var record runner.Record
-	if err := json.Unmarshal(inspectOut.Bytes(), &record); err != nil || record.Manifest == nil || record.Manifest.RunID != artifact.Manifest.RunID {
+	if err := json.Unmarshal(inspectOut.Bytes(), &record); err != nil || record.Manifest == nil ||
+		record.Manifest.RunID != artifact.Manifest.RunID || !containsString(record.Files, "evidence.sha256") ||
+		!containsString(record.Files, "result.txt") {
 		t.Fatalf("inspect=%s err=%v", inspectOut.String(), err)
 	}
+}
+
+func containsString(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
 }
