@@ -55,6 +55,29 @@ func TestRunsCLIListsAndInspectsCurrentArtifacts(t *testing.T) {
 	}
 }
 
+func TestRunsCLIAuditsFieldEvidence(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", root)
+	var stdout, stderr bytes.Buffer
+	exit := Main([]string{"runs", "audit", "--minimum-total", "0", "--minimum-surface=0", "--json"}, bytes.NewReader(nil), &stdout, &stderr, true)
+	if exit != 0 {
+		t.Fatalf("exit=%d stderr=%s", exit, stderr.String())
+	}
+	var result struct {
+		Passed bool              `json:"passed"`
+		Audit  runner.FieldAudit `json:"audit"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil || !result.Passed || result.Audit.Eligible != 0 {
+		t.Fatalf("audit=%s err=%v", stdout.String(), err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if exit := Main([]string{"runs", "audit", "--minimum-total", "1"}, bytes.NewReader(nil), &stdout, &stderr, true); exit != 1 || !bytes.Contains(stderr.Bytes(), []byte("not yet satisfied")) {
+		t.Fatalf("unmet exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+}
+
 func containsString(values []string, wanted string) bool {
 	for _, value := range values {
 		if value == wanted {

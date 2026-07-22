@@ -114,11 +114,11 @@ Rollback remains `scripts/install-local.sh --select python` and does not mutate 
 
 Python production files stay in the branch until `scripts/check-field-evidence.sh` verifies at least 50 genuine contract-complete runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert. The checker validates terminal/durable state, rejects capture-persistence warnings, verifies the persisted evidence-manifest digest, and verifies every file hash in that closed set.
 
-The latest audit observed 18 Go records: ten predate the explicit
-`writer={implementation:go, contract_revision:1}` marker, three were live
-nonterminal records, two were durable explained Kimi model-resolution failures,
-and one successful request used the raw diagnostic surface. Stable Kimi K3,
-Claude Fable, and two Cursor runs are the first four eligible surfaced successes.
+The latest audit observed 20 Go records: ten predate the explicit
+`writer={implementation:go, contract_revision:1}` marker, one remains a live
+nonterminal record, two were durable explained Kimi model-resolution failures,
+and one successful request used the raw diagnostic surface. Six stable surfaced
+successes qualify: Claude 2, Codex 1, Cursor 2, OpenRouter 1, and Expert 0.
 Synthetic paid calls are not counted merely to accelerate deletion.
 
 Kimi's final review run
@@ -128,8 +128,14 @@ now establishes the writer contract first, excludes pre-contract records,
 reports nonterminal final-writer records as incomplete without awarding credit,
 and reserves unsafe status for terminal final-writer capture or hash failure.
 Tests cover degraded capture, evidence-byte tampering, recorded-digest
-tampering, old-writer crashes, and final-writer incompletes. This preserves
-incident evidence instead of incentivizing deletion.
+tampering, incomplete or traversal-bearing hash manifests, undeclared evidence
+files, duplicate run identities, old-writer crashes, and final-writer
+incompletes. The authoritative checker is now `hatch runs audit`, implemented
+in the Go run layer and exercised by the default Go suite; the shell
+entrypoint only builds and invokes it. The audit also proves that sorted
+hash-manifest membership
+exactly matches manifest-declared request, stream, result, and provider snapshot
+evidence. This preserves incident evidence instead of incentivizing deletion.
 
 The same review found that doctor used ambient credentials and checked only
 three of six Codex aliases. Doctor now resolves OpenAI and OpenRouter credentials

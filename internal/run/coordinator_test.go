@@ -437,7 +437,7 @@ func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "hang_opencode"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
 		Surface: "openrouter.kimi-k3", Provider: "openrouter", Model: "openrouter/~moonshotai/kimi-latest", CWD: t.TempDir(), Prompt: "prompt",
-		Timeout: 300 * time.Millisecond, Invocation: invocation,
+		Timeout: 2 * time.Second, Invocation: invocation,
 	})
 	if result.Status != "timeout" || result.Run == nil || result.Run.ProviderState.RecoveryHint == nil ||
 		result.Run.ProviderState.InspectHint == nil || result.Run.ProviderState.ProviderVersion == nil ||

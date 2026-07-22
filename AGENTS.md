@@ -88,6 +88,7 @@ Machine callers:
   run ID, artifact path, capture state, and provider identity when available
 - use `hatch runs list` and `hatch runs inspect <run-id>` to recover results
   independently of an outer terminal wrapper
+- use `hatch runs audit --json` for the authoritative Python-retirement field gate
 
 ## Architecture
 

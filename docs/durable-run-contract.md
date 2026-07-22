@@ -324,6 +324,12 @@ Required rules:
   final-writer capture/hash corruption is unsafe. Explained terminal provider
   failures remain evidence but receive no success credit. No gate may require
   deleting a crash artifact in order to pass.
+- Retirement credit additionally requires a unique nonempty run identity and a
+  sorted, duplicate-free, traversal-free evidence manifest whose members match
+  the manifest-declared request, streams, result, and approved provider snapshot
+  exactly. Projection, manifest, and declared archive-receipt files remain
+  outside the closed evidence set; an undeclared extra file is corruption, not
+  silent post-terminal evidence.
 - `run_id` is sortable and collision-resistant; it is never derived from a
   provider ID. Implement it with the standard library; no new dependency is
   justified for IDs.
@@ -526,11 +532,16 @@ in-repo usage reaches zero and a time-boxed external compatibility window ends.
 ```text
 hatch runs list [--status ...] [--json]
 hatch runs inspect <run-id> [--json]
+hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
 ```
 
 - `list` and `inspect` are local and never require provider credentials.
 - `inspect` shows exact files, capture state, native identity/capabilities,
   warnings, and any structured operator recovery hint.
+- `audit` is the authoritative Go implementation of the field-retirement gate.
+  It reuses the V1 writer validator and closed-evidence verifier; the
+  `scripts/check-field-evidence.sh` entrypoint is only a build-and-invoke
+  wrapper, not a second JSON or hash parser.
 - V1 does not dispatch resume, create an export format, or delete artifacts.
   Those operations require separate decisions backed by observed demand and
   provider/storage evidence.

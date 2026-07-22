@@ -1,6 +1,7 @@
 package run
 
 import (
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -70,7 +71,7 @@ func ValidateManifest(manifest Manifest) error {
 			return fmt.Errorf("%s is unsafe: %q", name, value)
 		}
 	}
-	if len(manifest.Invocation.RequestSHA256) != 64 {
+	if !validSHA256(manifest.Invocation.RequestSHA256) {
 		return fmt.Errorf("request_sha256 must be a SHA-256 digest")
 	}
 	if manifest.Capture.ArtifactPath == "" || !filepath.IsAbs(manifest.Capture.ArtifactPath) {
@@ -83,11 +84,20 @@ func ValidateManifest(manifest Manifest) error {
 		return fmt.Errorf("invalid result axes")
 	}
 	if manifest.Lifecycle == LifecycleTerminal && manifest.Capture.State == "durable" {
-		if manifest.Capture.EvidenceSHA256 == nil || len(*manifest.Capture.EvidenceSHA256) != 64 {
+		if manifest.Capture.EvidenceSHA256 == nil || !validSHA256(*manifest.Capture.EvidenceSHA256) {
 			return fmt.Errorf("durable terminal manifest requires an evidence digest")
 		}
 		if manifest.Result.Output == "present" && manifest.Result.OutputFile == nil {
 			return fmt.Errorf("durably captured output requires an output file")
+		}
+	}
+	for name, value := range map[string]*string{
+		"result.output_file":           manifest.Result.OutputFile,
+		"provider_state.snapshot_path": manifest.ProviderState.SnapshotPath,
+		"archive.receipt_file":         manifest.Archive.ReceiptFile,
+	} {
+		if value != nil && !safeRelativeFile(*value) {
+			return fmt.Errorf("%s is unsafe: %q", name, *value)
 		}
 	}
 	if !oneOfString(manifest.ProviderState.Retention, "hatch_preserved", "provider_owned", "remote_provider", "unavailable", "unknown") {
@@ -121,4 +131,12 @@ func ValidateManifest(manifest Manifest) error {
 
 func safeRelativeFile(name string) bool {
 	return name != "" && !filepath.IsAbs(name) && filepath.Clean(name) == name && name != "." && name != ".." && !strings.HasPrefix(name, ".."+string(filepath.Separator))
+}
+
+func validSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }

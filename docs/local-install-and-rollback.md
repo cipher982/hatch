@@ -31,4 +31,5 @@ scripts/install-local.sh --select go
 ```
 
 Before and after either switch, verify `which hatch`, `hatch --version`,
-`hatch --help`, `hatch doctor --json`, and `hatch runs list --json`.
+`hatch --help`, `hatch doctor --json`, `hatch runs list --json`, and
+`hatch runs audit --json`.

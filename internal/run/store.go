@@ -252,6 +252,9 @@ func (s Store) MarkCaptureDegraded(artifact *Artifact, warning Warning) error {
 }
 
 func (s Store) writeManifest(artifact *Artifact) error {
+	if artifact.Manifest.Capture.ArtifactPath != artifact.Path {
+		return fmt.Errorf("manifest artifact_path %q does not match run path %q", artifact.Manifest.Capture.ArtifactPath, artifact.Path)
+	}
 	if err := ValidateManifest(artifact.Manifest); err != nil {
 		return fmt.Errorf("validate manifest: %w", err)
 	}

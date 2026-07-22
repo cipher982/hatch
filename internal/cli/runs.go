@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	runner "github.com/cipher982/hatch/internal/run"
@@ -78,9 +79,71 @@ func runRuns(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stdout, string(encoded))
 		}
 		return 0
+	case "audit":
+		minimumTotal, minimumSurface, jsonOutput, err := parseRunsAudit(args[1:])
+		if err != nil {
+			return renderConfigError(jsonOutput, stdout, stderr, err)
+		}
+		audit, err := runner.AuditFieldEvidence(root, minimumTotal, minimumSurface)
+		if err != nil {
+			return renderConfigError(jsonOutput, stdout, stderr, err)
+		}
+		passed := audit.Passed()
+		if jsonOutput {
+			_ = json.NewEncoder(stdout).Encode(map[string]any{"passed": passed, "audit": audit})
+		} else {
+			fmt.Fprintf(stdout, "Go field evidence: eligible=%d/%d observed=%d excluded-pre-contract=%d incomplete=%d non-success=%d non-surfaced=%d unsafe=%d\n", audit.Eligible, audit.MinimumTotal, audit.Observed, audit.ExcludedPreContract, audit.Incomplete, audit.NonSuccess, audit.NonSurfaced, audit.Unsafe)
+			for _, surface := range []string{"claude", "codex", "cursor", "openrouter", "expert"} {
+				fmt.Fprintf(stdout, "  %s: %d/%d\n", surface, audit.Surfaces[surface], audit.MinimumSurface)
+			}
+			for _, issue := range audit.UnsafeRuns {
+				fmt.Fprintf(stderr, "  unsafe %s: %s\n", issue.RunID, issue.Reason)
+			}
+			if passed {
+				fmt.Fprintln(stdout, "field evidence gate passed")
+			} else {
+				fmt.Fprintln(stderr, "field evidence gate is not yet satisfied")
+			}
+		}
+		if passed {
+			return 0
+		}
+		return 1
 	default:
 		return renderConfigError(false, stdout, stderr, fmt.Errorf("unknown runs command %q", args[0]))
 	}
+}
+
+func parseRunsAudit(args []string) (int, int, bool, error) {
+	minimumTotal, minimumSurface, jsonOutput := 50, 5, false
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		if arg == "--json" {
+			jsonOutput = true
+			continue
+		}
+		name, value, inline := strings.Cut(arg, "=")
+		if name != "--minimum-total" && name != "--minimum-surface" {
+			return minimumTotal, minimumSurface, jsonOutput, fmt.Errorf("unrecognized argument: %s", arg)
+		}
+		if !inline {
+			if index+1 >= len(args) {
+				return minimumTotal, minimumSurface, jsonOutput, fmt.Errorf("%s requires a value", name)
+			}
+			index++
+			value = args[index]
+		}
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 0 {
+			return minimumTotal, minimumSurface, jsonOutput, fmt.Errorf("%s must be a nonnegative integer", name)
+		}
+		if name == "--minimum-total" {
+			minimumTotal = parsed
+		} else {
+			minimumSurface = parsed
+		}
+	}
+	return minimumTotal, minimumSurface, jsonOutput, nil
 }
 
 func parseRunsList(args []string) (bool, string, error) {
@@ -142,6 +205,7 @@ func outcomeString(value *runner.Outcome) string {
 
 const RunsHelp = `usage: hatch runs list [--status STATUS] [--json]
        hatch runs inspect <run-id> [--json]
+       hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
 
 Inspect local Hatch run artifacts without provider credentials.
 `
