@@ -36,3 +36,47 @@ func TestBuildOracleInvocations(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildAdvancedBackendInvocations(t *testing.T) {
+	t.Run("claude resume and explicit stream", func(t *testing.T) {
+		got, err := Build(Request{
+			Backend: "claude", Model: "opus", Prompt: "p", OutputFormat: "stream-json",
+			IncludePartialMessages: true, Resume: "ses_1",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantTail := []string{"--include-partial-messages", "--resume", "ses_1"}
+		if !reflect.DeepEqual(got.Argv[len(got.Argv)-len(wantTail):], wantTail) || got.Adapter != "claude" {
+			t.Fatalf("claude invocation = %#v", got)
+		}
+	})
+
+	t.Run("raw codex", func(t *testing.T) {
+		got, err := Build(Request{
+			Backend: "codex", Model: "gpt-5.6", Prompt: "p", APIKey: "secret",
+			ReasoningEffort: "high", SkipGitRepoCheck: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []string{
+			"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "-m", "gpt-5.6",
+			"-c", "model_reasoning_effort=high", "--skip-git-repo-check",
+		}
+		if !reflect.DeepEqual(got.Argv, want) || got.SetEnv["OPENAI_API_KEY"] != "secret" {
+			t.Fatalf("codex invocation = %#v", got)
+		}
+	})
+
+	t.Run("bedrock defaults", func(t *testing.T) {
+		got, err := Build(Request{Backend: "bedrock", Prompt: "p", OutputFormat: "text"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.SetEnv["AWS_PROFILE"] != "zh-ml-mlengineer" || got.SetEnv["AWS_REGION"] != "us-east-1" ||
+			got.SetEnv["ANTHROPIC_MODEL"] != "us.anthropic.claude-sonnet-4-6" || got.Adapter != "claude" {
+			t.Fatalf("bedrock invocation = %#v", got)
+		}
+	})
+}

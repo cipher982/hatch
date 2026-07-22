@@ -31,6 +31,24 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 	if request.Backend == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("No default model is configured; choose an explicit provider"))
 	}
+	if !oneOf(request.Backend, "claude", "cursor", "bedrock", "codex", "gemini", "opencode") {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, bedrock, codex, gemini", request.Backend))
+	}
+	if request.CWD != "" {
+		info, statErr := os.Stat(request.CWD)
+		if statErr != nil {
+			return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("cwd does not exist: %s", request.CWD))
+		}
+		if !info.IsDir() {
+			return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("cwd is not a directory: %s", request.CWD))
+		}
+	}
+	if request.Backend == "opencode" && request.SkipGitRepoCheck {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("--skip-git-repo-check is not supported for surfaced providers"))
+	}
+	if request.ReasoningEffort != "" && request.Backend != "codex" && !(request.Backend == "opencode" && strings.HasPrefix(request.Model, "openai/")) {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("--reasoning-effort only works with Codex models"))
+	}
 	prompt, err := readPrompt(request.PromptArgs, stdin)
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
@@ -39,19 +57,21 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 	if apiKey == "" {
 		if strings.HasPrefix(request.Model, "openrouter/") {
 			apiKey = strings.TrimSpace(os.Getenv("OPENROUTER_API_KEY"))
-		} else if strings.HasPrefix(request.Model, "openai/") {
+		} else if strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex" {
 			apiKey = strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
 		}
 	}
 	if strings.HasPrefix(request.Model, "openrouter/") && apiKey == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENROUTER_API_KEY not set and no credential helper is configured"))
 	}
-	if strings.HasPrefix(request.Model, "openai/") && apiKey == "" {
+	if (strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex") && apiKey == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENAI_API_KEY not set and no credential helper is configured"))
 	}
 	invocation, err := provider.Build(provider.Request{
 		Backend: request.Backend, Model: request.Model, Prompt: prompt, CWD: request.CWD,
-		ReasoningEffort: request.ReasoningEffort, APIKey: apiKey,
+		ReasoningEffort: request.ReasoningEffort, OutputFormat: request.OutputFormat, APIKey: apiKey,
+		Resume: request.Resume, SkipGitRepoCheck: request.SkipGitRepoCheck,
+		IncludePartialMessages: request.IncludePartialMessages,
 	})
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
@@ -64,8 +84,10 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 	credentialNames := []string{}
 	if strings.HasPrefix(request.Model, "openrouter/") {
 		credentialNames = append(credentialNames, "OPENROUTER_API_KEY")
-	} else if strings.HasPrefix(request.Model, "openai/") {
+	} else if strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex" {
 		credentialNames = append(credentialNames, "OPENAI_API_KEY")
+	} else if request.Backend == "cursor" && apiKey != "" {
+		credentialNames = append(credentialNames, "CURSOR_API_KEY")
 	}
 	coordinator := runner.NewCoordinator(runner.NewStore(root))
 	result := coordinator.Execute(runner.Request{

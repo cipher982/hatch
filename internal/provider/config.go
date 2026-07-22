@@ -9,12 +9,16 @@ const boundedRunContract = `Hatch execution contract:
 This is a single bounded, non-interactive run with a time budget of about 15 minutes. Complete the requested scope and nothing more. Investigate proportionally to the question; once you have sufficient evidence, stop using tools and write your answer. Return a concise, decision-ready result. If you are blocked or running low on budget, return your best current findings and state what is uncertain rather than continuing to investigate. If the request explicitly asks for exhaustive or deep work, honor that instead.`
 
 type Request struct {
-	Backend         string
-	Model           string
-	Prompt          string
-	CWD             string
-	ReasoningEffort string
-	APIKey          string
+	Backend                string
+	Model                  string
+	Prompt                 string
+	CWD                    string
+	ReasoningEffort        string
+	OutputFormat           string
+	APIKey                 string
+	Resume                 string
+	SkipGitRepoCheck       bool
+	IncludePartialMessages bool
 }
 
 type Invocation struct {
@@ -34,27 +38,94 @@ func Build(req Request) (Invocation, error) {
 	prompt := PreparePrompt(req.Prompt)
 	switch req.Backend {
 	case "claude":
+		model := req.Model
+		if model == "" {
+			model = "sonnet"
+		}
+		outputFormat := req.OutputFormat
+		if outputFormat == "" || outputFormat == "text" {
+			outputFormat = "stream-json"
+		}
+		argv := []string{"claude"}
+		if outputFormat == "stream-json" {
+			argv = append(argv, "--verbose")
+		}
+		argv = append(argv,
+			"--print", "-", "--output-format", outputFormat,
+			"--model", model, "--dangerously-skip-permissions", "--setting-sources", "local",
+			"--no-session-persistence", "--tools", "default", "--effort", "low",
+		)
+		if req.IncludePartialMessages || req.OutputFormat == "" || req.OutputFormat == "text" {
+			argv = append(argv, "--include-partial-messages")
+		}
+		if req.Resume != "" {
+			argv = append(argv, "--resume", req.Resume)
+		}
+		adapter, streamFormat := "raw", "text"
+		if outputFormat == "stream-json" {
+			adapter, streamFormat = "claude", "jsonl"
+		}
 		return Invocation{
-			Argv: []string{
-				"claude", "--verbose", "--print", "-", "--output-format", "stream-json",
-				"--model", req.Model, "--dangerously-skip-permissions", "--setting-sources", "local",
-				"--no-session-persistence", "--tools", "default", "--effort", "low",
-				"--include-partial-messages",
-			},
-			Stdin:        []byte(prompt),
-			StreamFormat: "jsonl", Adapter: "claude",
+			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
 			UnsetEnv: []string{
 				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY",
 				"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
+				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "ANTHROPIC_MODEL",
 			},
 		}, nil
-	case "cursor":
+	case "bedrock":
+		model := req.Model
+		if model == "" {
+			model = "us.anthropic.claude-sonnet-4-6"
+		}
+		outputFormat := req.OutputFormat
+		if outputFormat == "" || outputFormat == "text" {
+			outputFormat = "stream-json"
+		}
+		argv := []string{"claude"}
+		if outputFormat == "stream-json" {
+			argv = append(argv, "--verbose")
+		}
+		argv = append(argv, "--print", "-", "--output-format", outputFormat,
+			"--dangerously-skip-permissions", "--setting-sources", "local",
+			"--no-session-persistence", "--tools", "", "--effort", "low")
+		if req.IncludePartialMessages || req.OutputFormat == "" || req.OutputFormat == "text" {
+			argv = append(argv, "--include-partial-messages")
+		}
+		if req.Resume != "" {
+			argv = append(argv, "--resume", req.Resume)
+		}
+		adapter, streamFormat := "raw", "text"
+		if outputFormat == "stream-json" {
+			adapter, streamFormat = "claude", "jsonl"
+		}
 		return Invocation{
-			Argv: []string{
-				"cursor-agent", "--print", "--trust", "--model", req.Model,
-				"--output-format", "stream-json", "--force", prompt,
-			}, StreamFormat: "jsonl", Adapter: "cursor",
+			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
+			SetEnv: map[string]string{
+				"CLAUDE_CODE_USE_BEDROCK": "1", "AWS_PROFILE": "zh-ml-mlengineer",
+				"AWS_REGION": "us-east-1", "ANTHROPIC_MODEL": model,
+			},
+			UnsetEnv: []string{"AWS_DEFAULT_REGION", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"},
 		}, nil
+	case "cursor":
+		model := req.Model
+		if model == "" {
+			model = "cursor-grok-4.5-high"
+		}
+		invocation := Invocation{
+			Argv: []string{
+				"cursor-agent", "--print", "--trust", "--model", model,
+				"--output-format", "stream-json", "--force", prompt,
+			}, StreamFormat: "jsonl", Adapter: "cursor", SetEnv: map[string]string{},
+			UnsetEnv: []string{
+				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
+			},
+		}
+		if req.APIKey != "" {
+			invocation.SetEnv["CURSOR_API_KEY"] = req.APIKey
+		}
+		return invocation, nil
 	case "opencode":
 		if req.Model == "" {
 			return Invocation{}, fmt.Errorf("OpenCode backend requires an explicit model")
@@ -83,6 +154,25 @@ func Build(req Request) (Invocation, error) {
 			invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
 		}
 		return invocation, nil
+	case "codex":
+		if req.APIKey == "" {
+			return Invocation{}, fmt.Errorf("OPENAI_API_KEY not set and no api_key provided")
+		}
+		argv := []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox"}
+		if req.Model != "" {
+			argv = append(argv, "-m", req.Model)
+		}
+		if req.ReasoningEffort != "" {
+			argv = append(argv, "-c", "model_reasoning_effort="+req.ReasoningEffort)
+		}
+		if req.SkipGitRepoCheck {
+			argv = append(argv, "--skip-git-repo-check")
+		}
+		return Invocation{
+			Argv: argv, Stdin: []byte(prompt), StreamFormat: "text", Adapter: "raw",
+			SetEnv:   map[string]string{"OPENAI_API_KEY": req.APIKey},
+			UnsetEnv: []string{"CODEX_API_KEY", "CLAUDE_CODE_USE_BEDROCK"},
+		}, nil
 	case "gemini":
 		model := req.Model
 		if model == "" {
@@ -92,6 +182,7 @@ func Build(req Request) (Invocation, error) {
 			Argv:         []string{"gemini", "--model", model, "--yolo", "--skip-trust", "-p", "-"},
 			Stdin:        []byte(prompt),
 			StreamFormat: "text", Adapter: "raw",
+			UnsetEnv: []string{"CLAUDE_CODE_USE_BEDROCK"},
 		}, nil
 	default:
 		return Invocation{}, fmt.Errorf("unsupported backend %q", req.Backend)

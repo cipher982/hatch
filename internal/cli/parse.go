@@ -65,6 +65,9 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 			continue
 		}
 		name, inlineValue, hasInlineValue := splitLongFlag(arg)
+		if hasInlineValue && !flagsWithValue[name] {
+			return req, fmt.Errorf("unrecognized argument: %s", arg)
+		}
 		switch name {
 		case "-h", "--help":
 			req.Help = true
