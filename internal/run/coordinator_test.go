@@ -216,7 +216,7 @@ func TestCoordinatorStructuredFailureAndRecovery(t *testing.T) {
 		{"cursor error", "cursor", "cursor-grok-4.5-high", "cursor_error", "", "request rejected", false, OutcomeFailed, 0},
 		{"opencode error", "opencode", "openrouter/moonshotai/kimi-k3", "opencode_error", "", "provider unavailable", false, OutcomeFailed, 0},
 		{"opencode recovered", "opencode", "openrouter/moonshotai/kimi-k3", "opencode_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
-		{"opencode missing terminal", "opencode", "openrouter/moonshotai/kimi-k3", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 0},
+		{"opencode missing terminal", "opencode", "openrouter/moonshotai/kimi-k3", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 1},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -50,8 +50,25 @@ func TestInterpretOpenCodeJoinsChunksAndRecoversWithWarning(t *testing.T) {
 			`{"type":"step_finish","part":{"reason":"stop"}}` + "\n",
 	)
 	got := Interpret("opencode", stdout, nil)
-	if string(got.Output) != "one two" || got.Error != "" || len(got.Warnings) != 1 || got.Warnings[0] != "transient" || got.TerminalMarker != "observed" {
+	if string(got.Output) != "one two" || got.Error != "" || len(got.Warnings) != 1 || got.Warnings[0].Code != "transient_provider_error" || got.Warnings[0].Message != "transient" || got.TerminalMarker != "observed" {
 		t.Fatalf("unexpected interpretation: %#v", got)
+	}
+}
+
+func TestInterpretEmitsAdapterDriftTripwire(t *testing.T) {
+	got := Interpret("claude", []byte(`{"type":"future_terminal","result":"answer"}`+"\n"), nil)
+	if got.TerminalMarker != "not_observed" || len(got.Warnings) != 1 || got.Warnings[0].Code != "adapter_recognition_empty" {
+		t.Fatalf("drift interpretation: %#v", got)
+	}
+}
+
+func TestInterpretRecordsRecoveredStderrError(t *testing.T) {
+	stdout := []byte(`{"type":"text","part":{"text":"answer","metadata":{"openai":{"phase":"final_answer"}}}}` + "\n" +
+		`{"type":"step_finish","part":{"reason":"stop"}}` + "\n")
+	stderr := []byte(`ERROR error={"message":"earlier transport error"}`)
+	got := Interpret("opencode", stdout, stderr)
+	if got.Error != "" || len(got.Warnings) != 1 || got.Warnings[0].Code != "stderr_error_recovered" {
+		t.Fatalf("recovered stderr interpretation: %#v", got)
 	}
 }
 

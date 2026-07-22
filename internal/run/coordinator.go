@@ -155,8 +155,8 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 
 	interpretation := provider.Interpret(req.Invocation.Adapter, stdout.Bytes(), stderr.Bytes())
-	for _, message := range interpretation.Warnings {
-		warnings = append(warnings, Warning{Code: "provider_warning", Message: message})
+	for _, warning := range interpretation.Warnings {
+		warnings = append(warnings, Warning{Code: warning.Code, Message: warning.Message})
 	}
 	output := interpretation.Output
 	resultFile, resultWriteErr := c.Store.WriteResult(artifact, output)

@@ -10,12 +10,17 @@ import (
 type Interpretation struct {
 	Output         []byte
 	Error          string
-	Warnings       []string
+	Warnings       []Warning
 	TerminalMarker string
 	NativeID       string
 	NativeIDState  string
 	Retention      string
 	Capabilities   map[string]string
+}
+
+type Warning struct {
+	Code    string
+	Message string
 }
 
 func Interpret(adapter string, stdout, stderr []byte) Interpretation {
@@ -40,6 +45,7 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 		result.Capabilities["identify"] = "supported"
 	}
 	var textChunks, finalChunks []string
+	validStructuredEvent := false
 	for _, line := range bytes.Split(stdout, []byte{'\n'}) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
@@ -48,6 +54,7 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 		if json.Unmarshal(line, &event) != nil {
 			continue
 		}
+		validStructuredEvent = true
 		typeName, _ := event["type"].(string)
 		switch adapter {
 		case "claude":
@@ -134,12 +141,21 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 		chunks = textChunks
 	}
 	result.Output = []byte(strings.Join(chunks, ""))
-	if adapter == "opencode" && result.Error == "" && len(result.Output) == 0 {
-		result.Error = extractOpenCodeLogError(string(stderr))
+	if adapter == "opencode" && result.Error == "" {
+		if stderrError := extractOpenCodeLogError(string(stderr)); stderrError != "" {
+			if result.TerminalMarker == "observed" && len(result.Output) > 0 {
+				result.Warnings = append(result.Warnings, Warning{Code: "stderr_error_recovered", Message: stderrError})
+			} else if len(result.Output) == 0 {
+				result.Error = stderrError
+			}
+		}
 	}
 	if result.Error != "" && result.TerminalMarker == "observed" && len(result.Output) > 0 {
-		result.Warnings = append(result.Warnings, result.Error)
+		result.Warnings = append(result.Warnings, Warning{Code: "transient_provider_error", Message: result.Error})
 		result.Error = ""
+	}
+	if validStructuredEvent && result.TerminalMarker == "not_observed" && result.Error == "" {
+		result.Warnings = append(result.Warnings, Warning{Code: "adapter_recognition_empty", Message: "structured events contained no terminal result recognized by the adapter"})
 	}
 	return result
 }
