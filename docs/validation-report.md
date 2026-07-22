@@ -137,8 +137,8 @@ The latest audit observed 22 Go records: ten predate the explicit
 `writer={implementation:go, contract_revision:1}` marker, two were durable
 explained Kimi model-resolution failures, one successful request used the raw
 diagnostic surface, and one timed-out OpenCode run is a reviewed unsafe
-incident. One current Codex run is still active. Seven stable surfaced successes
-qualify: Claude 2, Codex 2, Cursor 2, OpenRouter 1, and Expert 0.
+incident. Eight stable surfaced successes qualify: Claude 2, Codex 3, Cursor 2,
+OpenRouter 1, and Expert 0; no final-writer run is incomplete.
 Synthetic paid calls are not counted merely to accelerate deletion.
 
 Kimi's final review run

@@ -1,6 +1,6 @@
 # Hatch Go Rewrite Epic
 
-Status: Go 0.2.0 cut over; Phase 7 field soak in progress (7/50 eligible; 22 observed at the latest audit)
+Status: Go 0.2.0 cut over; Phase 7 field soak in progress (8/50 eligible; 22 observed at the latest audit)
 
 Decision owner: David Rose
 
@@ -689,9 +689,9 @@ credential change, or provider-state conversion.
 ### Phase 7 — Retire Python
 
 Status: in progress. Twenty-two durable Go records have been observed at the
-latest audit, but pre-contract, active, failed, reviewed-incident, and raw
+latest audit, but pre-contract, failed, reviewed-incident, and raw
 diagnostic runs are provider evidence rather than Python-retirement credit.
-Seven stable surfaced successes currently qualify: Claude 2, Codex 2, Cursor 2, OpenRouter 1, and
+Eight stable surfaced successes currently qualify: Claude 2, Codex 3, Cursor 2, OpenRouter 1, and
 Expert 0. Python is retained only as the frozen
 compatibility oracle and rollback release until the cryptographic
 `scripts/check-field-evidence.sh` gate passes.
