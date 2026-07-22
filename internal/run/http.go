@@ -75,7 +75,7 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 	}
 	defer cancel()
 	outcome := req.Execute(ctx, record)
-	cancelled := ctx.Err() == context.Canceled
+	cancelRequested := ctx.Err() == context.Canceled
 	if ctx.Err() == context.DeadlineExceeded {
 		outcome.TimedOut = true
 	}
@@ -99,6 +99,7 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 	if outcome.Output != "" {
 		resultState.Output = "present"
 	}
+	cancelled := httpCancellationWins(cancelRequested, outcome)
 	if writeErr == nil {
 		resultState.OutputFile = &resultFile
 	} else {
@@ -172,4 +173,8 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 		_ = c.Store.CommitTerminal(artifact, terminalOutcome, exitCode, resultState, state, warnings)
 	}
 	return result
+}
+
+func httpCancellationWins(requested bool, outcome HTTPOutcome) bool {
+	return requested && (outcome.Error != "" || outcome.Output == "")
 }

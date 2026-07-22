@@ -385,8 +385,18 @@ func TestCoordinatorCancellationKillsProcessGroup(t *testing.T) {
 	})
 	if result.OK || result.Status != "cancelled" || result.ExitCode != -4 || result.CLIExitCode() != 130 || result.Run == nil || result.Run.Outcome == nil ||
 		*result.Run.Outcome != OutcomeCancelled || result.Run.Process == nil || result.Run.Process.CancelCleanup == nil ||
-		!result.Run.Process.CancelCleanup.WaitBounded {
+		!result.Run.Process.CancelCleanup.WaitBounded || result.Run.Process.CancelCleanup.Signal != "SIGKILL" {
 		t.Fatalf("cancelled result = %#v", result)
+	}
+}
+
+func TestCompletedProviderResultWinsCancellationRace(t *testing.T) {
+	complete := provider.Interpretation{Output: []byte("answer"), TerminalMarker: "observed"}
+	if cancellationWins(true, 0, complete) {
+		t.Fatal("completed provider result was relabelled as cancelled")
+	}
+	if !cancellationWins(true, 0, provider.Interpretation{Output: []byte("partial"), TerminalMarker: "not_observed"}) {
+		t.Fatal("incomplete provider result incorrectly won cancellation race")
 	}
 }
 

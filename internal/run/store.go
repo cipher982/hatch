@@ -178,7 +178,7 @@ func (s Store) StageTerminal(artifact *Artifact, outcome Outcome, exitCode int, 
 	artifact.Manifest.UpdatedAt = now
 	artifact.Manifest.Result = result
 	artifact.Manifest.ProviderState = state
-	artifact.Manifest.Warnings = append([]Warning(nil), warnings...)
+	artifact.Manifest.Warnings = append([]Warning{}, warnings...)
 	if artifact.Manifest.Capture.State == "degraded" && outcome == OutcomeSucceeded {
 		updated := OutcomeSucceededWarnings
 		artifact.Manifest.Outcome = &updated

@@ -125,6 +125,16 @@ func (s *State) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON keeps the short-lived Go-preview spelling additive while V1
+// consumers move to provider_tool_version.
+func (s State) MarshalJSON() ([]byte, error) {
+	type stateWire State
+	return json.Marshal(struct {
+		stateWire
+		PreviewProviderVersion *string `json:"provider_version,omitempty"`
+	}{stateWire: stateWire(s), PreviewProviderVersion: s.ProviderVersion})
+}
+
 type OperatorHint struct {
 	Argv                   []string `json:"argv"`
 	VersionBound           bool     `json:"version_bound"`

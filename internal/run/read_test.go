@@ -1,6 +1,7 @@
 package run
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -95,6 +96,11 @@ func TestReadRecordAcceptsPreviewProviderVersionField(t *testing.T) {
 	if err != nil || record.Manifest.ProviderState.ProviderVersion == nil ||
 		*record.Manifest.ProviderState.ProviderVersion != "opencode preview" {
 		t.Fatalf("record = %#v, %v", record, err)
+	}
+	encoded, err := json.Marshal(record.Manifest.ProviderState)
+	if err != nil || !bytes.Contains(encoded, []byte(`"provider_tool_version":"opencode preview"`)) ||
+		!bytes.Contains(encoded, []byte(`"provider_version":"opencode preview"`)) {
+		t.Fatalf("provider version aliases = %s, %v", encoded, err)
 	}
 }
 

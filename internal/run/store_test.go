@@ -173,6 +173,9 @@ func TestStoreLifecycleAndEvidenceDigest(t *testing.T) {
 	if artifact.Manifest.Lifecycle != LifecycleTerminal || artifact.Manifest.Capture.EvidenceSHA256 == nil {
 		t.Fatalf("terminal manifest incomplete: %#v", artifact.Manifest)
 	}
+	if artifact.Manifest.Warnings == nil {
+		t.Fatal("terminal warnings must be an explicit empty array")
+	}
 	manifestPath := filepath.Join(artifact.Path, artifact.Manifest.Capture.EvidenceManifestFile)
 	manifest, err := os.ReadFile(manifestPath)
 	if err != nil {

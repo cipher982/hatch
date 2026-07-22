@@ -6,11 +6,11 @@ import "os/exec"
 
 func configureProcess(cmd *exec.Cmd) {}
 
-func killProcessGroup(cmd *exec.Cmd) error {
+func killProcessGroup(cmd *exec.Cmd) (string, error) {
 	if cmd.Process == nil {
-		return nil
+		return "", nil
 	}
-	return cmd.Process.Kill()
+	return "KILL", cmd.Process.Kill()
 }
 
 func processStartIdentity(int) string { return "" }

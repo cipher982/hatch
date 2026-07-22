@@ -64,6 +64,21 @@ func TestCoordinatorHTTPCancellationPreservesRemoteIdentity(t *testing.T) {
 	}
 }
 
+func TestCompletedHTTPResultWinsCancellationRace(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).ExecuteHTTP(HTTPRequest{
+		Context: ctx, Surface: "expert", Backend: "responses", Provider: "openai", Prompt: "question",
+		Execute: func(context.Context, func([]byte) error) HTTPOutcome {
+			return HTTPOutcome{Output: "completed answer", NativeID: "resp_complete", NativeIDState: "observed", Retention: "remote_provider"}
+		},
+	})
+	if !result.OK || result.Status != "ok" || result.Output != "completed answer" || result.Run == nil ||
+		result.Run.Outcome == nil || *result.Run.Outcome != OutcomeSucceeded {
+		t.Fatalf("completed HTTP race result = %#v", result)
+	}
+}
+
 func TestHTTPStreamOpenFailureReturnsCanonicalRun(t *testing.T) {
 	store := unavailableStreamStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).ExecuteHTTP(HTTPRequest{

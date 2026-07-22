@@ -504,6 +504,9 @@ Compatibility fields are projections:
 - `resume_command` is a deprecated display rendering only when the adapter
   reports a recovery hint for this exact run/version; canonical recovery data is
   a structured argv array plus risk metadata.
+- `provider_state.provider_version` is the short-lived Go-preview alias for
+  canonical `provider_tool_version`; both are emitted through the 0.x field
+  soak and the preview alias is removed only with the documented 1.0 cleanup.
 
 Their absence never carries canonical meaning. Deprecation occurs only after
 in-repo usage reaches zero and a time-boxed external compatibility window ends.

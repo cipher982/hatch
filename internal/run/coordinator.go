@@ -133,6 +133,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	var waitErr error
 	timedOut := false
 	cancelled := false
+	cleanupSignal := ""
 	if req.Timeout > 0 {
 		timer := time.NewTimer(req.Timeout)
 		select {
@@ -140,12 +141,12 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			timer.Stop()
 		case <-timer.C:
 			timedOut = true
-			_ = killProcessGroup(cmd)
+			cleanupSignal, _ = killProcessGroup(cmd)
 			waitErr = <-waited
 		case <-ctx.Done():
 			timer.Stop()
 			cancelled = true
-			_ = killProcessGroup(cmd)
+			cleanupSignal, _ = killProcessGroup(cmd)
 			waitErr = <-waited
 		}
 	} else {
@@ -153,13 +154,13 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		case waitErr = <-waited:
 		case <-ctx.Done():
 			cancelled = true
-			_ = killProcessGroup(cmd)
+			cleanupSignal, _ = killProcessGroup(cmd)
 			waitErr = <-waited
 		}
 	}
 	if timedOut || cancelled {
 		cleanup := &TimeoutCleanup{
-			Signal: "SIGKILL", WaitBounded: true, SurvivorState: "unknown",
+			Signal: cleanupSignal, WaitBounded: true, SurvivorState: "unknown",
 			PipeClosureForced: errors.Is(waitErr, exec.ErrWaitDelay),
 		}
 		if timedOut {
@@ -189,8 +190,6 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	exitCode := processExitCode(waitErr)
 	if timedOut {
 		exitCode = -1
-	} else if cancelled {
-		exitCode = -4
 	}
 
 	interpretation := provider.Interpret(req.Invocation.Adapter, stdout.Bytes(), stderr.Bytes())
@@ -207,6 +206,13 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		warnings = append(warnings, Warning{Code: warning.Code, Message: warning.Message, EvidenceFile: &evidenceFile})
 	}
 	output := interpretation.Output
+	// A provider completion already available when cancellation races with the
+	// wait wins. Cancel cleanup remains in process evidence, but a complete
+	// terminal answer is not relabelled or discarded.
+	cancelledOutcome := cancellationWins(cancelled, exitCode, interpretation)
+	if cancelledOutcome {
+		exitCode = -4
+	}
 	resultFile, resultWriteErr := c.Store.WriteResult(artifact, output)
 	if resultWriteErr != nil {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: resultWriteErr.Error()})
@@ -221,7 +227,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 
 	outcome := OutcomeSucceeded
-	ok := exitCode == 0 && !timedOut && !cancelled && interpretation.Error == "" && interpretation.TerminalMarker != "not_observed" && len(output) > 0
+	ok := exitCode == 0 && !timedOut && !cancelledOutcome && interpretation.Error == "" && interpretation.TerminalMarker != "not_observed" && len(output) > 0
 	status := "ok"
 	var resultErr *string
 	if timedOut {
@@ -229,7 +235,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		status = "timeout"
 		message := fmt.Sprintf("Agent timed out after %ds", int(req.Timeout.Seconds()))
 		resultErr = &message
-	} else if cancelled {
+	} else if cancelledOutcome {
 		outcome = OutcomeCancelled
 		status = "cancelled"
 		message := "Agent cancelled"
@@ -345,6 +351,10 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		req.Progress(fmt.Sprintf("[hatch] %s completed", req.ProgressLabel))
 	}
 	return result
+}
+
+func cancellationWins(requested bool, exitCode int, interpretation provider.Interpretation) bool {
+	return requested && !(exitCode == 0 && interpretation.Error == "" && interpretation.TerminalMarker != "not_observed" && len(interpretation.Output) > 0)
 }
 
 func (c Coordinator) finalizePrelaunchFailure(artifact *Artifact, started time.Time, exitCode int, outcome Outcome, message string, warnings []Warning) PublicResult {

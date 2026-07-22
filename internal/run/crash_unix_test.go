@@ -158,3 +158,19 @@ func TestCLIInterruptCommitsCancelledArtifact(t *testing.T) {
 		t.Fatalf("interrupt result = %#v", result)
 	}
 }
+
+func TestProcessObservationDoesNotCallZombieAlive(t *testing.T) {
+	command := exec.Command("/bin/sh", "-c", "exit 0")
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer command.Wait()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) && !processIsZombie(command.Process.Pid) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	alive, known := processAlive(command.Process.Pid)
+	if !known || alive {
+		t.Fatalf("zombie observation alive=%t known=%t", alive, known)
+	}
+}
