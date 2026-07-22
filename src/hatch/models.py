@@ -23,7 +23,7 @@ class SurfacedProvider:
 
 
 OPENROUTER_DEEPSEEK_V4_PRO = "openrouter/deepseek/deepseek-v4-pro"
-OPENROUTER_KIMI_K3 = "openrouter/moonshotai/kimi-k3"
+OPENROUTER_KIMI_K3 = "openrouter/~moonshotai/kimi-latest"
 CURSOR_GROK = "cursor-grok-4.5-high"
 
 SURFACED_PROVIDERS: dict[str, SurfacedProvider] = {

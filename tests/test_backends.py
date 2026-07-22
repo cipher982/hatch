@@ -431,10 +431,10 @@ class TestConfigureOpenCode:
         config = configure_opencode(
             "test prompt",
             laptop_context,
-            model="openrouter/moonshotai/kimi-k3",
+            model="openrouter/~moonshotai/kimi-latest",
             api_key="sk-or-test",
         )
-        assert config.cmd[config.cmd.index("-m") + 1] == "openrouter/moonshotai/kimi-k3"
+        assert config.cmd[config.cmd.index("-m") + 1] == "openrouter/~moonshotai/kimi-latest"
         assert config.env["OPENROUTER_API_KEY"] == "sk-or-test"
 
     def test_opencode_explicitly_sets_workspace_directory(self, laptop_context):

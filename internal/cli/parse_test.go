@@ -9,7 +9,7 @@ func TestParseSurfacedCommands(t *testing.T) {
 	}{
 		{[]string{"claude", "haiku", "--json", "-"}, "claude", "haiku"},
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "cursor-grok-4.5-high"},
-		{[]string{"openrouter", "kimi-k3", "--json", "-"}, "opencode", "openrouter/moonshotai/kimi-k3"},
+		{[]string{"openrouter", "kimi-k3", "--json", "-"}, "opencode", "openrouter/~moonshotai/kimi-latest"},
 		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-5.6-sol"},
 	}
 	for _, test := range tests {

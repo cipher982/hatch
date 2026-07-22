@@ -11,7 +11,7 @@
     "legacy_exit_code": 0,
     "legacy_result": {"ok": true, "status": "ok", "output": "useful evidence", "exit_code": 0, "error": null, "stderr": "", "artifact_path": "$ARTIFACT", "session_id": "ses_incomplete", "resume_command": null},
     "target_result": {"ok": false, "status": "error", "output": "useful evidence", "exit_code": 0, "error": "structured provider output did not contain a terminal marker", "stderr": ""},
-    "provider_argv": ["opencode", "run", "--dangerously-skip-permissions", "--pure", "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", "openrouter/moonshotai/kimi-k3", "$PREPARED_PROMPT"],
+    "provider_argv": ["opencode", "run", "--dangerously-skip-permissions", "--pure", "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", "openrouter/~moonshotai/kimi-latest", "$PREPARED_PROMPT"],
     "provider_stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "provider_stdin_bytes": 0,
     "stderr_contains": ["[hatch] OpenRouter started"]

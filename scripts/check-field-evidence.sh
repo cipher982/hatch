@@ -23,6 +23,8 @@ manifests="$tmp/manifests"
 
 observed=0
 excluded=0
+non_success=0
+non_surfaced=0
 unsafe=0
 
 if [ -d "$root" ]; then
@@ -59,13 +61,26 @@ while IFS= read -r manifest; do
     unsafe=$((unsafe + 1))
     continue
   fi
-  surface=$(jq -r '.surface | split(".")[0]' "$manifest")
+  outcome=$(jq -r '.outcome // ""' "$manifest")
+  if [ "$outcome" != succeeded ] && [ "$outcome" != succeeded_with_warnings ]; then
+    non_success=$((non_success + 1))
+    continue
+  fi
+  full_surface=$(jq -r '.surface' "$manifest")
+  case "$full_surface" in
+    claude.haiku|claude.sonnet|claude.opus|claude.fable) surface=claude ;;
+    codex.sol|codex.terra|codex.luna|codex.nano|codex.mini|codex.max) surface=codex ;;
+    cursor.grok) surface=cursor ;;
+    openrouter.deepseek-v4-pro|openrouter.kimi-k3) surface=openrouter ;;
+    expert) surface=expert ;;
+    *) non_surfaced=$((non_surfaced + 1)); continue ;;
+  esac
   run_id=$(jq -r '.run_id' "$manifest")
   printf '%s\t%s\n' "$surface" "$run_id" >> "$records"
 done < "$manifests"
 
 eligible=$(wc -l < "$records" | tr -d ' ')
-printf 'Go field evidence: eligible=%s/%s observed=%s excluded-pre-contract=%s unsafe=%s\n' "$eligible" "$minimum_total" "$observed" "$excluded" "$unsafe"
+printf 'Go field evidence: eligible=%s/%s observed=%s excluded-pre-contract=%s non-success=%s non-surfaced=%s unsafe=%s\n' "$eligible" "$minimum_total" "$observed" "$excluded" "$non_success" "$non_surfaced" "$unsafe"
 
 passed=true
 [ "$eligible" -ge "$minimum_total" ] || passed=false

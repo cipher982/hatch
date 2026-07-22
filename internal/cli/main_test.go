@@ -67,9 +67,9 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 
 func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 	for model, want := range map[string]string{
-		"openai/gpt-5.6-sol":            "codex.sol",
-		"openai/gpt-5.4-nano":           "codex.nano",
-		"openrouter/moonshotai/kimi-k3": "openrouter.kimi-k3",
+		"openai/gpt-5.6-sol":                 "codex.sol",
+		"openai/gpt-5.4-nano":                "codex.nano",
+		"openrouter/~moonshotai/kimi-latest": "openrouter.kimi-k3",
 	} {
 		if got, _ := identity("opencode", model); got != want {
 			t.Fatalf("identity(%q)=%q want=%q", model, got, want)
@@ -129,8 +129,12 @@ func TestMainFailsClosedBeforeProviderWhenArtifactRootUnavailable(t *testing.T) 
 
 func TestMainDoctorJSON(t *testing.T) {
 	directory := t.TempDir()
-	binary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok'\n"), 0o700); err != nil {
+	cursorBinary := filepath.Join(directory, "cursor-agent")
+	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	opencodeBinary := filepath.Join(directory, "opencode")
+	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openrouter/deepseek/deepseek-v4-pro' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
@@ -148,8 +152,13 @@ func TestMainDoctorJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || len(result.Checks) != 1 || result.Checks[0].Name != "cursor.grok" || !result.Checks[0].OK {
+	if !result.OK || len(result.Checks) != 3 {
 		t.Fatalf("doctor = %#v", result)
+	}
+	for _, check := range result.Checks {
+		if !check.OK {
+			t.Fatalf("doctor = %#v", result)
+		}
 	}
 }
 

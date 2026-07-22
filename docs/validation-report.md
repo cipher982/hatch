@@ -89,6 +89,15 @@ artifact commit, 237.8 ns run-ID generation, 32 concurrent isolated provider
 runs, bounded timeout/cancellation cleanup, and one reused HTTP connection
 across Expert POST/poll in `TestRunPollsAndReturnsMetadata`.
 
+The final-writer soak exposed a current model-catalog incompatibility before it
+could be mistaken for healthy coverage: OpenCode 1.17.20 lists
+`openrouter/moonshotai/kimi-k3` but rejects that direct slug at execution time.
+OpenRouter's official `~moonshotai/kimi-latest` alias currently resolves to K3
+and succeeded through the identical Hatch/OpenCode path in run
+`hatch_20260722T190654.473305000Z_ff9131e975e70754`. The stable Hatch `kimi-k3`
+surface and Python rollback oracle now use that routing alias, and `hatch doctor`
+checks all configured Codex/OpenRouter catalog IDs in addition to Cursor.
+
 ## Cutover and rollback
 
 `scripts/install-local.sh` installed the content-addressed Go 0.2.0 binary and preserved Python 0.1.0 as `hatch-python`. The real selector was switched Go → Python → Go; both `--version` checks passed. The installed Go binary then passed help, doctor, runs-list, fake-provider, and real Claude smokes.
@@ -105,10 +114,10 @@ Rollback remains `scripts/install-local.sh --select python` and does not mutate 
 
 Python production files stay in the branch until `scripts/check-field-evidence.sh` verifies at least 50 genuine contract-complete runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert. The checker validates terminal/durable state, rejects capture-persistence warnings, verifies the persisted evidence-manifest digest, and verifies every file hash in that closed set.
 
-Eight genuine Go runs have been observed: Claude 3, Codex 2, Cursor 1,
-OpenRouter 1, and Expert 1. They remain live provider proofs, but all predate the
-explicit `writer={implementation:go, contract_revision:1}` marker added after
-the final audit. They are therefore conservatively excluded from
-Python-retirement credit rather than inferred from incidental fields. The final
-writer deletion gate starts at 0/50. Synthetic paid calls are not counted merely
-to accelerate deletion.
+Thirteen genuine Go runs have been observed. Ten predate the explicit
+`writer={implementation:go, contract_revision:1}` marker; two final-writer Kimi
+attempts are durable explained model-resolution failures; and one successful
+final-writer request used the raw diagnostic surface. They remain provider and
+failure-semantics evidence but are conservatively excluded from surfaced
+Python-retirement credit. The final writer deletion gate remains 0/50.
+Synthetic paid calls are not counted merely to accelerate deletion.

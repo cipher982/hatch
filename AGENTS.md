@@ -136,7 +136,11 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
    secret manager in the Go binary, and never put prompt or credential values in
    manifest argv
 5. **Surfaced `claude` must not use OpenRouter implicitly** - `hatch claude` uses local Claude Code OAuth/subscription and strips `OPENROUTER_API_KEY`; OpenRouter Claude models require an explicit OpenRouter surface if ever re-added
-6. **Surfaced `cursor` uses Cursor Agent CLI** - `cursor-agent -p --trust --force --model ...`; auth is Cursor login (or optional `CURSOR_API_KEY`). Prefer the `cursor-agent` binary name over the `agent` symlink to avoid PATH collisions. Run `hatch doctor` after Cursor upgrades to verify that the stable `grok` alias still targets an available account model.
+6. **Provider aliases drift** - run `hatch doctor` after Cursor or OpenCode
+   upgrades. It verifies Cursor `grok`, Codex tiers, and OpenRouter aliases.
+   Stable `kimi-k3` intentionally routes through OpenRouter's
+   `~moonshotai/kimi-latest` alias because OpenCode 1.17.20 lists the direct K3
+   slug but rejects it at execution time.
 7. **Artifact publication is ordered** - `result.json` precedes the terminal
    manifest. A terminal manifest is the commit point; never rewrite an existing
    run artifact or infer loss from a collapsed caller transcript.

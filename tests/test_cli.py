@@ -450,7 +450,7 @@ class TestNormalizeArgv:
             "--backend",
             "opencode",
             "--model",
-            "openrouter/moonshotai/kimi-k3",
+            "openrouter/~moonshotai/kimi-latest",
             "review",
         ]
         assert normalize_argv(["cursor", "grok", "review"]) == [
@@ -1147,7 +1147,7 @@ class TestMain:
             assert mock_hydrate.call_args[0][0] == "openrouter"
             kwargs = mock_config.call_args[1]
             assert kwargs["api_key"] == "or-key"
-            assert kwargs["model"] == "openrouter/moonshotai/kimi-k3"
+            assert kwargs["model"] == "openrouter/~moonshotai/kimi-latest"
 
     def test_timeout_passed(
         self, mock_run_sync, mock_get_config, mock_hydrate_backend_kwargs, mock_detect_context, mock_zai_key

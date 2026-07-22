@@ -479,7 +479,7 @@ class TestOpenCodeStreamRunSync:
             env={},
             cwd=None,
             timeout_s=1,
-            model="openrouter/moonshotai/kimi-k3",
+            model="openrouter/~moonshotai/kimi-latest",
             progress_label="Codex",
         )
 
@@ -494,7 +494,7 @@ class TestOpenCodeStreamRunSync:
         metadata = json.loads((artifact / "metadata.json").read_text())
         assert metadata["session_id"] == "ses_timeout123"
         assert metadata["outcome"] == "timed_out"
-        assert metadata["model"] == "openrouter/moonshotai/kimi-k3"
+        assert metadata["model"] == "openrouter/~moonshotai/kimi-latest"
         assert metadata["provider"] == "openrouter"
         assert metadata["credential_env_var"] == "OPENROUTER_API_KEY"
         assert metadata["resume_argv"][:3] == [

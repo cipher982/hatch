@@ -38,7 +38,7 @@ var surfaces = map[string]struct {
 	}},
 	"openrouter": {"opencode", map[string]string{
 		"deepseek-v4-pro": "openrouter/deepseek/deepseek-v4-pro",
-		"kimi-k3":         "openrouter/moonshotai/kimi-k3",
+		"kimi-k3":         "openrouter/~moonshotai/kimi-latest",
 	}},
 }
 

@@ -1,6 +1,6 @@
 # Hatch Go Rewrite Epic
 
-Status: Go 0.2.0 cut over; Phase 7 field soak in progress (0/50 final-writer; 8 observed)
+Status: Go 0.2.0 cut over; Phase 7 field soak in progress (0/50 final-writer; 13 observed)
 
 Decision owner: David Rose
 
@@ -686,8 +686,8 @@ credential change, or provider-state conversion.
 ### Phase 7 — Retire Python
 
 Status: in progress. Eight genuine durable Go runs have accumulated, but the
-eight runs before the final writer-contract marker are provider evidence rather
-than Python-retirement credit. Python is retained only as the frozen
+thirteen runs have been observed, but pre-marker, failed, and raw diagnostic
+runs are provider evidence rather than Python-retirement credit. Python is retained only as the frozen
 compatibility oracle and rollback release until the cryptographic
 `scripts/check-field-evidence.sh` gate passes.
 

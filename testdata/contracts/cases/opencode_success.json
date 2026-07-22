@@ -23,7 +23,7 @@
     "provider_argv": [
       "opencode", "run", "--dangerously-skip-permissions", "--pure", "--print-logs",
       "--log-level", "ERROR", "--format", "json", "-m",
-      "openrouter/moonshotai/kimi-k3", "$PREPARED_PROMPT"
+      "openrouter/~moonshotai/kimi-latest", "$PREPARED_PROMPT"
     ],
     "provider_stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "provider_stdin_bytes": 0

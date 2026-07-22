@@ -256,7 +256,7 @@ Illustrative V1 shape:
   "surface": "openrouter.kimi-k3",
   "backend": "opencode",
   "provider": "openrouter",
-  "model": "moonshotai/kimi-k3",
+  "model": "openrouter/~moonshotai/kimi-latest",
   "cwd": "/repo",
   "execution": "subprocess",
   "invocation": {
