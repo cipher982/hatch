@@ -229,6 +229,64 @@ func TestCoordinatorTimeoutKillsProcessGroup(t *testing.T) {
 	}
 }
 
+func TestCoordinatorTimeoutKillsDescendants(t *testing.T) {
+	fake := buildTestProvider(t)
+	sentinel := filepath.Join(t.TempDir(), "child-survived")
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 300 * time.Millisecond,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang_with_child", "HATCH_CHILD_SENTINEL": sentinel}},
+	})
+	if result.Status != "timeout" {
+		t.Fatalf("result = %#v", result)
+	}
+	time.Sleep(2200 * time.Millisecond)
+	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+		t.Fatalf("descendant survived process-group timeout: %v", err)
+	}
+}
+
+func TestCoordinatorPreservesInvalidUTF8Evidence(t *testing.T) {
+	fake := buildTestProvider(t)
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "invalid_utf8"}},
+	})
+	if !result.OK || result.ArtifactPath == nil {
+		t.Fatalf("result = %#v", result)
+	}
+	raw, err := os.ReadFile(filepath.Join(*result.ArtifactPath, "stdout.log"))
+	want := []byte{'o', 'k', ':', 0xff, 0xfe, '\n'}
+	if err != nil || !bytes.Equal(raw, want) {
+		t.Fatalf("raw = %v, %v", raw, err)
+	}
+}
+
+func TestCoordinatorRedactsPromptAndCredentialValues(t *testing.T) {
+	fake := buildTestProvider(t)
+	secret := "sk-secret-never-persist"
+	prompt := "prompt with $(shell) and 'quotes'"
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/moonshotai/kimi-k3", Prompt: prompt, APIKey: secret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	invocation.Argv[0] = fake
+	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_opencode"
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "openrouter.kimi-k3", Provider: "openrouter", Model: "openrouter/moonshotai/kimi-k3", Prompt: prompt,
+		Timeout: 5 * time.Second, Invocation: invocation, CredentialNames: []string{"OPENROUTER_API_KEY"},
+	})
+	if !result.OK || result.ArtifactPath == nil {
+		t.Fatalf("result = %#v", result)
+	}
+	manifest, err := os.ReadFile(filepath.Join(*result.ArtifactPath, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(manifest, []byte(secret)) || bytes.Contains(manifest, []byte(prompt)) || !bytes.Contains(manifest, []byte("OPENROUTER_API_KEY")) {
+		t.Fatalf("unsafe manifest: %s", manifest)
+	}
+}
+
 func TestCoordinatorThirtyTwoConcurrentRunsAreIsolated(t *testing.T) {
 	fake := buildTestProvider(t)
 	store := NewStore(filepath.Join(t.TempDir(), "runs"))

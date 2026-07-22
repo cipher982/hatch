@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -107,6 +108,17 @@ func main() {
 	case "hang":
 		fmt.Fprintln(os.Stdout, "partial output")
 		time.Sleep(10 * time.Second)
+	case "hang_with_child":
+		child := exec.Command("sh", "-c", `sleep 2; printf survived > "$HATCH_CHILD_SENTINEL"`)
+		child.Env = os.Environ()
+		if err := child.Start(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(93)
+		}
+		fmt.Fprintln(os.Stdout, "partial output")
+		time.Sleep(10 * time.Second)
+	case "invalid_utf8":
+		_, _ = os.Stdout.Write([]byte{'o', 'k', ':', 0xff, 0xfe, '\n'})
 	default:
 		fmt.Fprintf(os.Stderr, "testprovider: unknown scenario %q\n", os.Getenv("HATCH_TEST_SCENARIO"))
 		os.Exit(96)
