@@ -51,7 +51,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	artifactPath := artifact.Path
 	if req.Progress != nil {
 		req.Progress(fmt.Sprintf("[hatch] run %s artifact %s", artifact.Manifest.RunID, artifact.Path))
-		if req.ProgressLabel != "" {
+		if req.ProgressLabel != "" && (req.Invocation.Adapter == "" || req.Invocation.Adapter == "raw") {
 			req.Progress(fmt.Sprintf("[hatch] %s started", req.ProgressLabel))
 		}
 	}
@@ -85,6 +85,14 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 	var stdout, stderr bytes.Buffer
 	stdoutCapture := &captureWriter{memory: &stdout, sink: stdoutFile}
+	if req.Progress != nil && req.Invocation.Adapter != "" && req.Invocation.Adapter != "raw" {
+		progress := provider.NewProgressParser(req.Invocation.Adapter, req.ProgressLabel)
+		stdoutCapture.observeLine = func(line []byte) {
+			for _, message := range progress.Observe(line) {
+				req.Progress(message)
+			}
+		}
+	}
 	stderrCapture := &captureWriter{memory: &stderr, sink: stderrFile}
 	cmd.Stdout = stdoutCapture
 	cmd.Stderr = stderrCapture
@@ -123,6 +131,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		waitErr = <-waited
 	}
 	for _, capture := range []*captureWriter{stdoutCapture, stderrCapture} {
+		capture.Flush()
 		if capture.sinkErr != nil {
 			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: capture.sinkErr.Error()})
 			artifact.Manifest.Capture.State = "degraded"
@@ -241,16 +250,18 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 		result.ArtifactPath = nil
 	}
-	if req.Progress != nil && req.ProgressLabel != "" {
+	if req.Progress != nil && req.ProgressLabel != "" && (req.Invocation.Adapter == "" || req.Invocation.Adapter == "raw") {
 		req.Progress(fmt.Sprintf("[hatch] %s completed", req.ProgressLabel))
 	}
 	return result
 }
 
 type captureWriter struct {
-	memory  *bytes.Buffer
-	sink    io.Writer
-	sinkErr error
+	memory      *bytes.Buffer
+	sink        io.Writer
+	sinkErr     error
+	observeLine func([]byte)
+	pending     []byte
 }
 
 func (w *captureWriter) Write(data []byte) (int, error) {
@@ -262,8 +273,27 @@ func (w *captureWriter) Write(data []byte) (int, error) {
 			w.sinkErr = io.ErrShortWrite
 		}
 	}
+	if w.observeLine != nil {
+		w.pending = append(w.pending, data...)
+		for {
+			index := bytes.IndexByte(w.pending, '\n')
+			if index < 0 {
+				break
+			}
+			line := append([]byte(nil), w.pending[:index]...)
+			w.pending = w.pending[index+1:]
+			w.observeLine(line)
+		}
+	}
 	// Storage degradation must not make os/exec stop draining provider output.
 	return len(data), nil
+}
+
+func (w *captureWriter) Flush() {
+	if w.observeLine != nil && len(w.pending) > 0 {
+		w.observeLine(append([]byte(nil), w.pending...))
+		w.pending = nil
+	}
 }
 
 func buildEnvironment(invocation provider.Invocation, runID string, automation bool) []string {

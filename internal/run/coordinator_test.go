@@ -130,6 +130,7 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var progress []string
 			invocation, err := provider.Build(provider.Request{Backend: test.backend, Model: test.model, Prompt: "oracle prompt", APIKey: "fake"})
 			if err != nil {
 				t.Fatal(err)
@@ -143,6 +144,7 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 			result := coordinator.Execute(Request{
 				Surface: test.name, Provider: test.name, Model: test.model, Prompt: "oracle prompt",
 				Timeout: 5 * time.Second, Invocation: invocation,
+				ProgressLabel: test.name, Progress: func(message string) { progress = append(progress, message) },
 			})
 			if !result.OK || result.Output != test.output || result.SessionID == nil || *result.SessionID != test.session {
 				t.Fatalf("unexpected result: ok=%v output=%q session=%v error=%s stderr=%s", result.OK, result.Output, result.SessionID, stringValue(result.Error), stringValue(result.Stderr))
@@ -154,6 +156,9 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 				stateFile := filepath.Join(*result.ArtifactPath, "provider", "opencode", "data", "opencode", "session.db")
 				if data, err := os.ReadFile(stateFile); err != nil || string(data) != "fake opencode state" {
 					t.Fatalf("provider state not preserved: %q, %v", data, err)
+				}
+				if len(progress) < 3 || progress[0][:12] != "[hatch] run " {
+					t.Fatalf("progress = %#v", progress)
 				}
 				if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider", "opencode", "data", "opencode", "auth.json")); !os.IsNotExist(err) {
 					t.Fatalf("untrusted provider auth state retained: %v", err)
