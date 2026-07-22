@@ -1,6 +1,6 @@
 # Hatch Go Rewrite Epic
 
-Status: proposed migration contract
+Status: Go 0.2.0 cut over; Phase 7 field soak in progress (7/50)
 
 Decision owner: David Rose
 
@@ -570,6 +570,8 @@ latency is reported separately because it overwhelms launcher overhead.
 
 ### Phase 0 — Freeze and classify
 
+Status: complete.
+
 - Tag the Python baseline and record its build/test commands.
 - Save `pytest --collect-only` and the green baseline result.
 - Build the compatibility ledger with all 304 tests classified.
@@ -581,6 +583,8 @@ Gate: the Python binary is reproducibly green, every test is classified, and the
 fake provider can exercise every execution family without credentials.
 
 ### Phase 1 — Go skeleton and public CLI
+
+Status: complete.
 
 - Add `go.mod`, `cmd/hatch`, build metadata, and the minimal package graph.
 - Implement argument normalization, aliases, help, stdin selection, machine
@@ -606,6 +610,8 @@ expanding the Go architecture to justify sunk cost.
 
 ### Phase 2 — Execution kernel
 
+Status: complete.
+
 - Implement the prelaunch `RunStore` and one run identity.
 - Implement subprocess execution, process groups, concurrent stream sinks,
   cancellation, timeout, and terminal commit.
@@ -617,6 +623,8 @@ including large streams, concurrency, crash evidence, and every persistence
 failure boundary.
 
 ### Phase 3 — Structured provider adapters
+
+Status: complete.
 
 - Port Claude, Cursor, and OpenCode using sanitized fixtures.
 - Keep adapters thin; share only mechanical parsing helpers.
@@ -632,6 +640,8 @@ legacy cases have zero unexplained divergence.
 
 ### Phase 4 — Expert and complete target contract
 
+Status: complete.
+
 - Port Expert using `net/http` with explicit polling and timeout semantics.
 - Store response snapshots in the common run artifact.
 - Finish public nested run JSON and compatibility aliases.
@@ -642,6 +652,8 @@ Gate: every V1 requirement in `docs/durable-run-contract.md` maps to a passing G
 test; existing artifacts are inspectable without mutation.
 
 ### Phase 5 — Independent validation
+
+Status: complete. See `docs/validation-report.md`.
 
 - Run the complete legacy parity and target contract suites.
 - Assign validation to an agent/context that did not write the relevant package.
@@ -657,6 +669,9 @@ complete.
 
 ### Phase 6 — Cutover with explicit rollback
 
+Status: complete. Go is selected locally; the real Go → Python → Go rollback
+was rehearsed without artifact or credential migration.
+
 - Install the Go binary as `hatch` while retaining the last Python release as
   `hatch-python` or an exact recoverable package version.
 - Provide an explicit operator-only implementation selector during validation;
@@ -669,6 +684,10 @@ Gate: rollback to the Python binary is rehearsed and requires no data mutation,
 credential change, or provider-state conversion.
 
 ### Phase 7 — Retire Python
+
+Status: in progress. Seven genuine durable Go runs have accumulated. Python is
+retained only as the frozen compatibility oracle and rollback release until the
+executable `scripts/check-field-evidence.sh` gate passes.
 
 - Observe at least 50 real Go Hatch invocations spanning every enabled surfaced
   provider, with at least five per surface.

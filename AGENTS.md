@@ -8,8 +8,14 @@ OpenRouter, and expert calls.
 ## Install
 
 ```bash
-uv tool install -e ~/git/hatch
+./scripts/build-release.sh
+./scripts/install-local.sh --select go
 ```
+
+The installer keeps the frozen Python 0.1.0 release available as
+`hatch-python` during the field soak. Use `./scripts/install-local.sh --select
+python` only for an explicit operator rollback; there is no per-invocation
+fallback.
 
 ## Entrypoints
 
@@ -54,9 +60,11 @@ Use the same surfaced commands for normal build/edit work and review prompts.
 ## Quick Reference
 
 ```bash
-uv sync --all-extras                   # Install dev deps
-uv run --extra dev pytest -v           # Run tests
-uv run --extra dev pytest -v -m integration  # Real API calls (needs creds)
+go test ./... -count=1                 # Go unit + contract suite
+go test -race ./... -count=1           # Concurrency and isolation
+go vet ./...                           # Static checks
+uv run pytest -q                       # Frozen Python compatibility oracle
+./scripts/test-field-evidence.sh       # Python-retirement gate checker
 ```
 
 ## Runtime Notes
@@ -64,7 +72,9 @@ uv run --extra dev pytest -v -m integration  # Real API calls (needs creds)
 Credentials are resolved explicitly before backend launch:
 - CLI `--api-key` override wins
 - Existing shell env wins next
-- Credentialed backends (`codex`, `openrouter`) then use the configured local secret helper
+- Credentialed backends then use the external helper named by
+  `HATCH_CREDENTIAL_HELPER`; Hatch passes a small JSON request on stdin and
+  receives credentials on stdout without owning a secret-manager integration
 
 Machine callers:
 - non-interactive CLI runs default to JSON output and automation mode automatically
@@ -72,18 +82,20 @@ Machine callers:
   investigate proportionally, and synthesize once evidence is sufficient
 - set `HATCH_DISABLE_SECRET_HELPER=1` when you need tests or subprocesses to fail fast instead of loading secrets from the local helper
 - surfaced Claude/Codex/Cursor runs stream terse live progress to stderr while preserving only the final answer on stdout/JSON
-- surfaced OpenCode runs preserve private provider state plus raw stdout/stderr
-  under `~/.local/state/hatch/runs/`; JSON results carry the artifact path and
-  provider session ID for every outcome
+- every run allocates a durable artifact before provider launch and preserves
+  raw stdout/stderr under `~/.local/state/hatch/runs/`; JSON results carry the
+  run ID, artifact path, capture state, and provider identity when available
+- use `hatch runs list` and `hatch runs inspect <run-id>` to recover results
+  independently of an outer terminal wrapper
 
 ## Architecture
 
 ```
-cli.py → credentials.py → backends.py → subprocess(opencode/claude/codex/gemini)
-                    ↓
-               infisical-get.py
-        ↓
-    context.py (container detection)
+cmd/hatch → internal/cli → internal/run.Coordinator → provider process or Expert HTTP
+                                  ↓
+                          content-addressed RunStore
+                                  ↓
+                    raw evidence + result + terminal manifest
 ```
 
 **Active backends:** `claude`, `cursor`, `bedrock`, `codex`, `gemini`, `opencode`
@@ -93,11 +105,13 @@ cli.py → credentials.py → backends.py → subprocess(opencode/claude/codex/g
 **Key files:**
 | File | Purpose |
 |------|---------|
-| `backends.py` | Env vars + cmd building per backend |
-| `runner.py` | Async subprocess wrapper + timeout |
-| `expert.py` | Direct single-call Responses API expert mode |
-| `context.py` | Container/filesystem detection |
-| `cli.py` | Argument parsing + main() |
+| `cmd/hatch/main.go` | Release entrypoint |
+| `internal/cli/` | Parsing, command construction, credentials, doctor, run inspection |
+| `internal/run/coordinator.go` | Single execution path and lifecycle ownership |
+| `internal/run/store.go` | Ordered durable artifact commits |
+| `internal/provider/` | Thin provider interpretation and progress adapters |
+| `internal/expert/` | Responses HTTP execution and polling |
+| `testdata/contract/` | Shared Python/Go process oracle corpus |
 
 ## Conventions
 
@@ -109,27 +123,22 @@ cli.py → credentials.py → backends.py → subprocess(opencode/claude/codex/g
 - **Do not leak internal runtime nouns into the public contract** - `opencode` is an implementation detail, not part of the default user/agent mental model
 - **Machine callers should not remember flags** - real non-interactive CLI runs should default to JSON output + automation mode
 
-## Library
-
-```python
-from hatch import run, Backend
-
-result = await run(
-    prompt="Fix the bug",
-    backend=Backend.OPENCODE,
-    model="openai/gpt-5.6-sol",
-)
-print(result.output if result.ok else result.error)
-```
-
 ## Gotchas
 
 1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, `hatch cursor grok`, or `hatch openrouter ...`; z.ai/GLM is disabled for now
-2. **Tests mock subprocess** - no real CLI calls except `integration` marked tests
-3. **Core deps should stay minimal** - the CLI currently needs no runtime Python dependencies; add one only when it removes more complexity than it creates
-4. **Credential loading lives in `credentials.py`** - do not fetch secrets inside backend config builders
+2. **All production execution uses the coordinator** - adapters interpret
+   evidence; they do not launch processes, own persistence, or invent retries
+3. **Python is an oracle, not production architecture** - until the genuine
+   50-run field gate passes, retain its tests and tagged rollback release but do
+   not add product behavior to the Python package
+4. **Credential authority stays external** - do not embed Infisical or another
+   secret manager in the Go binary, and never put prompt or credential values in
+   manifest argv
 5. **Surfaced `claude` must not use OpenRouter implicitly** - `hatch claude` uses local Claude Code OAuth/subscription and strips `OPENROUTER_API_KEY`; OpenRouter Claude models require an explicit OpenRouter surface if ever re-added
 6. **Surfaced `cursor` uses Cursor Agent CLI** - `cursor-agent -p --trust --force --model ...`; auth is Cursor login (or optional `CURSOR_API_KEY`). Prefer the `cursor-agent` binary name over the `agent` symlink to avoid PATH collisions. Run `hatch doctor` after Cursor upgrades to verify that the stable `grok` alias still targets an available account model.
+7. **Artifact publication is ordered** - `result.json` precedes the terminal
+   manifest. A terminal manifest is the commit point; never rewrite an existing
+   run artifact or infer loss from a collapsed caller transcript.
 
 ---
 
@@ -157,3 +166,7 @@ print(result.output if result.ok else result.error)
 - (2026-07-17) [timeouts] A surfaced Codex/OpenCode timeout preserves partial JSONL, stderr, isolated session state, session id, and inspect/resume argv under the durable run artifact root; never collapse a long review timeout to empty output.
 - (2026-07-21) [timeouts] Agent runs carry a provider-neutral 15-minute behavioral contract with a 30-minute hard backstop. Timeout artifacts record an env-complete manual resume command plus non-secret model/provider/credential-name metadata; never persist credential values or echo reasoning content.
 - (2026-07-22) [durability] A collapsed caller transcript is not lost output, and `artifact_path: null` must not be used as a recovery verdict. Preserve every surfaced OpenCode run, propagate provider session identity on all outcomes, and keep result capture, provider-state retention, and Longhouse archival as separate facts.
+- (2026-07-22) [rewrite] Go 0.2.0 is the selected production Hatch. Every
+  surface now uses the same durable coordinator; Python remains only as the
+  frozen parity oracle and explicit rollback until the genuine field gate
+  passes.
