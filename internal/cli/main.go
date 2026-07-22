@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -15,6 +16,9 @@ import (
 
 var Version = "0.1.0-go-dev"
 var Commit = "unknown"
+var Dirty = "unknown"
+var BuildGoVersion = ""
+var BuildTarget = ""
 
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bool) int {
 	if len(args) > 0 && args[0] == "expert" {
@@ -35,7 +39,15 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 		return 0
 	}
 	if request.Version {
-		fmt.Fprintf(stdout, "hatch %s (%s)\n", Version, Commit)
+		goVersion := BuildGoVersion
+		if goVersion == "" {
+			goVersion = runtime.Version()
+		}
+		target := BuildTarget
+		if target == "" {
+			target = runtime.GOOS + "/" + runtime.GOARCH
+		}
+		fmt.Fprintf(stdout, "hatch %s (commit=%s dirty=%s go=%s target=%s)\n", Version, Commit, Dirty, goVersion, target)
 		return 0
 	}
 	if request.Backend == "" {

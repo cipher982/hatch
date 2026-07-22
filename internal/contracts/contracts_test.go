@@ -17,7 +17,8 @@ import (
 type ledger struct {
 	SchemaVersion int `json:"schema_version"`
 	Baseline      struct {
-		CollectedTests int `json:"collected_tests"`
+		CollectedTests            int `json:"collected_tests"`
+		PostBaselineContractTests int `json:"post_baseline_contract_tests"`
 	} `json:"baseline"`
 	Dispositions []string `json:"dispositions"`
 	Tests        []struct {
@@ -34,8 +35,8 @@ func TestPythonTestLedger(t *testing.T) {
 	if got.SchemaVersion != 1 {
 		t.Fatalf("schema_version = %d, want 1", got.SchemaVersion)
 	}
-	if len(got.Tests) != got.Baseline.CollectedTests {
-		t.Fatalf("ledger has %d tests, baseline says %d", len(got.Tests), got.Baseline.CollectedTests)
+	if len(got.Tests) != got.Baseline.CollectedTests+got.Baseline.PostBaselineContractTests {
+		t.Fatalf("ledger has %d tests, frozen baseline plus migration tests says %d", len(got.Tests), got.Baseline.CollectedTests+got.Baseline.PostBaselineContractTests)
 	}
 	if got.Baseline.CollectedTests != 304 {
 		t.Fatalf("baseline collected_tests = %d, want frozen baseline 304", got.Baseline.CollectedTests)
@@ -46,6 +47,18 @@ func TestPythonTestLedger(t *testing.T) {
 		allowed[disposition] = true
 	}
 	seen := make(map[string]bool, len(got.Tests))
+	proofs := map[string]bool{
+		"internal/cli.TestNormalizeSurfaceCompatibility":       true,
+		"internal/contracts.TestLegacyParityCommandBuilders":   true,
+		"internal/contracts.TestLegacyParity":                  true,
+		"internal/cli.TestApplyHostContext":                    true,
+		"internal/run.TestCoordinatorStructuredProviders":      true,
+		"internal/cli.TestResolveCredentialPrecedence":         true,
+		"internal/cli.TestPreflightBedrockFailureIsActionable": true,
+		"internal/expert.TestRunPollsAndReturnsMetadata":       true,
+		"internal/doctor.TestCheckCursorModel":                 true,
+		"internal/contracts.TestReleaseInstall":                true,
+	}
 	for _, test := range got.Tests {
 		if test.NodeID == "" || seen[test.NodeID] {
 			t.Fatalf("empty or duplicate node_id %q", test.NodeID)
@@ -56,10 +69,48 @@ func TestPythonTestLedger(t *testing.T) {
 		}
 		if test.Proof == "" {
 			t.Errorf("%s has no proof target", test.NodeID)
+		} else if !proofs[test.Proof] {
+			t.Errorf("%s names non-executable proof target %q", test.NodeID, test.Proof)
 		}
 		if test.Disposition == "intentional_change" && (test.Reason == nil || *test.Reason == "") {
 			t.Errorf("%s has an intentional change without a reason", test.NodeID)
 		}
+	}
+}
+
+func TestPythonTestLedgerMatchesFreshCollection(t *testing.T) {
+	var got ledger
+	root := repoRoot(t)
+	readJSON(t, filepath.Join(root, "testdata", "contracts", "python-test-ledger.json"), &got)
+	command := exec.Command("uv", "run", "pytest", "--collect-only", "-q")
+	command.Dir = root
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("collect Python tests: %v\n%s", err, output)
+	}
+	collected := map[string]bool{}
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "tests/") {
+			collected[line] = true
+		}
+	}
+	ledgerIDs := map[string]bool{}
+	for _, row := range got.Tests {
+		ledgerIDs[row.NodeID] = true
+	}
+	for id := range collected {
+		if !ledgerIDs[id] {
+			t.Errorf("fresh Python test missing from ledger: %s", id)
+		}
+	}
+	for id := range ledgerIDs {
+		if !collected[id] {
+			t.Errorf("ledger test missing from fresh collection: %s", id)
+		}
+	}
+	if len(collected) != len(ledgerIDs) {
+		t.Fatalf("fresh collection=%d ledger=%d", len(collected), len(ledgerIDs))
 	}
 }
 
