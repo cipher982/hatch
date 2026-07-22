@@ -30,6 +30,7 @@ type RunStore interface {
 	Prepare(PreparedRun) (*Artifact, error)
 	OpenStreams(*Artifact) (StreamSink, StreamSink, error)
 	MarkRunning(*Artifact, int, time.Time) error
+	MarkHTTPRunning(*Artifact, time.Time) error
 	WriteResult(*Artifact, []byte) (string, error)
 	CommitTerminal(*Artifact, Outcome, int, Result, State, []Warning) error
 	WritePublicProjection(*Artifact, PublicResult) error
@@ -43,6 +44,7 @@ type Artifact struct {
 
 type PreparedRun struct {
 	Surface, Provider, Model, CWD, Request string
+	Execution                              string
 	RedactedArgv                           []string
 	CredentialNames                        []string
 	StructuredStdout                       bool
@@ -94,7 +96,7 @@ func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
 	manifest := Manifest{
 		SchemaVersion: 1, RunID: runID, CreatedAt: now, UpdatedAt: now,
 		Lifecycle: LifecyclePrepared, Surface: spec.Surface, Provider: spec.Provider,
-		Model: spec.Model, CWD: spec.CWD, Execution: "subprocess",
+		Model: spec.Model, CWD: spec.CWD, Execution: executionOrDefault(spec.Execution),
 		Invocation: Invocation{
 			RequestFile: "request.txt", RequestSHA256: hex.EncodeToString(digest[:]),
 			RedactedArgv: append([]string(nil), spec.RedactedArgv...), CredentialEnvNames: append([]string(nil), spec.CredentialNames...),
@@ -111,9 +113,23 @@ func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
 	return artifact, nil
 }
 
+func executionOrDefault(value string) string {
+	if value == "" {
+		return "subprocess"
+	}
+	return value
+}
+
 func (s Store) MarkRunning(artifact *Artifact, pid int, started time.Time) error {
 	artifact.Manifest.Lifecycle = LifecycleRunning
 	artifact.Manifest.Process = &Process{PID: pid, StartedAt: started.UTC()}
+	artifact.Manifest.UpdatedAt = s.Now().UTC()
+	return s.writeManifest(artifact)
+}
+
+func (s Store) MarkHTTPRunning(artifact *Artifact, started time.Time) error {
+	artifact.Manifest.Lifecycle = LifecycleRunning
+	artifact.Manifest.HTTP = &HTTP{StartedAt: started.UTC()}
 	artifact.Manifest.UpdatedAt = s.Now().UTC()
 	return s.writeManifest(artifact)
 }

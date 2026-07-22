@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,6 +50,34 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 	}
 	if result.ArtifactPath == "" || result.Run.RunID == "" {
 		t.Fatalf("durable identity missing: %#v", result)
+	}
+}
+
+func TestMainExpertJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost {
+			t.Fatalf("method = %s", request.Method)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "resp_cli", "status": "completed", "model": "gpt-resolved",
+			"output": []any{map[string]any{"type": "message", "content": []any{map[string]any{"type": "output_text", "text": "expert answer"}}}},
+		})
+	}))
+	defer server.Close()
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv("HATCH_EXPERT_RESPONSES_URL", server.URL)
+	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", filepath.Join(t.TempDir(), "runs"))
+	var stdout, stderr bytes.Buffer
+	exit := Main([]string{"expert", "--json", "--no-web-search", "question"}, bytes.NewReader(nil), &stdout, &stderr, true)
+	if exit != 0 {
+		t.Fatalf("exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+	var result map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result["ok"] != true || result["output"] != "expert answer" || result["artifact_path"] == nil || result["run"] == nil {
+		t.Fatalf("result = %#v", result)
 	}
 }
 

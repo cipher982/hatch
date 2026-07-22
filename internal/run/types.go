@@ -31,11 +31,19 @@ type Manifest struct {
 	Execution     string     `json:"execution"`
 	Invocation    Invocation `json:"invocation"`
 	Process       *Process   `json:"process"`
+	HTTP          *HTTP      `json:"http,omitempty"`
 	Result        Result     `json:"result"`
 	Capture       Capture    `json:"capture"`
 	ProviderState State      `json:"provider_state"`
 	Archive       Archive    `json:"archive"`
 	Warnings      []Warning  `json:"warnings"`
+}
+
+type HTTP struct {
+	StartedAt   time.Time  `json:"started_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+	Attempts    int        `json:"attempts"`
+	LastStatus  *int       `json:"last_status"`
 }
 
 type Invocation struct {

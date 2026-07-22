@@ -17,6 +17,9 @@ var Version = "0.1.0-go-dev"
 var Commit = "unknown"
 
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bool) int {
+	if len(args) > 0 && args[0] == "expert" {
+		return runExpert(args[1:], stdin, stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "doctor" {
 		return runDoctor(args[1:], stdout, stderr)
 	}
