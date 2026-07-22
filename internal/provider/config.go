@@ -153,6 +153,10 @@ func Build(req Request) (Invocation, error) {
 		if strings.HasPrefix(req.Model, "openrouter/") && req.APIKey != "" {
 			invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
 		}
+		if strings.HasPrefix(req.Model, "amazon-bedrock/") {
+			invocation.SetEnv["AWS_PROFILE"] = "zh-ml-mlengineer"
+			invocation.SetEnv["AWS_REGION"] = "us-east-1"
+		}
 		return invocation, nil
 	case "codex":
 		if req.APIKey == "" {

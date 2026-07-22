@@ -81,6 +81,9 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
 	applyHostContext(&invocation, request.Backend, DetectContext())
+	if err := preflightBedrock(request.Model, invocation); err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
 	root, err := runner.DefaultRoot()
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
