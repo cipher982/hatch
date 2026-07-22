@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "name": "raw_codex_success",
+  "provider_binaries": ["codex"],
+  "arguments": ["-b", "codex", "--api-key", "fake-test-key", "--model", "gpt-test", "--reasoning-effort", "high", "--skip-git-repo-check", "--json", "-"],
+  "stdin": "oracle prompt",
+  "scenario": "success_text",
+  "expected": {
+    "exit_code": 0,
+    "result": {
+      "ok": true,
+      "status": "ok",
+      "output": "fake provider output\n",
+      "exit_code": 0,
+      "error": null,
+      "stderr": "",
+      "artifact_path": null,
+      "session_id": null,
+      "resume_command": null
+    },
+    "provider_argv": [
+      "codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "-m", "gpt-test",
+      "-c", "model_reasoning_effort=high", "--skip-git-repo-check"
+    ],
+    "provider_stdin_sha256": "0eb7749ad17c17ce3323e0628fc9a6fc040d640d95edb7d6839f983ac354ee54",
+    "provider_stdin_bytes": 570
+  }
+}

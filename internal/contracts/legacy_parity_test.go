@@ -40,7 +40,9 @@ func TestLegacyParityCommandBuilders(t *testing.T) {
 			}
 			invocation, err := provider.Build(provider.Request{
 				Backend: parsed.Backend, Model: parsed.Model, Prompt: prompt,
-				CWD: parsed.CWD, ReasoningEffort: parsed.ReasoningEffort,
+				CWD: parsed.CWD, ReasoningEffort: parsed.ReasoningEffort, APIKey: parsed.APIKey,
+				OutputFormat: parsed.OutputFormat, Resume: parsed.Resume,
+				SkipGitRepoCheck: parsed.SkipGitRepoCheck, IncludePartialMessages: parsed.IncludePartialMessages,
 			})
 			if err != nil {
 				t.Fatal(err)

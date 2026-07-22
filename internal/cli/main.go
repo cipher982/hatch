@@ -136,6 +136,8 @@ func progressLabel(surface string) string {
 	switch {
 	case strings.HasPrefix(surface, "claude."):
 		return "Claude"
+	case strings.HasPrefix(surface, "bedrock."):
+		return "Claude"
 	case strings.HasPrefix(surface, "cursor."):
 		return "Cursor"
 	case strings.HasPrefix(surface, "openrouter."):
