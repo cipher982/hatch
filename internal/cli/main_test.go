@@ -61,6 +61,18 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 	}
 }
 
+func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
+	for model, want := range map[string]string{
+		"openai/gpt-5.6-sol":            "codex.sol",
+		"openai/gpt-5.4-nano":           "codex.nano",
+		"openrouter/moonshotai/kimi-k3": "openrouter.kimi-k3",
+	} {
+		if got, _ := identity("opencode", model); got != want {
+			t.Fatalf("identity(%q)=%q want=%q", model, got, want)
+		}
+	}
+}
+
 func TestMainExpertJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {

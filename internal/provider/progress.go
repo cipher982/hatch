@@ -105,12 +105,19 @@ func (p *ProgressParser) claudeTools(event map[string]any) []string {
 }
 
 func startedMessage(label string, event map[string]any, idName string) string {
+	details := []string{}
+	if model, _ := event["model"].(string); model != "" {
+		details = append(details, model)
+	}
 	id, _ := event[idName].(string)
 	if id != "" {
 		if len(id) > 8 {
 			id = id[:8]
 		}
-		return fmt.Sprintf("[hatch] %s started (session %s)", label, id)
+		details = append(details, "session "+id)
+	}
+	if len(details) > 0 {
+		return fmt.Sprintf("[hatch] %s started (%s)", label, strings.Join(details, ", "))
 	}
 	return "[hatch] " + label + " started"
 }

@@ -235,11 +235,21 @@ func identity(backend, model string) (string, string) {
 	case "gemini":
 		return "gemini.raw", "google"
 	case "opencode":
+		for alias, configured := range surfaces["openrouter"].models {
+			if configured == model {
+				return "openrouter." + alias, "openrouter"
+			}
+		}
+		for alias, configured := range surfaces["codex"].models {
+			if configured == model {
+				return "codex." + alias, "openai"
+			}
+		}
 		if strings.HasPrefix(model, "openrouter/") {
-			return "openrouter." + strings.TrimPrefix(model[strings.LastIndex(model, "/"):], "/"), "openrouter"
+			return "openrouter.raw", "openrouter"
 		}
 		if strings.HasPrefix(model, "openai/") {
-			return "codex." + strings.TrimPrefix(model, "openai/gpt-5.6-"), "openai"
+			return "codex.raw", "openai"
 		}
 	}
 	return backend + ".raw", "unknown"

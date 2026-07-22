@@ -11,12 +11,12 @@ func TestProgressParserDeduplicatesToolsAndReportsLifecycle(t *testing.T) {
 		{
 			name: "claude", adapter: "claude", label: "Claude",
 			lines: []string{
-				`{"type":"system","subtype":"init","session_id":"claude-session"}`,
+				`{"type":"system","subtype":"init","model":"haiku","session_id":"claude-session"}`,
 				`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tool-1","name":"Read","input":{"file_path":"/tmp/a"}}]}}`,
 				`{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tool-1","name":"Read","input":{"file_path":"/tmp/a"}}]}}`,
 				`{"type":"result","duration_ms":1200}`,
 			},
-			want: []string{"[hatch] Claude started (session claude-s)", "[hatch] Read: /tmp/a", "[hatch] Claude completed in 1.2s"},
+			want: []string{"[hatch] Claude started (haiku, session claude-s)", "[hatch] Read: /tmp/a", "[hatch] Claude completed in 1.2s"},
 		},
 		{
 			name: "cursor", adapter: "cursor", label: "Cursor",
