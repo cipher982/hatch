@@ -42,6 +42,23 @@ installs the pointer beside its native-shell helper. This retains the existing
 Infisical machine-token authority, adds no secret-manager knowledge or Python
 runtime to Hatch, and works for GUI/noninteractive agents.
 
+## Final retirement proof
+
+Commit `c654584` removed the Python package, production modules, pytest suite,
+package metadata, soak wrappers, and implementation selector in one reviewable
+change. It retained the frozen 316-row migration ledger, language-neutral
+contract corpus, legacy artifact readers, and tagged Python release history.
+Commits `39618a0` and `0ab7a6b` made source-archive identity executable and
+Git-independent.
+
+An archive of exact commit `0ab7a6b` contained no `pyproject.toml`, `src/`, or
+`tests/`. From that archive, `go test ./... -count=1` passed, all four release
+targets built, the Go-only installer succeeded in a fresh home, help rendered,
+and the installed binary reported the exact commit with `dirty=false`. The final
+working-tree matrix also passed the full Go suite, race detector, vet, contract,
+legacy parity, release install, and all four fuzz targets. Hatch therefore has
+no production, build, test, credential, or install dependency on Python.
+
 ## Post-cutover contract audit
 
 A requirement-by-requirement audit at `75c579b` replaced broad test-suite claims
