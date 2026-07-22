@@ -2,9 +2,11 @@
 
 Status: reviewed architecture and implementation plan
 
-Scope: every surfaced command, raw backend escape hatch, library call, and Expert consultation
+Scope: every surfaced command, raw backend escape hatch, and Expert consultation
 
 Supersedes: the OpenCode-only durability design shipped in `48b1cac`
+
+Implementation plan: `docs/go-rewrite-epic.md`
 
 ## Decision
 
@@ -36,8 +38,8 @@ manifest identity, progress identity, `LONGHOUSE_HATCH_RUN_ID`, and any provider
 origin sidecar identity. Existing unmatched sidecars are legacy classification
 data and are never presented as joined run records.
 
-This is a CLI and library contract, not a daemon, scheduler, universal agent
-runtime, or MCP server.
+This is a CLI contract, not a daemon, scheduler, universal agent runtime, MCP
+server, or promise of a public Go package API.
 
 ## Why
 
@@ -54,8 +56,10 @@ declared the review unrecoverable, and launched a duplicate:
 
 The immediate OpenCode fix now preserves its isolated database and raw streams,
 but Claude, Cursor, Expert, raw Codex, and Gemini still have different result and
-durability contracts. The async library `run()` also bypasses the streamed CLI
-and artifact paths entirely. Fixing one backend is not a system.
+durability contracts. The legacy async Python `run()` also bypasses the streamed
+CLI and artifact paths entirely; the Go migration retires that unsupported
+library surface rather than porting its split execution path. Fixing one backend
+is not a system.
 
 ## Goals
 
@@ -411,21 +415,20 @@ Creates the prepared record, launches the configured invocation, tees streams to
 the store, forwards lines to an adapter, handles timeout/process exit, asks the
 adapter for its terminal interpretation, and commits one terminal projection.
 
-The sync CLI and async library call the same coordinator. They must not maintain
-separate durability implementations.
+Every surfaced/raw CLI command and Expert call uses the same coordinator. They
+must not maintain separate durability implementations.
 
 ### `ProviderAdapter` protocol
 
 Keep the protocol small and data-oriented:
 
-```python
-class ProviderAdapter(Protocol):
-    raw_stream_format: Literal["jsonl", "text"]
-
-    def observe_stdout(self, line: str) -> list[Observation]: ...
-    def observe_stderr(self, line: str) -> list[Observation]: ...
-    def finalize(self, execution: ExecutionOutcome) -> ProviderOutcome: ...
-    def state_claim(self, artifact: RunArtifact) -> ProviderStateClaim: ...
+```go
+type Adapter interface {
+    ObserveStdout(line []byte) []Observation
+    ObserveStderr(line []byte) []Observation
+    Finalize(execution ExecutionOutcome) ProviderOutcome
+    StateClaim(artifact Artifact) ProviderStateClaim
+}
 ```
 
 `ExecutionOutcome` is the mechanical subprocess or HTTP completion record;
@@ -468,7 +471,7 @@ Provider notes:
   includes an approval-bypass flag required by the original autonomous run, the
   manifest marks that fact explicitly so an operator/agent can judge it.
 
-## Public CLI and library contract
+## Public CLI contract
 
 ### Invocation output
 
@@ -601,8 +604,9 @@ structured reference adapter:
 12. unknown event preservation and forward-compatible ignore behavior.
 
 Assertions cover both returned JSON and on-disk evidence. A test never passes by
-checking only one projection. The same suite exercises the CLI and async library
-through the shared coordinator; parity is a Phase 1 gate, not cleanup.
+checking only one projection. The same suite exercises surfaced commands, raw
+escape hatches, and Expert through the shared coordinator; entrypoint parity is
+a Phase 1 gate, not cleanup.
 
 ### Adapter fixtures
 
@@ -632,14 +636,13 @@ Shared mechanics are not redundantly retested through every provider.
 - schema migration/read compatibility for existing
   `hatch_opencode_run` and Expert artifacts.
 
-### CLI/library parity
+### Entrypoint parity
 
-The sync CLI and async `run()` execute the same coordinator contract. Contract
-tests invoke both and compare lifecycle, result, capture, identity, warning, and
-artifact projections. Human mode and JSON mode may render differently but must
-reference the same run.
-No entrypoint may call a provider subprocess or HTTP client beneath the
-coordinator.
+Surfaced commands, raw backend escape hatches, and Expert execute the same
+coordinator contract. Contract tests invoke each execution family and compare
+lifecycle, result, capture, identity, warning, and artifact projections. Human
+mode and JSON mode may render differently but must reference the same run. No
+entrypoint may call a provider subprocess or HTTP client beneath the coordinator.
 
 ### Live proofs
 
@@ -662,15 +665,15 @@ path.
 ### Phase 1 — Universal `RunStore`
 
 - Create run identity/artifact before launch.
-- Route every CLI and library path through one coordinator.
+- Route every CLI execution path through one coordinator.
 - Stream request/stdout/stderr/result for subprocess and HTTP executions.
 - Reuse the one run ID in the artifact, manifest, progress output,
   `LONGHOUSE_HATCH_RUN_ID`, and sidecars.
 - Keep current public JSON and provider behavior otherwise unchanged.
 
 Gate: every backend has a durable artifact across success/failure/timeout, and
-no provider is launched when storage preparation fails. CLI and async library
-contract tests produce equivalent records.
+no provider is launched when storage preparation fails. Surfaced, raw, and
+Expert contract tests produce equivalent run records.
 
 ### Phase 2 — Thin adapters and canonical result
 
@@ -735,7 +738,7 @@ risk handling for approval-bypass flags.
   with no unproven capability claims.
 - Raw evidence written before the failure survives success, failure, timeout,
   caller loss, and Hatch crash; no claim exceeds the retained evidence.
-- CLI and library share one implementation and contract suite.
+- Surfaced, raw, and Expert paths share one implementation and contract suite.
 - One run ID joins all Hatch-owned records and Longhouse origin metadata.
 - Inspection never requires implementation-directory archaeology.
 - Recovery hints are structured, risk-labeled, version-bound, and never
@@ -744,5 +747,5 @@ risk handling for approval-bypass flags.
 - Existing OpenCode and Expert artifacts remain readable and unmodified.
 - Compatibility aliases have a measured removal path.
 - Hermetic core, targeted adapter, adversarial storage, concurrency, migration,
-  and CLI/library parity tests pass; optional live proofs report provider drift
+  and entrypoint-parity tests pass; optional live proofs report provider drift
   without gating hermetic correctness.
