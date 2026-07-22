@@ -133,12 +133,12 @@ Rollback remains `scripts/install-local.sh --select python` and does not mutate 
 
 Python production files stay in the branch until `scripts/check-field-evidence.sh` verifies at least 50 genuine contract-complete runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert. The checker validates terminal/durable state, rejects capture-persistence warnings, verifies the persisted evidence-manifest digest, and verifies every file hash in that closed set.
 
-The latest audit observed 20 Go records: ten predate the explicit
+The latest audit observed 22 Go records: ten predate the explicit
 `writer={implementation:go, contract_revision:1}` marker, two were durable
 explained Kimi model-resolution failures, one successful request used the raw
 diagnostic surface, and one timed-out OpenCode run is a reviewed unsafe
-incident. Six stable surfaced successes qualify: Claude 2, Codex 1, Cursor 2,
-OpenRouter 1, and Expert 0.
+incident. One current Codex run is still active. Seven stable surfaced successes
+qualify: Claude 2, Codex 2, Cursor 2, OpenRouter 1, and Expert 0.
 Synthetic paid calls are not counted merely to accelerate deletion.
 
 Kimi's final review run
