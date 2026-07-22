@@ -58,11 +58,16 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
 	apiKey := request.APIKey
-	if apiKey == "" {
-		if strings.HasPrefix(request.Model, "openrouter/") {
-			apiKey = strings.TrimSpace(os.Getenv("OPENROUTER_API_KEY"))
-		} else if strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex" {
-			apiKey = strings.TrimSpace(os.Getenv("OPENAI_API_KEY"))
+	credentialEnvironment := ""
+	if strings.HasPrefix(request.Model, "openrouter/") {
+		credentialEnvironment = "OPENROUTER_API_KEY"
+	} else if strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex" {
+		credentialEnvironment = "OPENAI_API_KEY"
+	}
+	if credentialEnvironment != "" {
+		apiKey, err = resolveCredential(apiKey, credentialEnvironment)
+		if err != nil {
+			return renderConfigError(request.JSON, stdout, stderr, err)
 		}
 	}
 	if strings.HasPrefix(request.Model, "openrouter/") && apiKey == "" {

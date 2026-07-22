@@ -392,6 +392,9 @@ output: secret bytes on stdout, no logging
 status: found | absent | authority_error
 ```
 
+The executable wire contract is specified in
+[`credential-helper-protocol.md`](credential-helper-protocol.md).
+
 The command path/configuration is explicit; Hatch never searches for arbitrary
 secret tools. The helper inherits the current machine-token/cache authority and
 must preserve its error distinctions. Secret bytes never enter argv, manifests,
