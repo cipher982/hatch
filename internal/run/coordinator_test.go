@@ -488,6 +488,24 @@ func TestCoordinatorRedactsPromptAndCredentialValues(t *testing.T) {
 	}
 }
 
+func TestCoordinatorFailsClosedOnRedactionMetadataDrift(t *testing.T) {
+	fake := buildTestProvider(t)
+	record := filepath.Join(t.TempDir(), "provider-ran")
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "openrouter.kimi-k3", Provider: "openrouter", Prompt: "sensitive prompt", Timeout: time.Second,
+		Invocation: provider.Invocation{
+			Argv: []string{fake, "sensitive prompt"}, RedactedArgv: []string{fake},
+			SetEnv: map[string]string{"HATCH_TEST_RECORD": record},
+		},
+	})
+	if result.OK || result.ExitCode != -3 || result.ArtifactPath != nil || result.Error == nil || !strings.Contains(*result.Error, "redaction metadata") {
+		t.Fatalf("result=%#v", result)
+	}
+	if _, err := os.Stat(record); !os.IsNotExist(err) {
+		t.Fatalf("provider ran despite unsafe redaction metadata: %v", err)
+	}
+}
+
 func TestCoordinatorThirtyTwoConcurrentRunsAreIsolated(t *testing.T) {
 	fake := buildTestProvider(t)
 	store := NewStore(filepath.Join(t.TempDir(), "runs"))

@@ -86,6 +86,9 @@ func TestApplyDCGClaudeOverlay(t *testing.T) {
 	if index < 0 || !strings.Contains(invocation.Argv[index+1], binary) {
 		t.Fatalf("Claude args = %#v", invocation.Argv)
 	}
+	if len(invocation.RedactedArgv) != len(invocation.Argv) {
+		t.Fatalf("Claude redaction drift: argv=%#v redacted=%#v", invocation.Argv, invocation.RedactedArgv)
+	}
 }
 
 func TestApplyDCGOpenCodeIsolation(t *testing.T) {
@@ -121,6 +124,9 @@ func TestApplyDCGOpenCodeIsolation(t *testing.T) {
 	}
 	if flagValueIndex(invocation.Argv, "--pure") >= 0 || invocation.SetEnv["OPENCODE_CONFIG_DIR"] != filepath.Join(root, "opencode") {
 		t.Fatalf("OpenCode invocation = %#v", invocation)
+	}
+	if len(invocation.RedactedArgv) != len(invocation.Argv) || invocation.RedactedArgv[len(invocation.RedactedArgv)-1] != "<prompt>" || strings.Contains(strings.Join(invocation.RedactedArgv, " "), "User task:") {
+		t.Fatalf("OpenCode redaction drift: argv=%#v redacted=%#v", invocation.Argv, invocation.RedactedArgv)
 	}
 }
 

@@ -23,14 +23,14 @@ type Request struct {
 }
 
 type Invocation struct {
-	Argv             []string
-	PromptArgIndices []int
-	SetEnv           map[string]string
-	UnsetEnv         []string
-	Stdin            []byte
-	StreamFormat     string
-	Adapter          string
-	ProviderVersion  string
+	Argv            []string
+	RedactedArgv    []string
+	SetEnv          map[string]string
+	UnsetEnv        []string
+	Stdin           []byte
+	StreamFormat    string
+	Adapter         string
+	ProviderVersion string
 }
 
 func PreparePrompt(prompt string) string {
@@ -70,14 +70,14 @@ func Build(req Request) (Invocation, error) {
 		} else if outputFormat == "stream-json" {
 			streamFormat = "jsonl"
 		}
-		return Invocation{
+		return redactInvocation(Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
 			UnsetEnv: []string{
 				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY",
 				"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "ANTHROPIC_MODEL",
 			},
-		}, nil
+		}), nil
 	case "bedrock":
 		model := req.Model
 		if model == "" {
@@ -106,14 +106,14 @@ func Build(req Request) (Invocation, error) {
 		} else if outputFormat == "stream-json" {
 			streamFormat = "jsonl"
 		}
-		return Invocation{
+		return redactInvocation(Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
 			SetEnv: map[string]string{
 				"CLAUDE_CODE_USE_BEDROCK": "1", "AWS_PROFILE": "zh-ml-mlengineer",
 				"AWS_REGION": "us-east-1", "ANTHROPIC_MODEL": model,
 			},
 			UnsetEnv: []string{"AWS_DEFAULT_REGION", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"},
-		}, nil
+		}), nil
 	case "cursor":
 		model := req.Model
 		if model == "" {
@@ -129,7 +129,7 @@ func Build(req Request) (Invocation, error) {
 				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
 			},
 		}
-		invocation.PromptArgIndices = []int{len(invocation.Argv) - 1}
+		invocation = redactInvocation(invocation, len(invocation.Argv)-1)
 		if req.APIKey != "" {
 			invocation.SetEnv["CURSOR_API_KEY"] = req.APIKey
 		}
@@ -148,10 +148,9 @@ func Build(req Request) (Invocation, error) {
 		}
 		argv = append(argv, prompt)
 		invocation := Invocation{
-			Argv:             argv,
-			PromptArgIndices: []int{len(argv) - 1},
-			SetEnv:           map[string]string{},
-			StreamFormat:     "jsonl", Adapter: "opencode",
+			Argv:         argv,
+			SetEnv:       map[string]string{},
+			StreamFormat: "jsonl", Adapter: "opencode",
 			UnsetEnv: []string{
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "OPENAI_API_KEY", "CODEX_API_KEY",
 			},
@@ -166,7 +165,7 @@ func Build(req Request) (Invocation, error) {
 			invocation.SetEnv["AWS_PROFILE"] = "zh-ml-mlengineer"
 			invocation.SetEnv["AWS_REGION"] = "us-east-1"
 		}
-		return invocation, nil
+		return redactInvocation(invocation, len(invocation.Argv)-1), nil
 	case "codex":
 		if req.APIKey == "" {
 			return Invocation{}, fmt.Errorf("OPENAI_API_KEY not set and no api_key provided")
@@ -181,23 +180,33 @@ func Build(req Request) (Invocation, error) {
 		if req.SkipGitRepoCheck {
 			argv = append(argv, "--skip-git-repo-check")
 		}
-		return Invocation{
+		return redactInvocation(Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: "text", Adapter: "raw",
 			SetEnv:   map[string]string{"OPENAI_API_KEY": req.APIKey},
 			UnsetEnv: []string{"CODEX_API_KEY", "CLAUDE_CODE_USE_BEDROCK"},
-		}, nil
+		}), nil
 	case "gemini":
 		model := req.Model
 		if model == "" {
 			model = "gemini-3-pro-preview"
 		}
-		return Invocation{
+		return redactInvocation(Invocation{
 			Argv:         []string{"gemini", "--model", model, "--yolo", "--skip-trust", "-p", "-"},
 			Stdin:        []byte(prompt),
 			StreamFormat: "text", Adapter: "raw",
 			UnsetEnv: []string{"CLAUDE_CODE_USE_BEDROCK"},
-		}, nil
+		}), nil
 	default:
 		return Invocation{}, fmt.Errorf("unsupported backend %q", req.Backend)
 	}
+}
+
+func redactInvocation(invocation Invocation, promptIndices ...int) Invocation {
+	invocation.RedactedArgv = append([]string(nil), invocation.Argv...)
+	for _, index := range promptIndices {
+		if index >= 0 && index < len(invocation.RedactedArgv) {
+			invocation.RedactedArgv[index] = "<prompt>"
+		}
+	}
+	return invocation
 }

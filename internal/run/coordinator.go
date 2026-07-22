@@ -41,7 +41,10 @@ func NewCoordinator(store RunStore) Coordinator {
 
 func (c Coordinator) Execute(req Request) PublicResult {
 	started := c.Now()
-	redacted := redactArgv(req.Invocation.Argv, req.Invocation.PromptArgIndices)
+	redacted, err := validatedRedactedArgv(req.Invocation)
+	if err != nil {
+		return failedResult(-3, started, c.Now(), err.Error(), nil)
+	}
 	artifact, err := c.Store.Prepare(PreparedRun{
 		Surface: req.Surface, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
 		Request: req.Prompt, RedactedArgv: redacted, CredentialNames: req.CredentialNames,
@@ -473,14 +476,14 @@ func copyFirstEnvironment(values map[string]string, target string, sources ...st
 	}
 }
 
-func redactArgv(argv []string, promptIndices []int) []string {
-	result := append([]string(nil), argv...)
-	for _, index := range promptIndices {
-		if index >= 0 && index < len(result) {
-			result[index] = "<prompt>"
-		}
+func validatedRedactedArgv(invocation provider.Invocation) ([]string, error) {
+	if invocation.RedactedArgv == nil {
+		return append([]string(nil), invocation.Argv...), nil
 	}
-	return result
+	if len(invocation.RedactedArgv) != len(invocation.Argv) {
+		return nil, fmt.Errorf("provider invocation redaction metadata does not match argv")
+	}
+	return append([]string(nil), invocation.RedactedArgv...), nil
 }
 
 func unknownState() State {

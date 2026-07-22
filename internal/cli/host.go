@@ -107,6 +107,7 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 		}
 		insert := index + 2
 		invocation.Argv = append(invocation.Argv[:insert], append([]string{"--settings", string(settings)}, invocation.Argv[insert:]...)...)
+		invocation.RedactedArgv = append(invocation.RedactedArgv[:insert], append([]string{"--settings", string(settings)}, invocation.RedactedArgv[insert:]...)...)
 	case "opencode":
 		root := filepath.Join(home, ".config", "hatch", "dcg")
 		source := filepath.Join(home, "git", "me", "config", "dcg", "opencode-plugin.js")
@@ -125,6 +126,7 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 		invocation.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(root, "opencode")
 		invocation.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] = "1"
 		invocation.Argv = removeArg(invocation.Argv, "--pure")
+		invocation.RedactedArgv = removeArg(invocation.RedactedArgv, "--pure")
 	}
 	return nil
 }

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 func FuzzEvidencePath(f *testing.F) {
@@ -46,8 +48,8 @@ func FuzzRedactArgv(f *testing.F) {
 	f.Add("ordinary")
 	f.Add("$(danger) 'quoted'")
 	f.Fuzz(func(t *testing.T, prompt string) {
-		redacted := redactArgv([]string{"provider", prompt}, []int{1})
-		if len(redacted) != 2 || redacted[1] != "<prompt>" {
+		redacted, err := validatedRedactedArgv(provider.Invocation{Argv: []string{"provider", prompt}, RedactedArgv: []string{"provider", "<prompt>"}})
+		if err != nil || len(redacted) != 2 || redacted[1] != "<prompt>" {
 			t.Fatalf("redacted = %#v", redacted)
 		}
 	})
