@@ -247,6 +247,7 @@ Illustrative V1 shape:
 ```json
 {
   "schema_version": 1,
+  "writer": {"implementation": "go", "contract_revision": 1},
   "run_id": "hatch_01K0...",
   "created_at": "2026-07-22T15:00:00.000Z",
   "updated_at": "2026-07-22T15:06:25.000Z",
@@ -314,6 +315,9 @@ Illustrative V1 shape:
 
 Required rules:
 
+- `writer.contract_revision` identifies the exact Hatch-owned persistence
+  protocol needed for field-soak and migration gates. It is not provider
+  capability metadata and never substitutes for `schema_version`.
 - `run_id` is sortable and collision-resistant; it is never derived from a
   provider ID. Implement it with the standard library; no new dependency is
   justified for IDs.

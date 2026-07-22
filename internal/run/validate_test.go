@@ -12,11 +12,12 @@ func TestManifestWriterRejectsInvalidAxesAndPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	tests := map[string]func(*Manifest){
-		"unsafe path":     func(m *Manifest) { m.Capture.StdoutFile = "../secret" },
-		"collapsed axes":  func(m *Manifest) { m.Capture.State = "succeeded" },
-		"unknown warning": func(m *Manifest) { m.Warnings = []Warning{{Code: "free_form"}} },
-		"early outcome":   func(m *Manifest) { value := OutcomeFailed; m.Outcome = &value },
-		"missing backend": func(m *Manifest) { m.Backend = "" },
+		"unsafe path":             func(m *Manifest) { m.Capture.StdoutFile = "../secret" },
+		"collapsed axes":          func(m *Manifest) { m.Capture.State = "succeeded" },
+		"unknown warning":         func(m *Manifest) { m.Warnings = []Warning{{Code: "free_form"}} },
+		"early outcome":           func(m *Manifest) { value := OutcomeFailed; m.Outcome = &value },
+		"missing backend":         func(m *Manifest) { m.Backend = "" },
+		"missing writer contract": func(m *Manifest) { m.Writer = Writer{} },
 		"identity without id": func(m *Manifest) {
 			m.ProviderState.NativeIDState = "observed"
 		},

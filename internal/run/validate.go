@@ -19,6 +19,9 @@ func ValidateManifest(manifest Manifest) error {
 	if manifest.SchemaVersion != 1 {
 		return fmt.Errorf("unsupported schema version %d", manifest.SchemaVersion)
 	}
+	if manifest.Writer.Implementation != "go" || manifest.Writer.ContractRevision != 1 {
+		return fmt.Errorf("unsupported writer contract %q revision %d", manifest.Writer.Implementation, manifest.Writer.ContractRevision)
+	}
 	for name, value := range map[string]string{
 		"run_id": manifest.RunID, "surface": manifest.Surface, "backend": manifest.Backend,
 		"provider": manifest.Provider, "model": manifest.Model,

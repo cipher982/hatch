@@ -32,6 +32,9 @@ func TestStorePreparesPrivateDurableRun(t *testing.T) {
 	if artifact.Manifest.Lifecycle != LifecyclePrepared || artifact.Manifest.RunID != "hatch_test_run" {
 		t.Fatalf("unexpected manifest: %#v", artifact.Manifest)
 	}
+	if artifact.Manifest.Writer.Implementation != "go" || artifact.Manifest.Writer.ContractRevision != 1 {
+		t.Fatalf("writer contract = %#v", artifact.Manifest.Writer)
+	}
 	assertMode(t, root, 0o700)
 	assertMode(t, artifact.Path, 0o700)
 	assertMode(t, filepath.Join(artifact.Path, "request.txt"), 0o600)

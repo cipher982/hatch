@@ -23,6 +23,7 @@ const (
 
 type Manifest struct {
 	SchemaVersion int        `json:"schema_version"`
+	Writer        Writer     `json:"writer"`
 	RunID         string     `json:"run_id"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
@@ -42,6 +43,11 @@ type Manifest struct {
 	ProviderState State      `json:"provider_state"`
 	Archive       Archive    `json:"archive"`
 	Warnings      []Warning  `json:"warnings"`
+}
+
+type Writer struct {
+	Implementation   string `json:"implementation"`
+	ContractRevision int    `json:"contract_revision"`
 }
 
 type HTTP struct {

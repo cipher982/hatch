@@ -41,6 +41,8 @@ while IFS= read -r manifest; do
   fi
 
   backend=$(jq -r '.backend // ""' "$manifest")
+  writer=$(jq -r '.writer.implementation // ""' "$manifest")
+  contract_revision=$(jq -r '.writer.contract_revision // 0' "$manifest")
   evidence_file=$(jq -r '.capture.evidence_manifest_file // ""' "$manifest")
   expected_digest=$(jq -r '.capture.evidence_sha256 // ""' "$manifest")
   case "$evidence_file" in
@@ -48,7 +50,7 @@ while IFS= read -r manifest; do
   esac
   run_dir=$(dirname "$manifest")
   evidence_path="$run_dir/$evidence_file"
-  if [ -z "$backend" ] || [ "$backend" = unknown ] || [ ! -f "$evidence_path" ] || [ "${#expected_digest}" -ne 64 ]; then
+  if [ "$writer" != go ] || [ "$contract_revision" -ne 1 ] || [ -z "$backend" ] || [ "$backend" = unknown ] || [ ! -f "$evidence_path" ] || [ "${#expected_digest}" -ne 64 ]; then
     excluded=$((excluded + 1))
     continue
   fi

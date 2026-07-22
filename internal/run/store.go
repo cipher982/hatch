@@ -95,7 +95,8 @@ func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
 		stdoutFile = "stdout.jsonl"
 	}
 	manifest := Manifest{
-		SchemaVersion: 1, RunID: runID, CreatedAt: now, UpdatedAt: now,
+		SchemaVersion: 1, Writer: Writer{Implementation: "go", ContractRevision: 1},
+		RunID: runID, CreatedAt: now, UpdatedAt: now,
 		Lifecycle: LifecyclePrepared, Surface: valueOrUnknown(spec.Surface), Backend: valueOrUnknown(spec.Backend), Provider: valueOrUnknown(spec.Provider),
 		Model: valueOrUnknown(spec.Model), CWD: spec.CWD, Execution: executionOrDefault(spec.Execution),
 		Invocation: Invocation{

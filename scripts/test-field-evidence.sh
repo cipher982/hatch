@@ -21,7 +21,7 @@ for surface in claude codex cursor openrouter expert; do
     printf 'output\n' > "$run/result.txt"
     write_hash_manifest "$run"
     digest=$(sha256_file "$run/evidence.sha256")
-    printf '{"schema_version":1,"run_id":"%s-%s","surface":"%s.test","backend":"fake","lifecycle":"terminal","outcome":"succeeded","capture":{"state":"durable","evidence_manifest_file":"evidence.sha256","evidence_sha256":"%s"},"warnings":[]}\n' "$surface" "$index" "$surface" "$digest" > "$run/manifest.json"
+    printf '{"schema_version":1,"writer":{"implementation":"go","contract_revision":1},"run_id":"%s-%s","surface":"%s.test","backend":"fake","lifecycle":"terminal","outcome":"succeeded","capture":{"state":"durable","evidence_manifest_file":"evidence.sha256","evidence_sha256":"%s"},"warnings":[]}\n' "$surface" "$index" "$surface" "$digest" > "$run/manifest.json"
     index=$((index + 1))
   done
 done

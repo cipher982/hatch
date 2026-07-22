@@ -106,8 +106,9 @@ Rollback remains `scripts/install-local.sh --select python` and does not mutate 
 Python production files stay in the branch until `scripts/check-field-evidence.sh` verifies at least 50 genuine contract-complete runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert. The checker validates terminal/durable state, rejects capture-persistence warnings, verifies the persisted evidence-manifest digest, and verifies every file hash in that closed set.
 
 Eight genuine Go runs have been observed: Claude 3, Codex 2, Cursor 1,
-OpenRouter 1, and Expert 1. The seven runs before the post-cutover audit lack the
-newly enforced persisted hash manifest/backend axis, so they remain live
-provider proofs but are conservatively excluded from Python-retirement credit.
-The deletion gate is therefore 1/50 contract-complete runs, currently Claude 1.
-Synthetic paid calls are not counted merely to accelerate deletion.
+OpenRouter 1, and Expert 1. They remain live provider proofs, but all predate the
+explicit `writer={implementation:go, contract_revision:1}` marker added after
+the final audit. They are therefore conservatively excluded from
+Python-retirement credit rather than inferred from incidental fields. The final
+writer deletion gate starts at 0/50. Synthetic paid calls are not counted merely
+to accelerate deletion.
