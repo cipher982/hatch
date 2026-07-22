@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -30,6 +31,38 @@ type ledger struct {
 		Proof       string  `json:"proof"`
 		Reason      *string `json:"reason"`
 	} `json:"tests"`
+}
+
+func TestContractWarningCodesRemainV1(t *testing.T) {
+	allowed := map[string]bool{
+		"capture_persistence_failed": true,
+		"transient_provider_error":   true,
+		"stderr_error_recovered":     true,
+		"adapter_recognition_empty":  true,
+	}
+	seen := map[string]bool{}
+	pattern := regexp.MustCompile(`Code:\s*"([^"]+)"`)
+	err := filepath.WalkDir(filepath.Join(repoRoot(t), "internal"), func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil || entry.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return walkErr
+		}
+		for _, match := range pattern.FindAllSubmatch(mustRead(t, path), -1) {
+			code := string(match[1])
+			if !allowed[code] {
+				t.Errorf("non-V1 warning code %q in %s", code, path)
+			}
+			seen[code] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for code := range allowed {
+		if !seen[code] {
+			t.Errorf("V1 warning code %q has no implementation", code)
+		}
+	}
 }
 
 func TestPythonTestLedger(t *testing.T) {
