@@ -22,13 +22,14 @@ type Request struct {
 }
 
 type Invocation struct {
-	Argv            []string
-	SetEnv          map[string]string
-	UnsetEnv        []string
-	Stdin           []byte
-	StreamFormat    string
-	Adapter         string
-	ProviderVersion string
+	Argv             []string
+	PromptArgIndices []int
+	SetEnv           map[string]string
+	UnsetEnv         []string
+	Stdin            []byte
+	StreamFormat     string
+	Adapter          string
+	ProviderVersion  string
 }
 
 func PreparePrompt(prompt string) string {
@@ -123,6 +124,7 @@ func Build(req Request) (Invocation, error) {
 				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
 			},
 		}
+		invocation.PromptArgIndices = []int{len(invocation.Argv) - 1}
 		if req.APIKey != "" {
 			invocation.SetEnv["CURSOR_API_KEY"] = req.APIKey
 		}
@@ -141,9 +143,10 @@ func Build(req Request) (Invocation, error) {
 		}
 		argv = append(argv, prompt)
 		invocation := Invocation{
-			Argv:         argv,
-			SetEnv:       map[string]string{},
-			StreamFormat: "jsonl", Adapter: "opencode",
+			Argv:             argv,
+			PromptArgIndices: []int{len(argv) - 1},
+			SetEnv:           map[string]string{},
+			StreamFormat:     "jsonl", Adapter: "opencode",
 			UnsetEnv: []string{
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "OPENAI_API_KEY", "CODEX_API_KEY",
 			},

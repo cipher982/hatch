@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -107,6 +108,20 @@ func main() {
 			os.Exit(93)
 		}
 		fmt.Fprintln(os.Stdout, "partial output")
+		time.Sleep(10 * time.Second)
+	case "hang_with_detached_child":
+		child := exec.Command(os.Args[0])
+		child.Env = append(os.Environ(), "HATCH_TEST_SCENARIO=detached_child")
+		child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		child.Stdout = os.Stdout
+		child.Stderr = os.Stderr
+		if err := child.Start(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(92)
+		}
+		fmt.Fprintln(os.Stdout, "partial output")
+		time.Sleep(10 * time.Second)
+	case "detached_child":
 		time.Sleep(10 * time.Second)
 	case "invalid_utf8":
 		_, _ = os.Stdout.Write([]byte{'o', 'k', ':', 0xff, 0xfe, '\n'})

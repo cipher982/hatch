@@ -39,7 +39,7 @@ func NewCoordinator(store RunStore) Coordinator {
 
 func (c Coordinator) Execute(req Request) PublicResult {
 	started := c.Now()
-	redacted := redactArgv(req.Invocation.Argv)
+	redacted := redactArgv(req.Invocation.Argv, req.Invocation.PromptArgIndices)
 	artifact, err := c.Store.Prepare(PreparedRun{
 		Surface: req.Surface, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
 		Request: req.Prompt, RedactedArgv: redacted, CredentialNames: req.CredentialNames,
@@ -80,6 +80,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 	cmd := exec.Command(req.Invocation.Argv[0], req.Invocation.Argv[1:]...)
 	configureProcess(cmd)
+	cmd.WaitDelay = time.Second
 	cmd.Dir = req.CWD
 	cmd.Env = buildEnvironment(req.Invocation, artifact.Manifest.RunID, req.Automation)
 	if req.Invocation.Stdin != nil {
@@ -122,6 +123,10 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			timedOut = true
 			_ = killProcessGroup(cmd)
 			waitErr = <-waited
+			artifact.Manifest.Process.TimeoutCleanup = &TimeoutCleanup{
+				Signal: "SIGKILL", WaitBounded: true, SurvivorState: "unknown",
+				PipeClosureForced: errors.Is(waitErr, exec.ErrWaitDelay),
+			}
 		}
 	} else {
 		waitErr = <-waited
@@ -409,10 +414,10 @@ func copyFirstEnvironment(values map[string]string, target string, sources ...st
 	}
 }
 
-func redactArgv(argv []string) []string {
+func redactArgv(argv []string, promptIndices []int) []string {
 	result := append([]string(nil), argv...)
-	for index, value := range result {
-		if strings.HasPrefix(value, "Hatch execution contract:\n") {
+	for _, index := range promptIndices {
+		if index >= 0 && index < len(result) {
 			result[index] = "<prompt>"
 		}
 	}

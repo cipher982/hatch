@@ -54,12 +54,20 @@ type Invocation struct {
 }
 
 type Process struct {
-	PID           int        `json:"pid"`
-	ProcessGroup  *int       `json:"process_group_id,omitempty"`
-	StartIdentity *string    `json:"start_identity,omitempty"`
-	StartedAt     time.Time  `json:"started_at"`
-	ExitedAt      *time.Time `json:"exited_at"`
-	ExitCode      *int       `json:"exit_code"`
+	PID            int             `json:"pid"`
+	ProcessGroup   *int            `json:"process_group_id,omitempty"`
+	StartIdentity  *string         `json:"start_identity,omitempty"`
+	StartedAt      time.Time       `json:"started_at"`
+	ExitedAt       *time.Time      `json:"exited_at"`
+	ExitCode       *int            `json:"exit_code"`
+	TimeoutCleanup *TimeoutCleanup `json:"timeout_cleanup,omitempty"`
+}
+
+type TimeoutCleanup struct {
+	Signal            string `json:"signal"`
+	WaitBounded       bool   `json:"wait_bounded"`
+	PipeClosureForced bool   `json:"pipe_closure_forced"`
+	SurvivorState     string `json:"survivor_state"`
 }
 
 type Result struct {

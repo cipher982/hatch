@@ -22,8 +22,7 @@ func FuzzRedactArgv(f *testing.F) {
 	f.Add("ordinary")
 	f.Add("$(danger) 'quoted'")
 	f.Fuzz(func(t *testing.T, prompt string) {
-		prepared := "Hatch execution contract:\n" + prompt
-		redacted := redactArgv([]string{"provider", prepared})
+		redacted := redactArgv([]string{"provider", prompt}, []int{1})
 		if len(redacted) != 2 || redacted[1] != "<prompt>" {
 			t.Fatalf("redacted = %#v", redacted)
 		}

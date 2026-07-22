@@ -316,6 +316,23 @@ func TestCoordinatorTimeoutKillsDescendants(t *testing.T) {
 	}
 }
 
+func TestCoordinatorTimeoutBoundsDetachedDescendantPipes(t *testing.T) {
+	fake := buildTestProvider(t)
+	started := time.Now()
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 250 * time.Millisecond,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang_with_detached_child"}},
+	})
+	if result.Status != "timeout" || time.Since(started) > 3*time.Second {
+		t.Fatalf("detached timeout result=%#v elapsed=%s", result, time.Since(started))
+	}
+	if result.Run == nil || result.Run.Process == nil || result.Run.Process.TimeoutCleanup == nil ||
+		!result.Run.Process.TimeoutCleanup.WaitBounded ||
+		result.Run.Process.TimeoutCleanup.SurvivorState != "unknown" {
+		t.Fatalf("timeout cleanup evidence = %#v", result.Run)
+	}
+}
+
 func TestCoordinatorPreservesInvalidUTF8Evidence(t *testing.T) {
 	fake := buildTestProvider(t)
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
