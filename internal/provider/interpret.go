@@ -29,6 +29,16 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 	}
 	result.TerminalMarker = "not_observed"
 	result.NativeIDState = "unavailable"
+	switch adapter {
+	case "claude":
+		result.Retention = "provider_owned"
+		result.Capabilities["identify"] = "supported"
+	case "cursor":
+		result.Retention = "unknown"
+		result.Capabilities["identify"] = "supported"
+	case "opencode":
+		result.Capabilities["identify"] = "supported"
+	}
 	var textChunks, finalChunks []string
 	for _, line := range bytes.Split(stdout, []byte{'\n'}) {
 		if len(bytes.TrimSpace(line)) == 0 {
@@ -51,9 +61,18 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 			}
 			if typeName == "result" {
 				result.TerminalMarker = "observed"
-				if value, ok := event["result"].(string); ok && strings.TrimSpace(value) != "" {
+				value, _ := event["result"].(string)
+				if event["is_error"] == true || event["subtype"] == "error" {
+					if strings.TrimSpace(value) == "" {
+						value = "Claude returned an error result"
+					}
+					result.Error = value
+				} else if strings.TrimSpace(value) != "" {
 					finalChunks = []string{value}
 				}
+			}
+			if typeName == "error" {
+				result.Error = nestedErrorMessage(event)
 			}
 		case "cursor":
 			if typeName == "system" && event["subtype"] == "init" {

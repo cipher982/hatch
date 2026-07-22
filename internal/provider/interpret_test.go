@@ -22,6 +22,26 @@ func TestInterpretCursorError(t *testing.T) {
 	}
 }
 
+func TestInterpretClaudeStructuredError(t *testing.T) {
+	stdout := []byte(`{"type":"result","subtype":"error","is_error":true,"result":"permission denied"}` + "\n")
+	got := Interpret("claude", stdout, nil)
+	if got.Error != "permission denied" || got.TerminalMarker != "observed" || got.Retention != "provider_owned" {
+		t.Fatalf("unexpected interpretation: %#v", got)
+	}
+}
+
+func TestInterpretReorderedAndUnknownEvents(t *testing.T) {
+	stdout := []byte(
+		`{"type":"future_event","payload":{"kept":"in raw evidence"}}` + "\n" +
+			`{"type":"step_finish","part":{"reason":"stop"}}` + "\n" +
+			`{"type":"text","part":{"text":"late output"}}` + "\n",
+	)
+	got := Interpret("opencode", stdout, nil)
+	if string(got.Output) != "late output" || got.TerminalMarker != "observed" {
+		t.Fatalf("unexpected interpretation: %#v", got)
+	}
+}
+
 func TestInterpretOpenCodeJoinsChunksAndRecoversWithWarning(t *testing.T) {
 	stdout := []byte(
 		`{"type":"error","error":{"data":{"message":"transient"}}}` + "\n" +
