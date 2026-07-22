@@ -51,6 +51,14 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 	if result.ArtifactPath == "" || result.Run.RunID == "" {
 		t.Fatalf("durable identity missing: %#v", result)
 	}
+	var inspectOut, inspectErr bytes.Buffer
+	if exit := Main([]string{"runs", "inspect", result.Run.RunID, "--json"}, bytes.NewReader(nil), &inspectOut, &inspectErr, true); exit != 0 {
+		t.Fatalf("inspect exit=%d stdout=%s stderr=%s", exit, inspectOut.String(), inspectErr.String())
+	}
+	var inspected map[string]any
+	if err := json.Unmarshal(inspectOut.Bytes(), &inspected); err != nil || inspected["kind"] != "hatch_run" || inspected["manifest"] == nil {
+		t.Fatalf("inspect = %#v, %v", inspected, err)
+	}
 }
 
 func TestMainExpertJSON(t *testing.T) {

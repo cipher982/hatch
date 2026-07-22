@@ -20,6 +20,9 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 	if len(args) > 0 && args[0] == "expert" {
 		return runExpert(args[1:], stdin, stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "runs" {
+		return runRuns(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "doctor" {
 		return runDoctor(args[1:], stdout, stderr)
 	}
