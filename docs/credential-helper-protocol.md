@@ -1,11 +1,15 @@
 # Hatch Credential Helper Protocol
 
-Status: Go preview contract
+Status: Go contract
 
-Hatch never discovers a secret manager. An operator opts in by setting
-`HATCH_CREDENTIAL_HELPER` to an absolute executable path. Hatch consults the
-helper only after an explicit CLI credential and a non-empty provider
-environment variable are both absent.
+Hatch never discovers a secret manager. An operator opts in by either setting
+`HATCH_CREDENTIAL_HELPER` to an absolute executable path or installing that
+path in the private plain-text pointer
+`${XDG_CONFIG_HOME:-$HOME/.config}/hatch/credential-helper`. The environment setting
+takes precedence over the file. Hatch consults the helper only after an explicit
+CLI credential and a non-empty provider environment variable are both absent.
+The pointer must be an owner-only regular file (normally mode `0600`), may not be
+a symlink, and contains only the absolute helper path plus an optional newline.
 
 Hatch starts the executable with no arguments and writes one JSON object plus a
 newline to stdin:

@@ -402,10 +402,12 @@ must preserve its error distinctions. Secret bytes never enter argv, manifests,
 logs, or test goldens.
 
 Creating or retargeting that helper is a separately authorized Agent Home task.
-Until it exists, the Go preview may use explicit environment credentials for
-tests and live proofs, but cutover on David's machine is blocked. Do not invoke a
-Python module through an implicit `uv` fallback and then claim the installed Go
-system has no Python runtime dependency.
+Agent Home now installs the native-shell helper at a stable path and explicitly
+authorizes it through Hatch's private configuration pointer; the environment
+variable remains an operator override. Tests and live proofs may still use
+explicit environment credentials. Do not invoke a Python module through an
+implicit `uv` fallback and then claim the installed Go system has no Python
+runtime dependency.
 
 ### Distribution
 

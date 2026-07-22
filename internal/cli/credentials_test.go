@@ -55,3 +55,52 @@ func TestResolveCredentialHelperAbsent(t *testing.T) {
 		t.Fatalf("absent = %q, %v", value, err)
 	}
 }
+
+func TestResolveCredentialHelperFromPrivateConfig(t *testing.T) {
+	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv(credentialHelperEnv, "")
+	configRoot := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configRoot)
+	helper := filepath.Join(t.TempDir(), "helper")
+	if err := os.WriteFile(helper, []byte("#!/bin/sh\nprintf 'configured-secret\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	configDirectory := filepath.Join(configRoot, "hatch")
+	if err := os.MkdirAll(configDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDirectory, credentialHelperConfigFile), []byte(helper+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	value, err := resolveCredential("", "OPENROUTER_API_KEY")
+	if err != nil || value != "configured-secret" {
+		t.Fatalf("configured helper = %q, %v", value, err)
+	}
+}
+
+func TestResolveCredentialHelperRejectsUnsafeConfig(t *testing.T) {
+	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv(credentialHelperEnv, "")
+	configRoot := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configRoot)
+	configDirectory := filepath.Join(configRoot, "hatch")
+	if err := os.MkdirAll(configDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(configDirectory, credentialHelperConfigFile)
+	if err := os.WriteFile(config, []byte("/tmp/helper\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveCredential("", "OPENROUTER_API_KEY"); err == nil {
+		t.Fatal("world-readable helper configuration was accepted")
+	}
+	if err := os.Remove(config); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(t.TempDir(), "target"), config); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveCredential("", "OPENROUTER_API_KEY"); err == nil {
+		t.Fatal("symlinked helper configuration was accepted")
+	}
+}

@@ -74,8 +74,10 @@ Credentials are resolved explicitly before backend launch:
 - CLI `--api-key` override wins
 - Existing shell env wins next
 - Credentialed backends then use the external helper named by
-  `HATCH_CREDENTIAL_HELPER`; Hatch passes a small JSON request on stdin and
-  receives credentials on stdout without owning a secret-manager integration
+  `HATCH_CREDENTIAL_HELPER` or its private
+  `${XDG_CONFIG_HOME:-$HOME/.config}/hatch/credential-helper` pointer; Hatch passes
+  a small JSON request on stdin and receives credentials on stdout without
+  owning a secret-manager integration
 
 Machine callers:
 - non-interactive CLI runs default to JSON output and automation mode automatically

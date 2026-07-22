@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,7 +13,11 @@ import (
 	"time"
 )
 
-const credentialHelperEnv = "HATCH_CREDENTIAL_HELPER"
+const (
+	credentialHelperEnv        = "HATCH_CREDENTIAL_HELPER"
+	credentialHelperConfigFile = "credential-helper"
+	maxCredentialHelperConfig  = 4096
+)
 
 type credentialRequest struct {
 	Environment string `json:"environment"`
@@ -26,7 +31,10 @@ func resolveCredential(explicit, environmentName string) (string, error) {
 	if value := strings.TrimSpace(os.Getenv(environmentName)); value != "" {
 		return value, nil
 	}
-	helper := strings.TrimSpace(os.Getenv(credentialHelperEnv))
+	helper, err := configuredCredentialHelper()
+	if err != nil {
+		return "", err
+	}
 	if helper == "" {
 		return "", nil
 	}
@@ -69,4 +77,52 @@ func resolveCredential(explicit, environmentName string) (string, error) {
 		detail = "helper exited unsuccessfully"
 	}
 	return "", fmt.Errorf("credential helper authority error: %s", detail)
+}
+
+func configuredCredentialHelper() (string, error) {
+	if helper := strings.TrimSpace(os.Getenv(credentialHelperEnv)); helper != "" {
+		return helper, nil
+	}
+	configRoot := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME"))
+	if configRoot == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", nil
+		}
+		configRoot = filepath.Join(home, ".config")
+	}
+	if !filepath.IsAbs(configRoot) {
+		return "", fmt.Errorf("XDG_CONFIG_HOME must be absolute")
+	}
+	path := filepath.Join(configRoot, "hatch", credentialHelperConfigFile)
+	info, err := os.Lstat(path)
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read Hatch credential helper configuration: %w", err)
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0o077 != 0 {
+		return "", fmt.Errorf("Hatch credential helper configuration is not a private regular file: %s", path)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("read Hatch credential helper configuration: %w", err)
+	}
+	data, readErr := io.ReadAll(io.LimitReader(file, maxCredentialHelperConfig+1))
+	closeErr := file.Close()
+	if readErr != nil {
+		return "", fmt.Errorf("read Hatch credential helper configuration: %w", readErr)
+	}
+	if closeErr != nil {
+		return "", fmt.Errorf("close Hatch credential helper configuration: %w", closeErr)
+	}
+	if len(data) > maxCredentialHelperConfig {
+		return "", fmt.Errorf("Hatch credential helper configuration is too large")
+	}
+	helper := strings.TrimSpace(string(data))
+	if helper == "" {
+		return "", fmt.Errorf("Hatch credential helper configuration is empty")
+	}
+	return helper, nil
 }
