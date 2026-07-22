@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "cursor_error",
+  "provider_binaries": ["cursor-agent"],
+  "arguments": ["cursor", "grok", "--json", "-"],
+  "stdin": "oracle prompt",
+  "scenario": "cursor_error",
+  "environment": {},
+  "expected": {
+    "exit_code": 1,
+    "legacy_result": {"ok": false, "status": "error", "output": "{\"session_id\":\"cursor-error-session\",\"subtype\":\"init\",\"type\":\"system\"}\n{\"is_error\":true,\"result\":\"request rejected\",\"subtype\":\"error\",\"type\":\"result\"}\n", "exit_code": 0, "error": "request rejected", "stderr": "", "artifact_path": null, "session_id": null, "resume_command": null},
+    "target_result": {"ok": false, "status": "error", "output": "", "exit_code": 0, "error": "request rejected", "stderr": ""},
+    "provider_argv": ["cursor-agent", "--print", "--trust", "--model", "cursor-grok-4.5-high", "--output-format", "stream-json", "--force", "$PREPARED_PROMPT"],
+    "provider_stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "provider_stdin_bytes": 0,
+    "stderr_contains": ["[hatch] Cursor started"]
+  }
+}

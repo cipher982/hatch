@@ -68,17 +68,23 @@ def test_python_hatch_executes_shared_fake_provider(
     )
 
     expected = case["expected"]
-    assert completed.returncode == expected["exit_code"], completed.stderr
+    expected_exit = expected.get("legacy_exit_code", expected["exit_code"])
+    expected_result = (
+        expected["legacy_result"]
+        if "legacy_result" in expected
+        else expected["result"]
+    )
+    assert completed.returncode == expected_exit, completed.stderr
     for fragment in expected.get("stderr_contains", []):
         assert fragment in completed.stderr
     result = json.loads(completed.stdout)
     result.pop("duration_ms")
-    if expected["result"]["artifact_path"] == "$ARTIFACT":
+    if expected_result["artifact_path"] == "$ARTIFACT":
         artifact = Path(result["artifact_path"])
         assert artifact.is_dir()
         assert (artifact / "metadata.json").is_file()
         result["artifact_path"] = "$ARTIFACT"
-    assert result == expected["result"]
+    assert result == expected_result
 
     invocation = json.loads(record.read_text())
     normalized_argv = [

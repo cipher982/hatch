@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "raw_gemini_timeout",
+  "provider_binaries": ["gemini"],
+  "arguments": ["-b", "gemini", "--timeout", "1", "--json", "-"],
+  "stdin": "oracle prompt",
+  "scenario": "hang",
+  "environment": {},
+  "expected": {
+    "exit_code": 2,
+    "legacy_result": {"ok": false, "status": "timeout", "output": "partial output\n", "exit_code": -1, "error": "Agent timed out after 1s", "stderr": null, "artifact_path": null, "session_id": null, "resume_command": null},
+    "target_result": {"ok": false, "status": "timeout", "output": "partial output\n", "exit_code": -1, "error": "Agent timed out after 1s", "stderr": null},
+    "provider_argv": ["gemini", "--model", "gemini-3-pro-preview", "--yolo", "--skip-trust", "-p", "-"],
+    "provider_stdin_sha256": "0eb7749ad17c17ce3323e0628fc9a6fc040d640d95edb7d6839f983ac354ee54",
+    "provider_stdin_bytes": 570,
+    "stderr_contains": []
+  }
+}

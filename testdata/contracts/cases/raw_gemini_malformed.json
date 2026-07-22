@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "name": "raw_gemini_malformed",
+  "provider_binaries": ["gemini"],
+  "arguments": ["-b", "gemini", "--json", "-"],
+  "stdin": "oracle prompt",
+  "scenario": "malformed_then_text",
+  "environment": {},
+  "expected": {
+    "exit_code": 0,
+    "result": {"ok": true, "status": "ok", "output": "{not-json\nfake provider output\n", "exit_code": 0, "error": null, "stderr": "", "artifact_path": null, "session_id": null, "resume_command": null},
+    "provider_argv": ["gemini", "--model", "gemini-3-pro-preview", "--yolo", "--skip-trust", "-p", "-"],
+    "provider_stdin_sha256": "0eb7749ad17c17ce3323e0628fc9a6fc040d640d95edb7d6839f983ac354ee54",
+    "provider_stdin_bytes": 570,
+    "stderr_contains": []
+  }
+}

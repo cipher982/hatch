@@ -187,14 +187,14 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	if timedOut {
 		outcome = OutcomeTimedOut
 		status = "timeout"
-		message := fmt.Sprintf("Process timed out after %ds", int(req.Timeout.Seconds()))
+		message := fmt.Sprintf("Agent timed out after %ds", int(req.Timeout.Seconds()))
 		resultErr = &message
 	} else if exitCode != 0 {
 		outcome = OutcomeFailed
 		status = "error"
 		message := strings.TrimSpace(stderrText)
 		if message == "" {
-			message = fmt.Sprintf("Process exited with code %d", exitCode)
+			message = fmt.Sprintf("Exit code %d", exitCode)
 		} else {
 			message = stderrText
 		}
@@ -263,10 +263,14 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 	c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 	stderrCopy := stderrText
+	var publicStderr *string = &stderrCopy
+	if timedOut {
+		publicStderr = nil
+	}
 	result := PublicResult{
 		OK: ok, Status: status, Output: string(output), ExitCode: exitCode,
 		DurationMS: c.Now().Sub(started).Milliseconds(), Error: resultErr,
-		Stderr: &stderrCopy, ArtifactPath: &artifactPath, Run: &artifact.Manifest,
+		Stderr: publicStderr, ArtifactPath: &artifactPath, Run: &artifact.Manifest,
 	}
 	if artifact.Manifest.Capture.State != "durable" {
 		result.ArtifactPath = nil
@@ -484,7 +488,11 @@ func unknownState() State {
 }
 
 func failedResult(exitCode int, started, finished time.Time, message string, artifactPath *string) PublicResult {
-	return PublicResult{OK: false, Status: "error", Output: "", ExitCode: exitCode,
+	status := "error"
+	if exitCode == -2 {
+		status = "not_found"
+	}
+	return PublicResult{OK: false, Status: status, Output: "", ExitCode: exitCode,
 		DurationMS: finished.Sub(started).Milliseconds(), Error: &message, ArtifactPath: artifactPath}
 }
 

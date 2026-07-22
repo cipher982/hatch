@@ -3,6 +3,9 @@ package contracts
 import (
 	"bytes"
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,18 +50,6 @@ func TestPythonTestLedger(t *testing.T) {
 		allowed[disposition] = true
 	}
 	seen := make(map[string]bool, len(got.Tests))
-	proofs := map[string]bool{
-		"internal/cli.TestNormalizeSurfaceCompatibility":       true,
-		"internal/contracts.TestLegacyParityCommandBuilders":   true,
-		"internal/contracts.TestLegacyParity":                  true,
-		"internal/cli.TestApplyHostContext":                    true,
-		"internal/run.TestCoordinatorStructuredProviders":      true,
-		"internal/cli.TestResolveCredentialPrecedence":         true,
-		"internal/cli.TestPreflightBedrockFailureIsActionable": true,
-		"internal/expert.TestRunPollsAndReturnsMetadata":       true,
-		"internal/doctor.TestCheckCursorModel":                 true,
-		"internal/contracts.TestReleaseInstall":                true,
-	}
 	for _, test := range got.Tests {
 		if test.NodeID == "" || seen[test.NodeID] {
 			t.Fatalf("empty or duplicate node_id %q", test.NodeID)
@@ -67,15 +58,51 @@ func TestPythonTestLedger(t *testing.T) {
 		if !allowed[test.Disposition] {
 			t.Errorf("%s has invalid disposition %q", test.NodeID, test.Disposition)
 		}
-		if test.Proof == "" {
+		if test.Proof == "none" {
+			if test.Disposition != "retired_python_library_only" && test.Disposition != "obsolete_implementation_detail" {
+				t.Errorf("%s has no proof but is classified %q", test.NodeID, test.Disposition)
+			}
+		} else if test.Proof == "" {
 			t.Errorf("%s has no proof target", test.NodeID)
-		} else if !proofs[test.Proof] {
+		} else if strings.HasPrefix(test.Proof, "internal/contracts.TestContractLegacyParity/") {
+			caseName := strings.TrimPrefix(test.Proof, "internal/contracts.TestContractLegacyParity/")
+			if _, err := os.Stat(filepath.Join(repoRoot(t), "testdata", "contracts", "cases", caseName+".json")); err != nil {
+				t.Errorf("%s names missing contract case proof %q", test.NodeID, test.Proof)
+			}
+		} else if !goProofExists(t, test.Proof) {
 			t.Errorf("%s names non-executable proof target %q", test.NodeID, test.Proof)
 		}
-		if test.Disposition == "intentional_change" && (test.Reason == nil || *test.Reason == "") {
-			t.Errorf("%s has an intentional change without a reason", test.NodeID)
+		if (test.Disposition == "intentional_change" || test.Disposition == "retired_python_library_only" || test.Disposition == "obsolete_implementation_detail") && (test.Reason == nil || *test.Reason == "") {
+			t.Errorf("%s has disposition %q without a reason", test.NodeID, test.Disposition)
 		}
 	}
+}
+
+func goProofExists(t *testing.T, proof string) bool {
+	t.Helper()
+	separator := strings.LastIndex(proof, ".")
+	if separator <= 0 || separator == len(proof)-1 {
+		return false
+	}
+	directory := filepath.Join(repoRoot(t), filepath.FromSlash(proof[:separator]))
+	want := proof[separator+1:]
+	packages, err := parser.ParseDir(token.NewFileSet(), directory, func(info os.FileInfo) bool {
+		return strings.HasSuffix(info.Name(), "_test.go")
+	}, 0)
+	if err != nil {
+		return false
+	}
+	for _, pkg := range packages {
+		for _, file := range pkg.Files {
+			for _, declaration := range file.Decls {
+				function, ok := declaration.(*ast.FuncDecl)
+				if ok && function.Recv == nil && function.Name.Name == want {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func TestPythonTestLedgerMatchesFreshCollection(t *testing.T) {
@@ -142,6 +169,14 @@ func TestContractCorpus(t *testing.T) {
 	}
 }
 
+func TestContractPythonOracle(t *testing.T) {
+	command := exec.Command("uv", "run", "pytest", "tests/test_contract_harness.py", "-q")
+	command.Dir = repoRoot(t)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("Python contract oracle: %v\n%s", err, output)
+	}
+}
+
 type contractCase struct {
 	Name             string            `json:"name"`
 	ProviderBinaries []string          `json:"provider_binaries"`
@@ -150,23 +185,28 @@ type contractCase struct {
 	Scenario         string            `json:"scenario"`
 	Environment      map[string]string `json:"environment"`
 	Expected         struct {
-		ExitCode int `json:"exit_code"`
-		Result   struct {
-			OK       bool    `json:"ok"`
-			Status   string  `json:"status"`
-			Output   string  `json:"output"`
-			ExitCode int     `json:"exit_code"`
-			Error    *string `json:"error"`
-			Stderr   *string `json:"stderr"`
-		} `json:"result"`
-		ProviderArgv        []string `json:"provider_argv"`
-		ProviderStdinSHA256 string   `json:"provider_stdin_sha256"`
-		ProviderStdinBytes  int      `json:"provider_stdin_bytes"`
-		StderrContains      []string `json:"stderr_contains"`
+		ExitCode            int             `json:"exit_code"`
+		LegacyExitCode      *int            `json:"legacy_exit_code"`
+		Result              contractResult  `json:"result"`
+		LegacyResult        *contractResult `json:"legacy_result"`
+		TargetResult        *contractResult `json:"target_result"`
+		ProviderArgv        []string        `json:"provider_argv"`
+		ProviderStdinSHA256 string          `json:"provider_stdin_sha256"`
+		ProviderStdinBytes  int             `json:"provider_stdin_bytes"`
+		StderrContains      []string        `json:"stderr_contains"`
 	} `json:"expected"`
 }
 
-func TestLegacyParity(t *testing.T) {
+type contractResult struct {
+	OK       bool    `json:"ok"`
+	Status   string  `json:"status"`
+	Output   string  `json:"output"`
+	ExitCode int     `json:"exit_code"`
+	Error    *string `json:"error"`
+	Stderr   *string `json:"stderr"`
+}
+
+func TestContractLegacyParity(t *testing.T) {
 	root := repoRoot(t)
 	fake := filepath.Join(t.TempDir(), "testprovider")
 	command := exec.Command("go", "build", "-o", fake, "./internal/testprovider")
@@ -218,13 +258,26 @@ func TestLegacyParity(t *testing.T) {
 			if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 				t.Fatalf("result JSON: %v\n%s", err, stdout.String())
 			}
-			if result.OK != testCase.Expected.Result.OK || result.Status != testCase.Expected.Result.Status ||
-				result.Output != testCase.Expected.Result.Output || result.ExitCode != testCase.Expected.Result.ExitCode ||
-				!reflect.DeepEqual(result.Error, testCase.Expected.Result.Error) || !reflect.DeepEqual(result.Stderr, testCase.Expected.Result.Stderr) {
-				t.Errorf("legacy result mismatch: %#v expected %#v", result, testCase.Expected.Result)
+			expectedResult := testCase.Expected.Result
+			if testCase.Expected.TargetResult != nil {
+				expectedResult = *testCase.Expected.TargetResult
+			}
+			if result.OK != expectedResult.OK || result.Status != expectedResult.Status ||
+				result.Output != expectedResult.Output || result.ExitCode != expectedResult.ExitCode ||
+				!reflect.DeepEqual(result.Error, expectedResult.Error) || !reflect.DeepEqual(result.Stderr, expectedResult.Stderr) {
+				t.Errorf("target result mismatch: %#v expected %#v", result, expectedResult)
 			}
 			if result.ArtifactPath == nil || result.Run == nil || result.Run.RunID == "" || result.Run.Capture.State != "durable" {
 				t.Fatalf("target durability missing: %#v", result)
+			}
+			if result.Run.Lifecycle != runner.LifecycleTerminal || result.Run.Capture.EvidenceSHA256 == nil {
+				t.Fatalf("target terminal projection missing: %#v", result.Run)
+			}
+			for _, name := range []string{"manifest.json", "request.txt", result.Run.Capture.StdoutFile, result.Run.Capture.StderrFile, "result.txt", "result.json"} {
+				info, err := os.Stat(filepath.Join(*result.ArtifactPath, name))
+				if err != nil || info.Mode().Perm() != 0o600 {
+					t.Fatalf("artifact %s mode=%v err=%v", name, info, err)
+				}
 			}
 			var invocation struct {
 				Argv        []string          `json:"argv"`

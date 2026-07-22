@@ -120,7 +120,7 @@ func TestCoordinatorPersistsLaunchFailure(t *testing.T) {
 		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
 		Invocation: provider.Invocation{Argv: []string{filepath.Join(t.TempDir(), "missing-provider")}},
 	})
-	if result.OK || result.ExitCode != -2 || result.Run == nil || result.ArtifactPath == nil ||
+	if result.OK || result.Status != "not_found" || result.ExitCode != -2 || result.Run == nil || result.ArtifactPath == nil ||
 		result.Run.Lifecycle != LifecycleTerminal || result.Run.Outcome == nil || *result.Run.Outcome != OutcomeLaunch {
 		t.Fatalf("launch result = %#v", result)
 	}
