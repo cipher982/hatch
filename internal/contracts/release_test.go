@@ -56,7 +56,7 @@ func TestReleaseInstall(t *testing.T) {
 	}
 	rehearsal := exec.Command("sh", filepath.Join(root, "scripts", "test-install-local.sh"))
 	rehearsal.Dir = root
-	if output, err := rehearsal.CombinedOutput(); err != nil || !bytes.Contains(output, []byte("rollback rehearsal passed")) {
-		t.Fatalf("local rollback rehearsal: %v\n%s", err, output)
+	if output, err := rehearsal.CombinedOutput(); err != nil || !bytes.Contains(output, []byte("local Go install smoke passed")) {
+		t.Fatalf("local install smoke: %v\n%s", err, output)
 	}
 }

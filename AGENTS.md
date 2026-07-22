@@ -10,13 +10,12 @@ OpenRouter, and expert calls.
 ```bash
 VERSION=0.2.0 ./scripts/build-release.sh
 ./scripts/install-local.sh \
-  --go-binary ./dist/hatch_0.2.0_darwin_arm64/hatch --select go
+  --go-binary ./dist/hatch_0.2.0_darwin_arm64/hatch
 ```
 
-The installer keeps the frozen Python 0.1.0 release available as
-`hatch-python` during the field soak. Use `./scripts/install-local.sh --select
-python` only for an explicit operator rollback; there is no per-invocation
-fallback.
+The installer is Go-only and never falls back per invocation. The retired
+Python 0.1.0 source remains available from tag `python-v0.1.0-final` for an
+explicit emergency rollback.
 
 ## Entrypoints
 
@@ -64,8 +63,8 @@ Use the same surfaced commands for normal build/edit work and review prompts.
 go test ./... -count=1                 # Go unit + contract suite
 go test -race ./... -count=1           # Concurrency and isolation
 go vet ./...                           # Static checks
-uv run pytest -q                       # Frozen Python compatibility oracle
-./scripts/test-field-evidence.sh       # Python-retirement gate checker
+go test ./... -run Contract -count=1   # V1 traceability + frozen migration ledger
+go test ./... -run LegacyParity -count=1
 ```
 
 ## Runtime Notes
@@ -90,7 +89,7 @@ Machine callers:
   run ID, artifact path, capture state, and provider identity when available
 - use `hatch runs list` and `hatch runs inspect <run-id>` to recover results
   independently of an outer terminal wrapper
-- use `hatch runs audit --json` for the authoritative Python-retirement field gate
+- use `hatch runs audit --json` to verify stored artifact integrity and review incidents
 
 ## Architecture
 
@@ -115,7 +114,7 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
 | `internal/run/store.go` | Ordered durable artifact commits |
 | `internal/provider/` | Thin provider interpretation and progress adapters |
 | `internal/expert/` | Responses HTTP execution and polling |
-| `testdata/contract/` | Shared Python/Go process oracle corpus |
+| `testdata/contracts/` | Frozen migration ledger and language-neutral process corpus |
 
 ## Conventions
 
@@ -132,9 +131,8 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
 1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, `hatch cursor grok`, or `hatch openrouter ...`; z.ai/GLM is disabled for now
 2. **All production execution uses the coordinator** - adapters interpret
    evidence; they do not launch processes, own persistence, or invent retries
-3. **Python is an oracle, not production architecture** - until the genuine
-   50-run field gate passes, retain its tests and tagged rollback release but do
-   not add product behavior to the Python package
+3. **Python is retired** - preserve the migration ledger, language-neutral
+   fixtures, and `python-v0.1.0-final` tag; do not restore Python production code
 4. **Credential authority stays external** - do not embed Infisical or another
    secret manager in the Go binary, and never put prompt or credential values in
    manifest argv
@@ -154,7 +152,6 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
 
 <!-- Agents: append below. Human compacts weekly. -->
 
-- (2026-01-27) [tool] `uv run pytest -v` omits dev extras; use `uv run --extra dev pytest -v` (or `uv run --python .venv/bin/python -m pytest -v`) after `uv sync --all-extras`.
 - (2026-03-29) [design] Keep backend builders pure; hatch credential policy belongs in one preflight resolver that uses the canonical `infisical-get.py` helper instead of ad hoc backend fallbacks.
 - (2026-04-09) [auth] Bedrock launches must clear inherited `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_BASE_URL`; otherwise Claude can take the wrong auth path and fail before it ever reaches AWS.
 - (2026-04-09) [ux] Agents should not be asked to choose raw backends like `bedrock` vs `codex`; surface `hatch claude` / `hatch codex` and map model-family aliases internally.
@@ -169,12 +166,10 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
 - (2026-05-24) [codex] Headless Hatch runs for Codex must explicitly pass `--dangerously-bypass-approvals-and-sandbox` to prevent deadlocks on interactive tool-approval prompts in non-interactive/redirected subshells.
 - (2026-05-27) [opencode] Surfaced Hatch/OpenCode runs must pass `--dangerously-skip-permissions`; keep `--dir` for repo context instead of broadening by omitting cwd.
 - (2026-07-07) [routing] `hatch claude` must use the official local Claude Code CLI OAuth/subscription path and fail closed with OpenRouter/API-key/Bedrock env stripped. OpenRouter Claude was an expensive accidental fallback after Bedrock access ended; do not make it implicit again.
-- (2026-06-29) [subprocess] Always use `subprocess.DEVNULL` (never `None`) for stdin when no stdin_data is supplied. `None` inherits the caller's stdin — harmless in a TTY, but in non-TTY callers (Cursor Composer, CI, pipes) OpenCode sees an open pipe and hangs until the hatch timeout fires.
 - (2026-07-16) [cursor] `cursor-agent -p` is the one-shot hatch path. Pass prompt as argv (stdin hangs). Use `--trust --force`, binary name `cursor-agent` (not `agent`), and verify the pinned model with `hatch doctor` because Cursor model IDs can be retired. Auth is Cursor login; optional `CURSOR_API_KEY`.
 - (2026-07-17) [timeouts] A surfaced Codex/OpenCode timeout preserves partial JSONL, stderr, isolated session state, session id, and inspect/resume argv under the durable run artifact root; never collapse a long review timeout to empty output.
 - (2026-07-21) [timeouts] Agent runs carry a provider-neutral 15-minute behavioral contract with a 30-minute hard backstop. Timeout artifacts record an env-complete manual resume command plus non-secret model/provider/credential-name metadata; never persist credential values or echo reasoning content.
 - (2026-07-22) [durability] A collapsed caller transcript is not lost output, and `artifact_path: null` must not be used as a recovery verdict. Preserve every surfaced OpenCode run, propagate provider session identity on all outcomes, and keep result capture, provider-state retention, and Longhouse archival as separate facts.
 - (2026-07-22) [rewrite] Go 0.2.0 is the selected production Hatch. Every
-  surface now uses the same durable coordinator; Python remains only as the
-  frozen parity oracle and explicit rollback until the genuine field gate
-  passes.
+  surface uses the same durable coordinator. Python production source is
+  retired; the frozen ledger, fixtures, and tagged release preserve history.

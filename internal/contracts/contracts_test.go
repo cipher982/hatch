@@ -107,7 +107,7 @@ func TestContractWarningCodesRemainV1(t *testing.T) {
 	}
 }
 
-func TestPythonTestLedger(t *testing.T) {
+func TestMigrationLedger(t *testing.T) {
 	var got ledger
 	readJSON(t, filepath.Join(repoRoot(t), "testdata", "contracts", "python-test-ledger.json"), &got)
 	if got.SchemaVersion != 1 {
@@ -180,42 +180,6 @@ func goProofExists(t *testing.T, proof string) bool {
 	return false
 }
 
-func TestPythonTestLedgerMatchesFreshCollection(t *testing.T) {
-	var got ledger
-	root := repoRoot(t)
-	readJSON(t, filepath.Join(root, "testdata", "contracts", "python-test-ledger.json"), &got)
-	command := exec.Command("uv", "run", "pytest", "--collect-only", "-q")
-	command.Dir = root
-	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("collect Python tests: %v\n%s", err, output)
-	}
-	collected := map[string]bool{}
-	for _, line := range strings.Split(string(output), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "tests/") {
-			collected[line] = true
-		}
-	}
-	ledgerIDs := map[string]bool{}
-	for _, row := range got.Tests {
-		ledgerIDs[row.NodeID] = true
-	}
-	for id := range collected {
-		if !ledgerIDs[id] {
-			t.Errorf("fresh Python test missing from ledger: %s", id)
-		}
-	}
-	for id := range ledgerIDs {
-		if !collected[id] {
-			t.Errorf("ledger test missing from fresh collection: %s", id)
-		}
-	}
-	if len(collected) != len(ledgerIDs) {
-		t.Fatalf("fresh collection=%d ledger=%d", len(collected), len(ledgerIDs))
-	}
-}
-
 func TestContractCorpus(t *testing.T) {
 	paths, err := filepath.Glob(filepath.Join(repoRoot(t), "testdata", "contracts", "cases", "*.json"))
 	if err != nil {
@@ -241,14 +205,6 @@ func TestContractCorpus(t *testing.T) {
 			}
 			seen[value.Name] = true
 		})
-	}
-}
-
-func TestContractPythonOracle(t *testing.T) {
-	command := exec.Command("uv", "run", "pytest", "tests/test_contract_harness.py", "-q")
-	command.Dir = repoRoot(t)
-	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("Python contract oracle: %v\n%s", err, output)
 	}
 }
 

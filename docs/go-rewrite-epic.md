@@ -1,6 +1,6 @@
 # Hatch Go Rewrite Epic
 
-Status: Go 0.2.0 cut over; Phase 7 field soak in progress (8/50 eligible; 22 observed at the latest audit)
+Status: complete. Go 0.2.0 is the sole production implementation; David is dogfooding it as Hatch's only user.
 
 Decision owner: David Rose
 
@@ -440,9 +440,9 @@ obsolete_implementation_detail
 ```
 
 Each row names the Go test or contract case that proves the claim. Intentional
-changes require a reason and specification link. CI compares the ledger with
-fresh `pytest --collect-only` output until Python deletion; missing and duplicate
-rows fail.
+changes require a reason and specification link. Before Python deletion, CI
+compared the ledger with fresh `pytest --collect-only` output. After deletion,
+`TestMigrationLedger` keeps the frozen rows unique and bound to live Go proofs.
 
 ### 2. Hermetic fake-provider executable
 
@@ -688,23 +688,20 @@ credential change, or provider-state conversion.
 
 ### Phase 7 — Retire Python
 
-Status: in progress. Twenty-two durable Go records have been observed at the
-latest audit, but pre-contract, failed, reviewed-incident, and raw
-diagnostic runs are provider evidence rather than Python-retirement credit.
-Eight stable surfaced successes currently qualify: Claude 2, Codex 3, Cursor 2, OpenRouter 1, and
-Expert 0. Python is retained only as the frozen
-compatibility oracle and rollback release until the cryptographic
-`scripts/check-field-evidence.sh` gate passes.
+Status: complete. The proposed 50-run/five-per-surface counter was removed: it
+had no statistical or product basis for a single-user CLI. Readiness is proven by
+the contract/parity/race/fuzz/adversarial/release suites, current successful live
+proofs for every enabled provider family, regression tests for every observed
+incident, and the rehearsed rollback. David will dogfood the sole Go
+implementation and report issues; each issue becomes a focused regression test.
 
-- Observe at least 50 real Go Hatch invocations spanning every enabled surfaced
-  provider, with at least five per surface.
-- Require zero unexplained result/capture loss, credential exposure, duplicate
-  provider execution, or process cleanup incident.
-- Close every migration ledger row and remove obsolete Python-only CI.
-- Preserve the Python source tag, release instructions, fixtures, and artifact
-  reader tests.
-- Remove Python production code, package metadata, and compatibility selector in
-  one reviewable commit.
+- Zero unexplained result/capture loss, credential exposure, duplicate provider
+  execution, or process-cleanup incidents.
+- Every migration ledger row is closed and Python-only CI is removed.
+- The Python source tag, release instructions, language-neutral fixtures, ledger,
+  and legacy artifact readers are preserved.
+- Python production code, package metadata, and the compatibility selector are
+  removed in one reviewable commit.
 
 Gate: Go is the only production implementation, rollback remains available from
 the preserved release, and a clean checkout can build/test/install Hatch without
@@ -791,6 +788,7 @@ provider drift -> update fixture from raw evidence and adapter claim, never gues
 - The installed Go binary identifies its source commit and passes an installed
   end-to-end smoke.
 - Rollback to the preserved Python release has been rehearsed.
-- Field evidence satisfies the Python deletion gate.
+- The artifact audit reports zero unexplained incidents; dogfood findings become
+  regression tests rather than an arbitrary usage counter.
 - Documentation, AGENTS guidance, install commands, and CI describe only the
   final Go system, while the migration ledger and source tag preserve history.

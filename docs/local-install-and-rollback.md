@@ -9,27 +9,20 @@ Build and select Go:
 dist=$(mktemp -d)
 DIST_DIR="$dist" VERSION=0.2.0 scripts/build-release.sh
 scripts/install-local.sh \
-  --go-binary "$dist/hatch_0.2.0_darwin_arm64/hatch" \
-  --select go
+  --go-binary "$dist/hatch_0.2.0_darwin_arm64/hatch"
 ```
 
 The installer stores the Go executable under a content-addressed directory,
-preserves the existing Python executable as `hatch-python`, exposes the Go
-binary as `hatch-go`, and atomically points `hatch` at the selected target.
+exposes it as `hatch-go`, and atomically points `hatch` at that target. It has no
+implementation selector and never falls back after a failed provider call.
 
-Rollback does not mutate run artifacts, credentials, or provider state:
+The retired Python source is preserved at tag `python-v0.1.0-final` (commit
+`4f07b783`). Emergency rollback is an explicit release operation: install that
+tag under a separate path and deliberately repoint `hatch`. Do not restore an
+automatic selector or retry a failed Go invocation through Python. Historical
+Go → Python → Go rehearsal already proved that existing artifacts, credentials,
+and provider state require no conversion.
 
-```bash
-scripts/install-local.sh --select python
-hatch-python --version
-```
-
-Re-select the already installed Go artifact with:
-
-```bash
-scripts/install-local.sh --select go
-```
-
-Before and after either switch, verify `which hatch`, `hatch --version`,
+After installation, verify `which hatch`, `hatch --version`,
 `hatch --help`, `hatch doctor --json`, `hatch runs list --json`, and
 `hatch runs audit --json`.

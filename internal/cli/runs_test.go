@@ -55,11 +55,11 @@ func TestRunsCLIListsAndInspectsCurrentArtifacts(t *testing.T) {
 	}
 }
 
-func TestRunsCLIAuditsFieldEvidence(t *testing.T) {
+func TestRunsCLIAuditsArtifactIntegrityByDefault(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "runs")
 	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", root)
 	var stdout, stderr bytes.Buffer
-	exit := Main([]string{"runs", "audit", "--minimum-total", "0", "--minimum-surface=0", "--json"}, bytes.NewReader(nil), &stdout, &stderr, true)
+	exit := Main([]string{"runs", "audit", "--json"}, bytes.NewReader(nil), &stdout, &stderr, true)
 	if exit != 0 {
 		t.Fatalf("exit=%d stderr=%s", exit, stderr.String())
 	}
@@ -73,7 +73,7 @@ func TestRunsCLIAuditsFieldEvidence(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	if exit := Main([]string{"runs", "audit", "--minimum-total", "1"}, bytes.NewReader(nil), &stdout, &stderr, true); exit != 1 || !bytes.Contains(stderr.Bytes(), []byte("not yet satisfied")) {
+	if exit := Main([]string{"runs", "audit", "--minimum-total", "1"}, bytes.NewReader(nil), &stdout, &stderr, true); exit != 1 || !bytes.Contains(stderr.Bytes(), []byte("sample minimum is not satisfied")) {
 		t.Fatalf("unmet exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
 	}
 }

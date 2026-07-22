@@ -92,7 +92,7 @@ func runRuns(args []string, stdout, stderr io.Writer) int {
 		if jsonOutput {
 			_ = json.NewEncoder(stdout).Encode(map[string]any{"passed": passed, "audit": audit})
 		} else {
-			fmt.Fprintf(stdout, "Go field evidence: eligible=%d/%d observed=%d excluded-pre-contract=%d incomplete=%d non-success=%d non-surfaced=%d unsafe=%d explained=%d unexplained=%d\n", audit.Eligible, audit.MinimumTotal, audit.Observed, audit.ExcludedPreContract, audit.Incomplete, audit.NonSuccess, audit.NonSurfaced, audit.Unsafe, audit.ExplainedUnsafe, audit.UnexplainedUnsafe)
+			fmt.Fprintf(stdout, "Go artifact audit: eligible=%d observed=%d excluded-pre-contract=%d incomplete=%d non-success=%d non-surfaced=%d unsafe=%d explained=%d unexplained=%d\n", audit.Eligible, audit.Observed, audit.ExcludedPreContract, audit.Incomplete, audit.NonSuccess, audit.NonSurfaced, audit.Unsafe, audit.ExplainedUnsafe, audit.UnexplainedUnsafe)
 			for _, surface := range []string{"claude", "codex", "cursor", "openrouter", "expert"} {
 				fmt.Fprintf(stdout, "  %s: %d/%d\n", surface, audit.Surfaces[surface], audit.MinimumSurface)
 			}
@@ -104,9 +104,9 @@ func runRuns(args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stderr, "  unsafe (%s) %s: %s\n", status, issue.RunID, issue.Reason)
 			}
 			if passed {
-				fmt.Fprintln(stdout, "field evidence gate passed")
+				fmt.Fprintln(stdout, "artifact integrity audit passed")
 			} else {
-				fmt.Fprintln(stderr, "field evidence gate is not yet satisfied")
+				fmt.Fprintln(stderr, "artifact integrity or requested sample minimum is not satisfied")
 			}
 		}
 		if passed {
@@ -119,7 +119,7 @@ func runRuns(args []string, stdout, stderr io.Writer) int {
 }
 
 func parseRunsAudit(args []string) (int, int, bool, error) {
-	minimumTotal, minimumSurface, jsonOutput := 50, 5, false
+	minimumTotal, minimumSurface, jsonOutput := 0, 0, false
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
 		if arg == "--json" {

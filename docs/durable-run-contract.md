@@ -316,20 +316,20 @@ Illustrative V1 shape:
 Required rules:
 
 - `writer.contract_revision` identifies the exact Hatch-owned persistence
-  protocol needed for field-soak and migration gates. It is not provider
+  protocol needed for artifact integrity and migration audits. It is not provider
   capability metadata and never substitutes for `schema_version`.
-- Field gates classify the writer revision before lifecycle or capture state.
+- Artifact audits classify the writer revision before lifecycle or capture state.
   Records from earlier writers are excluded, nonterminal final-writer records
   are retained and reported as incomplete incidents, and only terminal
   final-writer capture/hash corruption is unsafe. Explained terminal provider
   failures remain evidence but receive no success credit. No gate may require
   deleting a crash artifact in order to pass.
-- A reviewed unsafe field incident remains visible in the unsafe total. It may
-  cease blocking retirement only through a version-controlled disposition bound
+- A reviewed unsafe incident remains visible in the unsafe total. It may cease
+  blocking the integrity audit only through a version-controlled disposition bound
   to the run ID, evidence-manifest digest, and exact observed corruption
   fingerprint, with an explanation and fixing commit. Any further artifact
   mutation must make the incident unexplained again.
-- Retirement credit additionally requires a unique nonempty run identity and a
+- A contract-complete artifact additionally requires a unique nonempty run identity and a
   sorted, duplicate-free, traversal-free evidence manifest whose members match
   the manifest-declared request, streams, result, and approved provider snapshot
   exactly. Projection, manifest, and declared archive-receipt files remain
@@ -546,11 +546,11 @@ hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
 - `list` and `inspect` are local and never require provider credentials.
 - `inspect` shows exact files, capture state, native identity/capabilities,
   warnings, and any structured operator recovery hint.
-- `audit` is the authoritative Go implementation of the field-retirement gate.
-  It reuses the V1 writer validator and closed-evidence verifier; the
-  `scripts/check-field-evidence.sh` entrypoint is only a build-and-invoke
-  wrapper, not a second JSON or hash parser. Passing requires zero unexplained
-  unsafe incidents; reviewed incidents remain explicit in JSON and human output.
+- `audit` is the authoritative Go artifact-integrity checker. It reuses the V1
+  writer validator and closed-evidence verifier. With no minimum flags, passing
+  means zero unexplained unsafe incidents; optional sample minimums are reporting
+  tools, not product-readiness gates. Reviewed incidents remain explicit in JSON
+  and human output.
 - V1 does not dispatch resume, create an export format, or delete artifacts.
   Those operations require separate decisions backed by observed demand and
   provider/storage evidence.

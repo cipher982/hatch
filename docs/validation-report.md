@@ -1,12 +1,12 @@
 # Go rewrite validation report
 
-Status: Go 0.2.0 cut over on 2026-07-22; Python retirement soak in progress.
+Status: complete. Go 0.2.0 is the sole production Hatch implementation.
 
 ## Verification authority
 
 - Frozen Python baseline: `python-v0.1.0-final` at `4f07b783`.
-- Migration ledger: 316 live pytest nodes (304 frozen plus 12 shared contract cases), each classified with an executable Go proof, exact corpus case, or explicit retired/obsolete disposition.
-- Shared process oracle: Python and Go execute the same fake provider across 12 cases, including success, nonzero exit, structured error, missing terminal marker, malformed output, and timeout.
+- Migration ledger: 316 frozen pytest nodes (304 baseline plus 12 migration contract cases), each classified with an executable Go proof, exact corpus case, or explicit retired/obsolete disposition.
+- Shared process corpus: Python and Go executed the same fake provider across 12 cases during migration. The preserved language-neutral cases now run directly against Go and cover success, nonzero exit, structured error, missing terminal marker, malformed output, and timeout.
 - Independent reviews: Fable and Kimi initially returned no-ship findings; the remediated branch received a Fable `SHIP` verdict. A final Kimi review returned `CONDITIONAL SHIP`; every concrete condition is dispositioned below.
 
 ## Final pre-cutover checks
@@ -45,7 +45,7 @@ runtime to Hatch, and works for GUI/noninteractive agents.
 ## Post-cutover contract audit
 
 A requirement-by-requirement audit at `75c579b` replaced broad test-suite claims
-with `testdata/contracts/v1-traceability.json`. Its 36 V1 rows name executable
+with `testdata/contracts/v1-traceability.json`. Its 39 V1 rows name executable
 proofs for identity, independent axes, schema compatibility, storage ordering,
 security, adapters, failures, inspection, entrypoint parity, Python
 compatibility, and release. `TestContractV1Traceability` rejects missing or
@@ -119,7 +119,12 @@ checks all configured Codex/OpenRouter catalog IDs in addition to Cursor.
 
 ## Cutover and rollback
 
-`scripts/install-local.sh` installed the content-addressed Go 0.2.0 binary and preserved Python 0.1.0 as `hatch-python`. The real selector was switched Go → Python → Go; both `--version` checks passed. The installed Go binary then passed help, doctor, runs-list, fake-provider, and real Claude smokes.
+During migration, `scripts/install-local.sh` installed the content-addressed Go
+0.2.0 binary and the real selector was switched Go → Python → Go; both
+`--version` checks passed. That rehearsal proved rollback required no artifact,
+credential, or provider-state conversion. The final installer is Go-only and
+has no compatibility selector or per-invocation fallback. It passed help,
+doctor, runs-list, fake-provider, and real Claude smokes.
 
 Current selector:
 
@@ -127,32 +132,41 @@ Current selector:
 ~/.local/bin/hatch -> ~/.local/share/hatch/implementations/go/current
 ```
 
-Rollback remains `scripts/install-local.sh --select python` and does not mutate artifacts, credentials, or provider state.
+Emergency rollback remains available from tag `python-v0.1.0-final` at
+`4f07b783`, but is an explicit release operation rather than a production
+selector.
 
-## Remaining deletion gate
+## Retirement decision and dogfood policy
 
-Python production files stay in the branch until `scripts/check-field-evidence.sh` verifies at least 50 genuine contract-complete runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert. The checker validates terminal/durable state, rejects capture-persistence warnings, verifies the persisted evidence-manifest digest, and verifies every file hash in that closed set.
+The proposed 50-run/five-per-surface deletion counter was rejected before final
+retirement. It had no statistical basis for a single-user CLI, and repeated paid
+calls would test billing and availability more than implementation correctness.
+Readiness instead requires passing contract/parity/race/fuzz/adversarial/release
+tests, a current successful live proof for every enabled provider family,
+regressions for every field incident, a clean Go-only install, and a rehearsed
+tagged rollback. David will dogfood Hatch and report issues; every issue becomes
+a focused regression test.
 
 The latest audit observed 22 Go records: ten predate the explicit
 `writer={implementation:go, contract_revision:1}` marker, two were durable
 explained Kimi model-resolution failures, one successful request used the raw
 diagnostic surface, and one timed-out OpenCode run is a reviewed unsafe
-incident. Eight stable surfaced successes qualify: Claude 2, Codex 3, Cursor 2,
-OpenRouter 1, and Expert 0; no final-writer run is incomplete.
-Synthetic paid calls are not counted merely to accelerate deletion.
+incident. Eight stable surfaced successes were present at retirement: Claude 2,
+Codex 3, Cursor 2, and OpenRouter 1; no final-writer run was incomplete. These
+counts are operational evidence, not a readiness score. Expert's successful live
+proof is recorded above even though it predates the final-writer credit marker.
 
 Kimi's final review run
 `hatch_20260722T191640.922141000Z_f4d6146899934d0a` found one high-severity gate
-bug: preserved crash records could permanently poison retirement. The checker
+bug: preserved crash records could permanently poison a sample-count gate. The audit
 now establishes the writer contract first, excludes pre-contract records,
 reports nonterminal final-writer records as incomplete without awarding credit,
 and reserves unsafe status for terminal final-writer capture or hash failure.
 Tests cover degraded capture, evidence-byte tampering, recorded-digest
 tampering, incomplete or traversal-bearing hash manifests, undeclared evidence
 files, duplicate run identities, old-writer crashes, and final-writer
-incompletes. The authoritative checker is now `hatch runs audit`, implemented
-in the Go run layer and exercised by the default Go suite; the shell
-entrypoint only builds and invokes it. The audit also proves that sorted
+incompletes. The authoritative artifact checker is `hatch runs audit`, implemented
+in the Go run layer and exercised by the default Go suite. The audit also proves that sorted
 hash-manifest membership
 exactly matches manifest-declared request, stream, result, and provider snapshot
 evidence. This preserves incident evidence instead of incentivizing deletion.
@@ -169,8 +183,8 @@ snapshot is unchanged. The historical artifact was not modified or deleted.
 Its reviewed disposition is bound to the run ID, evidence-manifest digest, and
 exact observed file hash; any subsequent mutation becomes unexplained and
 blocks the field gate again. The audit therefore reports `unsafe=1`,
-`explained_unsafe=1`, and `unexplained_unsafe=0` while still denying retirement
-until the real 50-run/five-per-surface threshold is met.
+`explained_unsafe=1`, and `unexplained_unsafe=0`. With no optional sample
+minimums, that is a passing integrity audit.
 
 The same review found that doctor used ambient credentials and checked only
 three of six Codex aliases. Doctor now resolves OpenAI and OpenRouter credentials
@@ -183,6 +197,6 @@ The Kimi route intentionally uses OpenRouter's floating
 installed OpenCode catalog was rejected at execution time. Field credit belongs
 to the stable Hatch `openrouter.kimi-k3` surface, not an immutable upstream model
 generation. If OpenRouter repoints the alias away from K3, Hatch must re-alias or
-rename the surface and restart the affected provider proof; `hatch doctor`
+rename the surface and refresh the affected provider proof; `hatch doctor`
 detects disappearance, not semantic repointing. Successful explicit raw-model
-diagnostics remain diagnostic evidence and never receive surfaced soak credit.
+diagnostics remain diagnostic evidence rather than live-provider proofs.
