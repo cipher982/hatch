@@ -18,10 +18,12 @@ type Request struct {
 }
 
 type Invocation struct {
-	Argv     []string
-	SetEnv   map[string]string
-	UnsetEnv []string
-	Stdin    []byte
+	Argv         []string
+	SetEnv       map[string]string
+	UnsetEnv     []string
+	Stdin        []byte
+	StreamFormat string
+	Adapter      string
 }
 
 func PreparePrompt(prompt string) string {
@@ -39,7 +41,8 @@ func Build(req Request) (Invocation, error) {
 				"--no-session-persistence", "--tools", "default", "--effort", "low",
 				"--include-partial-messages",
 			},
-			Stdin: []byte(prompt),
+			Stdin:        []byte(prompt),
+			StreamFormat: "jsonl", Adapter: "claude",
 			UnsetEnv: []string{
 				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY",
 				"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
@@ -50,7 +53,7 @@ func Build(req Request) (Invocation, error) {
 			Argv: []string{
 				"cursor-agent", "--print", "--trust", "--model", req.Model,
 				"--output-format", "stream-json", "--force", prompt,
-			},
+			}, StreamFormat: "jsonl", Adapter: "cursor",
 		}, nil
 	case "opencode":
 		if req.Model == "" {
@@ -66,8 +69,9 @@ func Build(req Request) (Invocation, error) {
 		}
 		argv = append(argv, prompt)
 		invocation := Invocation{
-			Argv:   argv,
-			SetEnv: map[string]string{},
+			Argv:         argv,
+			SetEnv:       map[string]string{},
+			StreamFormat: "jsonl", Adapter: "opencode",
 			UnsetEnv: []string{
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "OPENAI_API_KEY", "CODEX_API_KEY",
 			},
@@ -85,8 +89,9 @@ func Build(req Request) (Invocation, error) {
 			model = "gemini-3-pro-preview"
 		}
 		return Invocation{
-			Argv:  []string{"gemini", "--model", model, "--yolo", "--skip-trust", "-p", "-"},
-			Stdin: []byte(prompt),
+			Argv:         []string{"gemini", "--model", model, "--yolo", "--skip-trust", "-p", "-"},
+			Stdin:        []byte(prompt),
+			StreamFormat: "text", Adapter: "raw",
 		}, nil
 	default:
 		return Invocation{}, fmt.Errorf("unsupported backend %q", req.Backend)

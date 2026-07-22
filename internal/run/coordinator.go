@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cipher982/hatch/internal/provider"
@@ -38,7 +37,11 @@ func NewCoordinator(store Store) Coordinator {
 func (c Coordinator) Execute(req Request) PublicResult {
 	started := c.Now()
 	redacted := redactArgv(req.Invocation.Argv)
-	artifact, err := c.Store.Prepare(req.Surface, req.Provider, req.Model, effectiveCWD(req.CWD), req.Prompt, redacted, req.CredentialNames)
+	artifact, err := c.Store.Prepare(PreparedRun{
+		Surface: req.Surface, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
+		Request: req.Prompt, RedactedArgv: redacted, CredentialNames: req.CredentialNames,
+		StructuredStdout: req.Invocation.StreamFormat == "jsonl",
+	})
 	if err != nil {
 		return failedResult(-3, started, c.Now(), fmt.Sprintf("prepare durable run: %v", err), nil)
 	}
@@ -53,6 +56,12 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 	defer stdoutFile.Close()
 	defer stderrFile.Close()
+	cleanupProviderState, err := prepareProviderState(artifact, &req.Invocation)
+	if err != nil {
+		message := fmt.Sprintf("prepare provider state: %v", err)
+		return failedResult(-3, started, c.Now(), message, &artifactPath)
+	}
+	defer cleanupProviderState()
 
 	if len(req.Invocation.Argv) == 0 {
 		message := "provider invocation is empty"
@@ -65,14 +74,9 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	if req.Invocation.Stdin != nil {
 		cmd.Stdin = bytes.NewReader(req.Invocation.Stdin)
 	}
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return failedResult(-2, started, c.Now(), err.Error(), &artifactPath)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return failedResult(-2, started, c.Now(), err.Error(), &artifactPath)
-	}
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = io.MultiWriter(stdoutFile, &stdout)
+	cmd.Stderr = io.MultiWriter(stderrFile, &stderr)
 
 	if err := cmd.Start(); err != nil {
 		message := err.Error()
@@ -87,12 +91,6 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 		artifact.Manifest.Capture.State = "degraded"
 	}
-
-	var stdout, stderr bytes.Buffer
-	var copies sync.WaitGroup
-	copies.Add(2)
-	go copyStream(&copies, io.MultiWriter(stdoutFile, &stdout), stdoutPipe)
-	go copyStream(&copies, io.MultiWriter(stderrFile, &stderr), stderrPipe)
 
 	waited := make(chan error, 1)
 	go func() { waited <- cmd.Wait() }()
@@ -111,7 +109,6 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	} else {
 		waitErr = <-waited
 	}
-	copies.Wait()
 	_ = stdoutFile.Sync()
 	_ = stderrFile.Sync()
 	stderrText = stderr.String()
@@ -120,13 +117,14 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		exitCode = -1
 	}
 
-	output := stdout.Bytes()
+	interpretation := provider.Interpret(req.Invocation.Adapter, stdout.Bytes(), stderr.Bytes())
+	output := interpretation.Output
 	resultFile, resultWriteErr := c.Store.WriteResult(artifact, output)
 	if resultWriteErr != nil {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: resultWriteErr.Error()})
 		artifact.Manifest.Capture.State = "degraded"
 	}
-	resultState := Result{Output: "absent", TerminalMarker: "not_applicable", OutputBytes: int64(len(output))}
+	resultState := Result{Output: "absent", TerminalMarker: interpretation.TerminalMarker, OutputBytes: int64(len(output))}
 	if len(output) > 0 {
 		resultState.Output = "present"
 	}
@@ -135,7 +133,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 
 	outcome := OutcomeSucceeded
-	ok := exitCode == 0 && !timedOut
+	ok := exitCode == 0 && !timedOut && interpretation.Error == "" && interpretation.TerminalMarker != "not_observed"
 	status := "ok"
 	var resultErr *string
 	if timedOut {
@@ -153,9 +151,29 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			message = stderrText
 		}
 		resultErr = &message
+	} else if interpretation.Error != "" {
+		outcome = OutcomeFailed
+		status = "error"
+		resultErr = &interpretation.Error
+	} else if interpretation.TerminalMarker == "not_observed" {
+		outcome = OutcomeFailed
+		status = "error"
+		message := "structured provider output did not contain a terminal marker"
+		resultErr = &message
 	}
 	resultState.Error = resultErr
-	if err := c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, unknownState(), warnings); err != nil {
+	state := State{
+		Retention: interpretation.Retention, NativeIDState: interpretation.NativeIDState,
+		Capabilities: interpretation.Capabilities,
+	}
+	if interpretation.NativeID != "" {
+		state.NativeID = &interpretation.NativeID
+	}
+	if req.Invocation.Adapter == "opencode" {
+		snapshot := "provider/opencode"
+		state.SnapshotPath = &snapshot
+	}
+	if err := c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, state, warnings); err != nil {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 		artifact.Manifest.Capture.State = "degraded"
 	}
@@ -166,17 +184,13 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		DurationMS: c.Now().Sub(started).Milliseconds(), Error: resultErr,
 		Stderr: &stderrCopy, ArtifactPath: &artifactPath, Run: &artifact.Manifest,
 	}
+	result.SessionID = state.NativeID
 	if err := c.Store.WritePublicProjection(artifact, result); err != nil {
 		artifact.Manifest.Capture.State = "degraded"
 		artifact.Manifest.Warnings = append(artifact.Manifest.Warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 		_ = c.Store.writeManifest(artifact)
 	}
 	return result
-}
-
-func copyStream(group *sync.WaitGroup, destination io.Writer, source io.Reader) {
-	defer group.Done()
-	_, _ = io.Copy(destination, source)
 }
 
 func buildEnvironment(invocation provider.Invocation, runID string) []string {
@@ -244,4 +258,36 @@ func effectiveCWD(cwd string) string {
 		return ""
 	}
 	return current
+}
+
+func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (func(), error) {
+	if invocation.Adapter != "opencode" {
+		return func() {}, nil
+	}
+	if invocation.SetEnv == nil {
+		invocation.SetEnv = map[string]string{}
+	}
+	root := filepath.Join(artifact.Path, "provider", "opencode")
+	for name, envName := range map[string]string{
+		"data": "XDG_DATA_HOME", "state": "XDG_STATE_HOME",
+	} {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			return nil, err
+		}
+		if err := os.Chmod(path, 0o700); err != nil {
+			return nil, err
+		}
+		invocation.SetEnv[envName] = path
+	}
+	cache, err := os.MkdirTemp("", "hatch-opencode-cache-*")
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(cache, 0o700); err != nil {
+		os.RemoveAll(cache)
+		return nil, err
+	}
+	invocation.SetEnv["XDG_CACHE_HOME"] = cache
+	return func() { _ = os.RemoveAll(cache) }, nil
 }

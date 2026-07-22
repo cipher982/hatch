@@ -24,6 +24,13 @@ type Artifact struct {
 	Manifest Manifest
 }
 
+type PreparedRun struct {
+	Surface, Provider, Model, CWD, Request string
+	RedactedArgv                           []string
+	CredentialNames                        []string
+	StructuredStdout                       bool
+}
+
 func DefaultRoot() (string, error) {
 	if configured := strings.TrimSpace(os.Getenv("HATCH_RUN_ARTIFACT_ROOT")); configured != "" {
 		return filepath.Abs(configured)
@@ -42,7 +49,7 @@ func NewStore(root string) Store {
 	return Store{Root: root, Now: time.Now, IDGen: newRunID}
 }
 
-func (s Store) Prepare(surface, provider, model, cwd, request string, redactedArgv []string, credentialNames []string) (*Artifact, error) {
+func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
 	now := s.Now().UTC()
 	runID, err := s.IDGen(now)
 	if err != nil {
@@ -59,20 +66,24 @@ func (s Store) Prepare(surface, provider, model, cwd, request string, redactedAr
 		return nil, err
 	}
 	requestPath := filepath.Join(path, "request.txt")
-	if err := writePrivate(requestPath, []byte(request)); err != nil {
+	if err := writePrivate(requestPath, []byte(spec.Request)); err != nil {
 		return nil, err
 	}
-	digest := sha256.Sum256([]byte(request))
+	digest := sha256.Sum256([]byte(spec.Request))
+	stdoutFile := "stdout.log"
+	if spec.StructuredStdout {
+		stdoutFile = "stdout.jsonl"
+	}
 	manifest := Manifest{
 		SchemaVersion: 1, RunID: runID, CreatedAt: now, UpdatedAt: now,
-		Lifecycle: LifecyclePrepared, Surface: surface, Provider: provider,
-		Model: model, CWD: cwd, Execution: "subprocess",
+		Lifecycle: LifecyclePrepared, Surface: spec.Surface, Provider: spec.Provider,
+		Model: spec.Model, CWD: spec.CWD, Execution: "subprocess",
 		Invocation: Invocation{
 			RequestFile: "request.txt", RequestSHA256: hex.EncodeToString(digest[:]),
-			RedactedArgv: append([]string(nil), redactedArgv...), CredentialEnvNames: append([]string(nil), credentialNames...),
+			RedactedArgv: append([]string(nil), spec.RedactedArgv...), CredentialEnvNames: append([]string(nil), spec.CredentialNames...),
 		},
 		Result:        Result{Output: "absent", TerminalMarker: "not_observed"},
-		Capture:       Capture{State: "durable", ArtifactPath: path, StdoutFile: "stdout.log", StderrFile: "stderr.log"},
+		Capture:       Capture{State: "durable", ArtifactPath: path, StdoutFile: stdoutFile, StderrFile: "stderr.log"},
 		ProviderState: State{Retention: "unknown", NativeIDState: "unknown", Capabilities: map[string]string{}},
 		Archive:       Archive{State: "not_requested"}, Warnings: []Warning{},
 	}
@@ -122,6 +133,21 @@ func (s Store) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int,
 	evidence := []string{"request.txt", artifact.Manifest.Capture.StdoutFile, artifact.Manifest.Capture.StderrFile}
 	if result.OutputFile != nil {
 		evidence = append(evidence, *result.OutputFile)
+	}
+	if state.SnapshotPath != nil {
+		for _, subtree := range []string{"data", "state"} {
+			base := filepath.Join(artifact.Path, *state.SnapshotPath, subtree)
+			_ = filepath.WalkDir(base, func(path string, entry os.DirEntry, walkErr error) error {
+				if walkErr != nil || entry.IsDir() {
+					return walkErr
+				}
+				relative, err := filepath.Rel(artifact.Path, path)
+				if err == nil {
+					evidence = append(evidence, relative)
+				}
+				return err
+			})
+		}
 	}
 	digest, err := evidenceDigest(artifact.Path, evidence)
 	if err == nil {

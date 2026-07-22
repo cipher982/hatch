@@ -56,6 +56,17 @@ func main() {
 			"duration_ms": 1250, "result": "fake cursor output",
 		})
 	case "success_opencode":
+		if dataHome := os.Getenv("XDG_DATA_HOME"); dataHome != "" {
+			stateDir := filepath.Join(dataHome, "opencode")
+			if err := os.MkdirAll(stateDir, 0o700); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(94)
+			}
+			if err := os.WriteFile(filepath.Join(stateDir, "session.db"), []byte("fake opencode state"), 0o600); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(94)
+			}
+		}
 		emitJSON(map[string]any{
 			"type": "step_start", "sessionID": "ses_oracle1234",
 		})

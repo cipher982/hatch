@@ -15,10 +15,10 @@ func TestStorePreparesPrivateDurableRun(t *testing.T) {
 	store.Now = func() time.Time { return fixed }
 	store.IDGen = func(time.Time) (string, error) { return "hatch_test_run", nil }
 
-	artifact, err := store.Prepare(
-		"gemini.raw", "google", "gemini-3-pro-preview", "/repo", "secret prompt",
-		[]string{"gemini", "<prompt>"}, []string{"GEMINI_API_KEY"},
-	)
+	artifact, err := store.Prepare(PreparedRun{
+		Surface: "gemini.raw", Provider: "google", Model: "gemini-3-pro-preview", CWD: "/repo",
+		Request: "secret prompt", RedactedArgv: []string{"gemini", "<prompt>"}, CredentialNames: []string{"GEMINI_API_KEY"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestStorePreparesPrivateDurableRun(t *testing.T) {
 func TestStoreLifecycleAndEvidenceDigest(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), "runs"))
 	store.IDGen = func(time.Time) (string, error) { return "hatch_lifecycle", nil }
-	artifact, err := store.Prepare("gemini.raw", "google", "model", "/repo", "prompt", []string{"gemini"}, nil)
+	artifact, err := store.Prepare(PreparedRun{Surface: "gemini.raw", Provider: "google", Model: "model", CWD: "/repo", Request: "prompt", RedactedArgv: []string{"gemini"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestStoreFailsBeforeLaunchWhenRootIsAFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewStore(root)
-	if _, err := store.Prepare("raw", "unknown", "", "", "prompt", nil, nil); err == nil {
+	if _, err := store.Prepare(PreparedRun{Surface: "raw", Provider: "unknown", Request: "prompt"}); err == nil {
 		t.Fatal("Prepare succeeded with an unusable root")
 	}
 }
