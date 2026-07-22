@@ -23,6 +23,25 @@ At commit `23c3641`:
 - Ten-second fuzz campaigns: provider interpretation, manifest reader, evidence paths, and argv redaction all pass.
 - Release binary: 6.2 MiB stripped darwin/arm64. Go help startup median was 6.44 ms versus 71.17 ms for Python/uv in the Phase 5 benchmark.
 
+The completion audit refreshed these gates at `b69e48b`: the full Go and race
+suites, vet, contract, legacy parity, reproducible four-target release with
+rollback rehearsal, and the Python oracle (`307 passed, 9 skipped`) all pass.
+Each of the four fuzz targets completed a new ten-second campaign; together they
+executed more than five million inputs without a failure. Current operational
+benchmarks measured 12,966.60 MB/s capture throughput, 18.99 ms terminal commit,
+and 215.8 ns run-ID generation. The installed binary reports the exact clean
+commit, and `hatch doctor --json` now passes Cursor, all six Codex aliases, and
+both OpenRouter aliases from a noninteractive agent process.
+
+That audit found one Agent Home integration gap rather than hiding it as a
+provider outage: the separately authorized credential helper had been exported
+only by interactive shell startup. Hatch now accepts an owner-only,
+non-symlinked helper pointer under `${XDG_CONFIG_HOME:-$HOME/.config}/hatch/`,
+with `HATCH_CREDENTIAL_HELPER` as the explicit override. Agent Home atomically
+installs the pointer beside its native-shell helper. This retains the existing
+Infisical machine-token authority, adds no secret-manager knowledge or Python
+runtime to Hatch, and works for GUI/noninteractive agents.
+
 ## Post-cutover contract audit
 
 A requirement-by-requirement audit at `75c579b` replaced broad test-suite claims
