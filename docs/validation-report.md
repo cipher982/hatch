@@ -103,4 +103,11 @@ Rollback remains `scripts/install-local.sh --select python` and does not mutate 
 
 ## Remaining deletion gate
 
-Python production files stay in the branch until `scripts/check-field-evidence.sh` observes at least 50 genuine schema-v1 runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert, and no nonterminal or degraded capture. The gate currently has eight genuine runs: Claude 3, Codex 2, Cursor 1, OpenRouter 1, and Expert 1. Synthetic paid calls are not counted merely to accelerate deletion.
+Python production files stay in the branch until `scripts/check-field-evidence.sh` verifies at least 50 genuine contract-complete runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert. The checker validates terminal/durable state, rejects capture-persistence warnings, verifies the persisted evidence-manifest digest, and verifies every file hash in that closed set.
+
+Eight genuine Go runs have been observed: Claude 3, Codex 2, Cursor 1,
+OpenRouter 1, and Expert 1. The seven runs before the post-cutover audit lack the
+newly enforced persisted hash manifest/backend axis, so they remain live
+provider proofs but are conservatively excluded from Python-retirement credit.
+The deletion gate is therefore 1/50 contract-complete runs, currently Claude 1.
+Synthetic paid calls are not counted merely to accelerate deletion.
