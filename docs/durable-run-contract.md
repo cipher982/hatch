@@ -324,6 +324,11 @@ Required rules:
   final-writer capture/hash corruption is unsafe. Explained terminal provider
   failures remain evidence but receive no success credit. No gate may require
   deleting a crash artifact in order to pass.
+- A reviewed unsafe field incident remains visible in the unsafe total. It may
+  cease blocking retirement only through a version-controlled disposition bound
+  to the run ID, evidence-manifest digest, and exact observed corruption
+  fingerprint, with an explanation and fixing commit. Any further artifact
+  mutation must make the incident unexplained again.
 - Retirement credit additionally requires a unique nonempty run identity and a
   sorted, duplicate-free, traversal-free evidence manifest whose members match
   the manifest-declared request, streams, result, and approved provider snapshot
@@ -544,7 +549,8 @@ hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
 - `audit` is the authoritative Go implementation of the field-retirement gate.
   It reuses the V1 writer validator and closed-evidence verifier; the
   `scripts/check-field-evidence.sh` entrypoint is only a build-and-invoke
-  wrapper, not a second JSON or hash parser.
+  wrapper, not a second JSON or hash parser. Passing requires zero unexplained
+  unsafe incidents; reviewed incidents remain explicit in JSON and human output.
 - V1 does not dispatch resume, create an export format, or delete artifacts.
   Those operations require separate decisions backed by observed demand and
   provider/storage evidence.

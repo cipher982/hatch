@@ -3,6 +3,7 @@ package run
 import (
 	"bufio"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -23,18 +24,40 @@ type FieldAudit struct {
 	NonSuccess          int               `json:"non_success"`
 	NonSurfaced         int               `json:"non_surfaced"`
 	Unsafe              int               `json:"unsafe"`
+	ExplainedUnsafe     int               `json:"explained_unsafe"`
+	UnexplainedUnsafe   int               `json:"unexplained_unsafe"`
 	MinimumSurface      int               `json:"minimum_surface"`
 	Surfaces            map[string]int    `json:"surfaces"`
 	UnsafeRuns          []FieldAuditIssue `json:"unsafe_runs"`
 }
 
 type FieldAuditIssue struct {
-	RunID  string `json:"run_id"`
-	Reason string `json:"reason"`
+	RunID       string                    `json:"run_id"`
+	Reason      string                    `json:"reason"`
+	Disposition *FieldIncidentDisposition `json:"disposition,omitempty"`
 }
 
+type FieldIncidentDisposition struct {
+	Kind          string `json:"kind"`
+	FixedByCommit string `json:"fixed_by_commit"`
+	Explanation   string `json:"explanation"`
+}
+
+type fieldIncidentRegistry struct {
+	SchemaVersion int `json:"schema_version"`
+	Incidents     []struct {
+		RunID                  string `json:"run_id"`
+		EvidenceManifestSHA256 string `json:"evidence_manifest_sha256"`
+		Reason                 string `json:"reason"`
+		FieldIncidentDisposition
+	} `json:"incidents"`
+}
+
+//go:embed field_incident_dispositions.json
+var fieldIncidentDispositionData []byte
+
 func (audit FieldAudit) Passed() bool {
-	if audit.Eligible < audit.MinimumTotal || audit.Unsafe != 0 {
+	if audit.Eligible < audit.MinimumTotal || audit.UnexplainedUnsafe != 0 {
 		return false
 	}
 	for _, surface := range []string{"claude", "codex", "cursor", "openrouter", "expert"} {
@@ -46,6 +69,14 @@ func (audit FieldAudit) Passed() bool {
 }
 
 func AuditFieldEvidence(root string, minimumTotal, minimumSurface int) (FieldAudit, error) {
+	dispositions, err := loadFieldIncidentDispositions()
+	if err != nil {
+		return FieldAudit{}, err
+	}
+	return auditFieldEvidence(root, minimumTotal, minimumSurface, dispositions)
+}
+
+func auditFieldEvidence(root string, minimumTotal, minimumSurface int, dispositions map[string]FieldIncidentDisposition) (FieldAudit, error) {
 	audit := FieldAudit{MinimumTotal: minimumTotal, MinimumSurface: minimumSurface, Surfaces: map[string]int{}}
 	if minimumTotal < 0 || minimumSurface < 0 {
 		return audit, fmt.Errorf("field evidence minimums must be nonnegative")
@@ -72,13 +103,13 @@ func AuditFieldEvidence(root string, minimumTotal, minimumSurface int) (FieldAud
 		}
 		if manifestInfoErr != nil || !manifestInfo.Mode().IsRegular() {
 			audit.Observed++
-			audit.addUnsafe(entry.Name(), "manifest is missing or unsafe")
+			audit.addUnsafe(entry.Name(), "", "manifest is missing or unsafe", dispositions)
 			continue
 		}
 		manifest, err := readAuditManifest(manifestPath)
 		if err != nil {
 			audit.Observed++
-			audit.addUnsafe(entry.Name(), "manifest is unreadable: "+err.Error())
+			audit.addUnsafe(entry.Name(), "", "manifest is unreadable: "+err.Error(), dispositions)
 			continue
 		}
 		if manifest.SchemaVersion != 1 {
@@ -93,29 +124,36 @@ func AuditFieldEvidence(root string, minimumTotal, minimumSurface int) (FieldAud
 			audit.Incomplete++
 			continue
 		}
+		evidenceDigest := ""
+		if manifest.Capture.EvidenceSHA256 != nil {
+			evidenceDigest = *manifest.Capture.EvidenceSHA256
+		}
+		addUnsafe := func(reason string) {
+			audit.addUnsafe(entry.Name(), evidenceDigest, reason, dispositions)
+		}
 		runInfo, infoErr := entry.Info()
 		if infoErr != nil || !privateMode(runInfo.Mode()) || !privateMode(manifestInfo.Mode()) {
-			audit.addUnsafe(entry.Name(), "run directory or manifest permissions are unsafe")
+			addUnsafe("run directory or manifest permissions are unsafe")
 			continue
 		}
 		if err := ValidateManifest(manifest); err != nil {
-			audit.addUnsafe(entry.Name(), "manifest contract violation: "+err.Error())
+			addUnsafe("manifest contract violation: " + err.Error())
 			continue
 		}
 		if manifest.Capture.State != "durable" || capturePersistenceFailed(manifest) {
-			audit.addUnsafe(entry.Name(), "terminal capture is degraded")
+			addUnsafe("terminal capture is degraded")
 			continue
 		}
 		if manifest.Backend == "unknown" || manifest.Capture.ArtifactPath != runDir || manifest.RunID != entry.Name() {
-			audit.addUnsafe(entry.Name(), "run identity, backend, or artifact path is not canonical")
+			addUnsafe("run identity, backend, or artifact path is not canonical")
 			continue
 		}
 		if err := verifyTerminalSemantics(runDir, manifest); err != nil {
-			audit.addUnsafe(entry.Name(), err.Error())
+			addUnsafe(err.Error())
 			continue
 		}
 		if err := verifyClosedEvidence(runDir, manifest); err != nil {
-			audit.addUnsafe(entry.Name(), err.Error())
+			addUnsafe(err.Error())
 			continue
 		}
 		if manifest.Outcome == nil || (*manifest.Outcome != OutcomeSucceeded && *manifest.Outcome != OutcomeSucceededWarnings) {
@@ -133,9 +171,39 @@ func AuditFieldEvidence(root string, minimumTotal, minimumSurface int) (FieldAud
 	return audit, nil
 }
 
-func (audit *FieldAudit) addUnsafe(runID, reason string) {
+func (audit *FieldAudit) addUnsafe(runID, evidenceDigest, reason string, dispositions map[string]FieldIncidentDisposition) {
 	audit.Unsafe++
-	audit.UnsafeRuns = append(audit.UnsafeRuns, FieldAuditIssue{RunID: runID, Reason: reason})
+	issue := FieldAuditIssue{RunID: runID, Reason: reason}
+	if disposition, ok := dispositions[fieldDispositionKey(runID, evidenceDigest, reason)]; ok {
+		audit.ExplainedUnsafe++
+		issue.Disposition = &disposition
+	} else {
+		audit.UnexplainedUnsafe++
+	}
+	audit.UnsafeRuns = append(audit.UnsafeRuns, issue)
+}
+
+func loadFieldIncidentDispositions() (map[string]FieldIncidentDisposition, error) {
+	var registry fieldIncidentRegistry
+	if err := json.Unmarshal(fieldIncidentDispositionData, &registry); err != nil || registry.SchemaVersion != 1 {
+		return nil, fmt.Errorf("invalid embedded field incident registry")
+	}
+	result := make(map[string]FieldIncidentDisposition, len(registry.Incidents))
+	for _, incident := range registry.Incidents {
+		if incident.RunID == "" || !validSHA256(incident.EvidenceManifestSHA256) || incident.Reason == "" || incident.Kind == "" || incident.FixedByCommit == "" || incident.Explanation == "" {
+			return nil, fmt.Errorf("invalid embedded field incident disposition")
+		}
+		key := fieldDispositionKey(incident.RunID, incident.EvidenceManifestSHA256, incident.Reason)
+		if _, exists := result[key]; exists {
+			return nil, fmt.Errorf("duplicate embedded field incident disposition")
+		}
+		result[key] = incident.FieldIncidentDisposition
+	}
+	return result, nil
+}
+
+func fieldDispositionKey(runID, evidenceDigest, reason string) string {
+	return runID + "\x00" + evidenceDigest + "\x00" + reason
 }
 
 func verifyTerminalSemantics(runDir string, manifest Manifest) error {
@@ -262,8 +330,11 @@ func verifyClosedEvidence(runDir string, manifest Manifest) error {
 			return fmt.Errorf("undeclared evidence entry %q", name)
 		}
 		fileDigest, err := hashFile(path)
-		if err != nil || fileDigest != line[:64] {
-			return fmt.Errorf("evidence hash mismatch for %q", name)
+		if err != nil {
+			return fmt.Errorf("cannot hash evidence %q", name)
+		}
+		if fileDigest != line[:64] {
+			return fmt.Errorf("evidence hash mismatch for %q (actual sha256 %s)", name, fileDigest)
 		}
 		if len(listed) > 0 && listed[len(listed)-1] >= name {
 			return fmt.Errorf("evidence manifest is unsorted or contains duplicates")

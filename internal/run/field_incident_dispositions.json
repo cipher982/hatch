@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "incidents": [
+    {
+      "run_id": "hatch_20260722T193522.487042000Z_b542466cdb83b812",
+      "evidence_manifest_sha256": "d16532e95a154515c5a2c66a73161379eefe18ec21260ab72746b4f07e972dd3",
+      "reason": "evidence hash mismatch for \"provider/opencode/data/opencode/opencode.db\" (actual sha256 d93dbdcb9ce69006908dc5abf3db5831ccf801ef3054bcf815054ac58a58997c)",
+      "kind": "post_terminal_provider_state_mutation",
+      "fixed_by_commit": "f293b282f5bf286837b06d5a029808ebbcb97a9e",
+      "explanation": "A detached OpenCode resource retained a writable SQLite descriptor after the timed-out parent exited. Hatch had hashed the live XDG tree in place, so the later write invalidated terminal evidence. New runs copy a coherent allowlisted snapshot onto new inodes and retire the live tree before terminal commit."
+    }
+  ]
+}

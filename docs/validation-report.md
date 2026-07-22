@@ -115,10 +115,11 @@ Rollback remains `scripts/install-local.sh --select python` and does not mutate 
 Python production files stay in the branch until `scripts/check-field-evidence.sh` verifies at least 50 genuine contract-complete runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert. The checker validates terminal/durable state, rejects capture-persistence warnings, verifies the persisted evidence-manifest digest, and verifies every file hash in that closed set.
 
 The latest audit observed 20 Go records: ten predate the explicit
-`writer={implementation:go, contract_revision:1}` marker, one remains a live
-nonterminal record, two were durable explained Kimi model-resolution failures,
-and one successful request used the raw diagnostic surface. Six stable surfaced
-successes qualify: Claude 2, Codex 1, Cursor 2, OpenRouter 1, and Expert 0.
+`writer={implementation:go, contract_revision:1}` marker, two were durable
+explained Kimi model-resolution failures, one successful request used the raw
+diagnostic surface, and one timed-out OpenCode run is a reviewed unsafe
+incident. Six stable surfaced successes qualify: Claude 2, Codex 1, Cursor 2,
+OpenRouter 1, and Expert 0.
 Synthetic paid calls are not counted merely to accelerate deletion.
 
 Kimi's final review run
@@ -136,6 +137,21 @@ entrypoint only builds and invokes it. The audit also proves that sorted
 hash-manifest membership
 exactly matches manifest-declared request, stream, result, and provider snapshot
 evidence. This preserves incident evidence instead of incentivizing deletion.
+
+The reviewed incident,
+`hatch_20260722T193522.487042000Z_b542466cdb83b812`, proved that an OpenCode
+resource could retain a writable SQLite descriptor after its timed-out parent
+exited. The original implementation hashed the live XDG tree, so a write after
+terminal commit invalidated two provider-state files. Commit `f293b28` now
+copies a hash-stable allowlisted view onto new inodes, rejects symlinked parent
+paths, retires the live tree, and leaves a locked empty working directory. A
+regression writes through an already-open retired descriptor and proves the
+snapshot is unchanged. The historical artifact was not modified or deleted.
+Its reviewed disposition is bound to the run ID, evidence-manifest digest, and
+exact observed file hash; any subsequent mutation becomes unexplained and
+blocks the field gate again. The audit therefore reports `unsafe=1`,
+`explained_unsafe=1`, and `unexplained_unsafe=0` while still denying retirement
+until the real 50-run/five-per-surface threshold is met.
 
 The same review found that doctor used ambient credentials and checked only
 three of six Codex aliases. Doctor now resolves OpenAI and OpenRouter credentials

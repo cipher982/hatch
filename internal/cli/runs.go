@@ -92,12 +92,16 @@ func runRuns(args []string, stdout, stderr io.Writer) int {
 		if jsonOutput {
 			_ = json.NewEncoder(stdout).Encode(map[string]any{"passed": passed, "audit": audit})
 		} else {
-			fmt.Fprintf(stdout, "Go field evidence: eligible=%d/%d observed=%d excluded-pre-contract=%d incomplete=%d non-success=%d non-surfaced=%d unsafe=%d\n", audit.Eligible, audit.MinimumTotal, audit.Observed, audit.ExcludedPreContract, audit.Incomplete, audit.NonSuccess, audit.NonSurfaced, audit.Unsafe)
+			fmt.Fprintf(stdout, "Go field evidence: eligible=%d/%d observed=%d excluded-pre-contract=%d incomplete=%d non-success=%d non-surfaced=%d unsafe=%d explained=%d unexplained=%d\n", audit.Eligible, audit.MinimumTotal, audit.Observed, audit.ExcludedPreContract, audit.Incomplete, audit.NonSuccess, audit.NonSurfaced, audit.Unsafe, audit.ExplainedUnsafe, audit.UnexplainedUnsafe)
 			for _, surface := range []string{"claude", "codex", "cursor", "openrouter", "expert"} {
 				fmt.Fprintf(stdout, "  %s: %d/%d\n", surface, audit.Surfaces[surface], audit.MinimumSurface)
 			}
 			for _, issue := range audit.UnsafeRuns {
-				fmt.Fprintf(stderr, "  unsafe %s: %s\n", issue.RunID, issue.Reason)
+				status := "unexplained"
+				if issue.Disposition != nil {
+					status = "explained"
+				}
+				fmt.Fprintf(stderr, "  unsafe (%s) %s: %s\n", status, issue.RunID, issue.Reason)
 			}
 			if passed {
 				fmt.Fprintln(stdout, "field evidence gate passed")

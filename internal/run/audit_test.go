@@ -30,7 +30,7 @@ func TestAuditFieldEvidenceClassifiesAndPassesCompleteFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !audit.Passed() || audit.Eligible != 25 || audit.Observed != 30 || audit.ExcludedPreContract != 2 || audit.Incomplete != 1 || audit.NonSuccess != 1 || audit.NonSurfaced != 1 || audit.Unsafe != 0 {
+	if !audit.Passed() || audit.Eligible != 25 || audit.Observed != 30 || audit.ExcludedPreContract != 2 || audit.Incomplete != 1 || audit.NonSuccess != 1 || audit.NonSurfaced != 1 || audit.Unsafe != 0 || audit.ExplainedUnsafe != 0 || audit.UnexplainedUnsafe != 0 {
 		t.Fatalf("audit = %#v", audit)
 	}
 }
@@ -104,10 +104,33 @@ func TestAuditFieldEvidenceRejectsCorruption(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if audit.Unsafe != 1 || audit.Passed() {
+			if audit.Unsafe != 1 || audit.UnexplainedUnsafe != 1 || audit.Passed() {
 				t.Fatalf("audit accepted %s: %#v", name, audit)
 			}
 		})
+	}
+}
+
+func TestAuditFieldEvidenceAcceptsOnlyExactReviewedIncident(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "runs")
+	artifact := createAuditRun(t, NewStore(root), "claude.haiku", OutcomeSucceeded)
+	appendFile(t, filepath.Join(artifact.Path, artifact.Manifest.Capture.StdoutFile), []byte("late write\n"))
+
+	initial, err := auditFieldEvidence(root, 0, 0, nil)
+	if err != nil || len(initial.UnsafeRuns) != 1 || initial.Passed() {
+		t.Fatalf("initial audit=%#v err=%v", initial, err)
+	}
+	disposition := FieldIncidentDisposition{Kind: "test", FixedByCommit: "deadbeef", Explanation: "reviewed fixture"}
+	key := fieldDispositionKey(artifact.Manifest.RunID, *artifact.Manifest.Capture.EvidenceSHA256, initial.UnsafeRuns[0].Reason)
+	reviewed, err := auditFieldEvidence(root, 0, 0, map[string]FieldIncidentDisposition{key: disposition})
+	if err != nil || !reviewed.Passed() || reviewed.Unsafe != 1 || reviewed.ExplainedUnsafe != 1 || reviewed.UnexplainedUnsafe != 0 || reviewed.UnsafeRuns[0].Disposition == nil {
+		t.Fatalf("reviewed audit=%#v err=%v", reviewed, err)
+	}
+
+	appendFile(t, filepath.Join(artifact.Path, artifact.Manifest.Capture.StdoutFile), []byte("another write\n"))
+	changed, err := auditFieldEvidence(root, 0, 0, map[string]FieldIncidentDisposition{key: disposition})
+	if err != nil || changed.Passed() || changed.ExplainedUnsafe != 0 || changed.UnexplainedUnsafe != 1 {
+		t.Fatalf("changed audit=%#v err=%v", changed, err)
 	}
 }
 

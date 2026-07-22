@@ -687,8 +687,8 @@ credential change, or provider-state conversion.
 ### Phase 7 — Retire Python
 
 Status: in progress. Twenty durable Go records have been observed at the
-latest audit, but pre-contract, incomplete, failed, and raw diagnostic runs are
-provider evidence rather than Python-retirement credit. Six stable surfaced
+latest audit, but pre-contract, failed, reviewed-incident, and raw diagnostic
+runs are provider evidence rather than Python-retirement credit. Six stable surfaced
 successes currently qualify: Claude 2, Codex 1, Cursor 2, OpenRouter 1, and
 Expert 0. Python is retained only as the frozen
 compatibility oracle and rollback release until the cryptographic
