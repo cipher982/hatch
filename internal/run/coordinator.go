@@ -253,11 +253,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			state.Capabilities["snapshot"] = "unsupported"
 		}
 	}
-	if err := c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, state, warnings); err != nil {
-		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
-		artifact.Manifest.Capture.State = "degraded"
-	}
-
+	c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 	stderrCopy := stderrText
 	result := PublicResult{
 		OK: ok, Status: status, Output: string(output), ExitCode: exitCode,
@@ -273,8 +269,18 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		result.ResumeCommand = &rendered
 	}
 	if err := c.Store.WritePublicProjection(artifact, result); err != nil {
-		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		artifact.Manifest.Capture.State = "degraded"
+		c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 		result.ArtifactPath = nil
+	}
+	if err := c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, state, warnings); err != nil {
+		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		artifact.Manifest.Capture.State = "degraded"
+		c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
+		result.ArtifactPath = nil
+		_ = c.Store.WritePublicProjection(artifact, result)
+		_ = c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 	}
 	if req.Progress != nil && req.ProgressLabel != "" && (req.Invocation.Adapter == "" || req.Invocation.Adapter == "raw") {
 		req.Progress(fmt.Sprintf("[hatch] %s completed", req.ProgressLabel))
@@ -291,9 +297,8 @@ func (c Coordinator) finalizePrelaunchFailure(artifact *Artifact, started time.T
 		artifact.Manifest.Capture.State = "degraded"
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: writeErr.Error()})
 	}
-	if err := c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, unknownState(), warnings); err != nil {
-		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
-	}
+	state := unknownState()
+	c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 	artifactPath := artifact.Path
 	result := failedResult(exitCode, started, c.Now(), message, &artifactPath)
 	result.Run = &artifact.Manifest
@@ -301,8 +306,18 @@ func (c Coordinator) finalizePrelaunchFailure(artifact *Artifact, started time.T
 		result.ArtifactPath = nil
 	}
 	if err := c.Store.WritePublicProjection(artifact, result); err != nil {
-		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		artifact.Manifest.Capture.State = "degraded"
+		c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 		result.ArtifactPath = nil
+	}
+	if err := c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, state, warnings); err != nil {
+		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		artifact.Manifest.Capture.State = "degraded"
+		c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
+		result.ArtifactPath = nil
+		_ = c.Store.WritePublicProjection(artifact, result)
+		_ = c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 	}
 	return result
 }

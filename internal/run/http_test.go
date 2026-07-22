@@ -41,3 +41,18 @@ func TestCoordinatorHTTPTimeoutPreservesRemoteIdentity(t *testing.T) {
 		t.Fatalf("result = %#v", result)
 	}
 }
+
+func TestHTTPStreamOpenFailureReturnsCanonicalRun(t *testing.T) {
+	store := unavailableStreamStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
+	result := NewCoordinator(store).ExecuteHTTP(HTTPRequest{
+		Surface: "expert.responses", Provider: "openai", Prompt: "question", Timeout: time.Second,
+		Execute: func(context.Context, func([]byte) error) HTTPOutcome {
+			t.Fatal("HTTP provider executed after stream failure")
+			return HTTPOutcome{}
+		},
+	})
+	if result.OK || result.ExitCode != -3 || result.Run == nil || result.Run.Lifecycle != LifecycleTerminal ||
+		result.Run.Capture.State != "degraded" || result.ArtifactPath != nil {
+		t.Fatalf("result=%#v", result)
+	}
+}

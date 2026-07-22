@@ -80,3 +80,19 @@ func TestRunHTTPError(t *testing.T) {
 		t.Fatalf("result = %#v", result)
 	}
 }
+
+func TestRunRejectsActiveResponseWithoutID(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "queued", "model": DefaultModel})
+	}))
+	defer server.Close()
+	result := Run(Options{
+		Prompt: "question", APIKey: "test", BaseURL: server.URL, Client: server.Client(),
+		PollInterval: time.Millisecond, Store: runner.NewStore(filepath.Join(t.TempDir(), "runs")),
+	})
+	if result.OK || result.Error == nil || *result.Error != "Responses API returned an active response without an id" || requests != 1 {
+		t.Fatalf("result=%#v requests=%d", result, requests)
+	}
+}

@@ -86,6 +86,34 @@ func (u unavailableStreamStore) OpenStreams(*Artifact) (StreamSink, StreamSink, 
 	return nil, nil, errors.New("streams unavailable")
 }
 
+type orderingStore struct {
+	Store
+	events *[]string
+}
+
+func (s orderingStore) WritePublicProjection(artifact *Artifact, result PublicResult) error {
+	*s.events = append(*s.events, "result.json")
+	return s.Store.WritePublicProjection(artifact, result)
+}
+
+func (s orderingStore) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int, result Result, state State, warnings []Warning) error {
+	*s.events = append(*s.events, "terminal manifest")
+	return s.Store.CommitTerminal(artifact, outcome, exitCode, result, state, warnings)
+}
+
+type transientCommitStore struct {
+	Store
+	attempts *int
+}
+
+func (s transientCommitStore) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int, result Result, state State, warnings []Warning) error {
+	(*s.attempts)++
+	if *s.attempts == 1 {
+		return errors.New("injected terminal commit failure")
+	}
+	return s.Store.CommitTerminal(artifact, outcome, exitCode, result, state, warnings)
+}
+
 func TestCoordinatorPersistsLaunchFailure(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "runs")
 	result := NewCoordinator(NewStore(root)).Execute(Request{
@@ -113,6 +141,37 @@ func TestCoordinatorReturnsCanonicalRunWhenStreamsUnavailable(t *testing.T) {
 		result.Run.Lifecycle != LifecycleTerminal || result.Run.Outcome == nil || *result.Run.Outcome != OutcomeFailed ||
 		result.Run.Capture.State != "degraded" {
 		t.Fatalf("stream-open result = %#v", result)
+	}
+}
+
+func TestCoordinatorWritesProjectionBeforeTerminalManifest(t *testing.T) {
+	fake := buildTestProvider(t)
+	events := []string{}
+	store := orderingStore{Store: NewStore(filepath.Join(t.TempDir(), "runs")), events: &events}
+	result := NewCoordinator(store).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
+	})
+	if !result.OK || len(events) < 2 || events[0] != "result.json" || events[1] != "terminal manifest" {
+		t.Fatalf("result=%#v events=%#v", result, events)
+	}
+}
+
+func TestCoordinatorRetriesTerminalCommitAsDegraded(t *testing.T) {
+	fake := buildTestProvider(t)
+	attempts := 0
+	store := transientCommitStore{Store: NewStore(filepath.Join(t.TempDir(), "runs")), attempts: &attempts}
+	result := NewCoordinator(store).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
+	})
+	if !result.OK || attempts != 2 || result.Run == nil || result.Run.Lifecycle != LifecycleTerminal ||
+		result.Run.Capture.State != "degraded" || len(result.Run.Warnings) == 0 || result.ArtifactPath != nil {
+		t.Fatalf("result=%#v attempts=%d", result, attempts)
+	}
+	data, err := os.ReadFile(filepath.Join(result.Run.Capture.ArtifactPath, "manifest.json"))
+	if err != nil || !bytes.Contains(data, []byte(`"lifecycle": "terminal"`)) || !bytes.Contains(data, []byte("injected terminal commit failure")) {
+		t.Fatalf("disk manifest=%s err=%v", data, err)
 	}
 }
 

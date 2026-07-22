@@ -44,7 +44,7 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 	}
 	stdoutSink, stderrSink, err := c.Store.OpenStreams(artifact)
 	if err != nil {
-		return failedResult(-3, started, c.Now(), fmt.Sprintf("open durable streams: %v", err), &artifactPath)
+		return c.finalizePrelaunchFailure(artifact, started, -3, OutcomeFailed, fmt.Sprintf("open durable streams: %v", err), []Warning{{Code: "capture_persistence_failed", Message: err.Error()}})
 	}
 	warnings := []Warning{}
 	if err := c.Store.MarkHTTPRunning(artifact, started); err != nil {
@@ -139,16 +139,24 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 	if outcome.LastStatus != 0 {
 		artifact.Manifest.HTTP.LastStatus = &outcome.LastStatus
 	}
-	if err := c.Store.CommitTerminal(artifact, terminalOutcome, exitCode, resultState, state, warnings); err != nil {
-		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
-	}
+	c.Store.StageTerminal(artifact, terminalOutcome, exitCode, resultState, state, warnings)
 	result := PublicResult{OK: ok, Status: status, Output: outcome.Output, ExitCode: exitCode, DurationMS: c.Now().Sub(started).Milliseconds(), Error: resultErr, ArtifactPath: &artifactPath, Run: &artifact.Manifest, SessionID: state.NativeID}
 	if artifact.Manifest.Capture.State != "durable" {
 		result.ArtifactPath = nil
 	}
 	if err := c.Store.WritePublicProjection(artifact, result); err != nil {
-		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		artifact.Manifest.Capture.State = "degraded"
+		c.Store.StageTerminal(artifact, terminalOutcome, exitCode, resultState, state, warnings)
 		result.ArtifactPath = nil
+	}
+	if err := c.Store.CommitTerminal(artifact, terminalOutcome, exitCode, resultState, state, warnings); err != nil {
+		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		artifact.Manifest.Capture.State = "degraded"
+		c.Store.StageTerminal(artifact, terminalOutcome, exitCode, resultState, state, warnings)
+		result.ArtifactPath = nil
+		_ = c.Store.WritePublicProjection(artifact, result)
+		_ = c.Store.CommitTerminal(artifact, terminalOutcome, exitCode, resultState, state, warnings)
 	}
 	return result
 }

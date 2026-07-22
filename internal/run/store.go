@@ -32,6 +32,7 @@ type RunStore interface {
 	MarkRunning(*Artifact, int, time.Time, string) error
 	MarkHTTPRunning(*Artifact, time.Time) error
 	WriteResult(*Artifact, []byte) (string, error)
+	StageTerminal(*Artifact, Outcome, int, Result, State, []Warning)
 	CommitTerminal(*Artifact, Outcome, int, Result, State, []Warning) error
 	WritePublicProjection(*Artifact, PublicResult) error
 	MarkCaptureDegraded(*Artifact, Warning) error
@@ -156,6 +157,11 @@ func (s Store) WritePublicProjection(artifact *Artifact, result PublicResult) er
 }
 
 func (s Store) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int, result Result, state State, warnings []Warning) error {
+	s.StageTerminal(artifact, outcome, exitCode, result, state, warnings)
+	return s.writeManifest(artifact)
+}
+
+func (s Store) StageTerminal(artifact *Artifact, outcome Outcome, exitCode int, result Result, state State, warnings []Warning) {
 	now := s.Now().UTC()
 	artifact.Manifest.Lifecycle = LifecycleTerminal
 	artifact.Manifest.Outcome = &outcome
@@ -199,7 +205,6 @@ func (s Store) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int,
 	} else {
 		s.markCaptureDegraded(artifact, outcome, fmt.Errorf("hash evidence: %w", err))
 	}
-	return s.writeManifest(artifact)
 }
 
 func (s Store) markCaptureDegraded(artifact *Artifact, outcome Outcome, err error) {

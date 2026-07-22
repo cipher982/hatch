@@ -147,6 +147,10 @@ func execute(ctx context.Context, options Options, payload map[string]any, recor
 		outcome.NativeID, outcome.NativeIDState = responseID, "observed"
 	}
 	statusName := stringField(response, "status")
+	if activeStatus(statusName) && responseID == "" {
+		outcome.Error = "Responses API returned an active response without an id"
+		return outcome
+	}
 	if options.Progress != nil && responseID != "" {
 		options.Progress(fmt.Sprintf("[hatch] expert response %s status=%s", responseID, defaultString(statusName, "unknown")))
 	}
