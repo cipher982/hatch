@@ -653,6 +653,8 @@ class TestMain:
                 return_code=0,
                 timed_out=False,
                 final_output="output",
+                artifact_path="/tmp/hatch-run-success",
+                session_id="ses_success",
             )
             yield m
 
@@ -823,6 +825,8 @@ class TestMain:
             timed_out=False,
             final_output=None,
             error_message="AWS session expired",
+            artifact_path="/tmp/hatch-run-error",
+            session_id="ses_error",
         )
 
         exit_code = main(["--json", "codex", "mini", "test prompt"])
@@ -832,6 +836,27 @@ class TestMain:
         data = json.loads(captured.out)
         assert data["ok"] is False
         assert data["error"] == "AWS session expired"
+        assert data["artifact_path"] == "/tmp/hatch-run-error"
+        assert data["session_id"] == "ses_error"
+
+    def test_opencode_success_surfaces_durable_run_identity(
+        self,
+        mock_run_opencode_stream_sync,
+        mock_get_config,
+        mock_hydrate_backend_kwargs,
+        mock_detect_context,
+        capsys,
+    ):
+        """Successful JSON results identify their preserved provider run."""
+        exit_code = main(["--json", "codex", "mini", "test prompt"])
+
+        assert exit_code == EXIT_SUCCESS
+        data = json.loads(capsys.readouterr().out)
+        assert data["ok"] is True
+        assert data["output"] == "output"
+        assert data["artifact_path"] == "/tmp/hatch-run-success"
+        assert data["session_id"] == "ses_success"
+        assert data["resume_command"] is None
 
     def test_surfaced_claude_uses_claude_runner_not_opencode_or_bedrock(
         self,

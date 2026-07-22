@@ -320,7 +320,7 @@ class TestCursorStreamRunSync:
 class TestOpenCodeStreamRunSync:
     """Tests for OpenCode JSON event stream handling."""
 
-    def test_parallel_runs_use_disposable_isolated_sqlite_roots(self):
+    def test_parallel_runs_use_isolated_durable_sqlite_roots(self):
         """Concurrent one-shot runs must never share OpenCode's writable DB."""
         script = "\n".join([
             "import json, os, sqlite3, time",
@@ -355,6 +355,9 @@ class TestOpenCodeStreamRunSync:
         assert len(set(roots)) == 8
         assert "/shared/would-lock" not in roots
         assert all(root is not None and not Path(root).exists() for root in roots)
+        artifacts = [Path(result.artifact_path or "") for result in results]
+        assert len(set(artifacts)) == 8
+        assert all((artifact / "data" / "opencode" / "opencode.db").exists() for artifact in artifacts)
 
     def test_extracts_final_text_progress_and_writes_sidecar(self, tmp_path):
         """Parses JSONL tool events and keeps only the final text."""
@@ -391,6 +394,7 @@ class TestOpenCodeStreamRunSync:
 
         assert result.return_code == 0
         assert result.timed_out is False
+        assert result.session_id == "ses_12345678"
         assert result.final_output == "Findings go here."
         assert '"type":"text"' in result.stdout
         assert progress == [
@@ -403,6 +407,14 @@ class TestOpenCodeStreamRunSync:
         sidecar_payload = json.loads(sidecar.read_text())
         assert sidecar_payload["origin_kind"] == "hatch_automation"
         assert sidecar_payload["hatch_run_id"] == "hatch-run-stream"
+        artifact = Path(result.artifact_path or "")
+        assert artifact.is_dir()
+        metadata = json.loads((artifact / "metadata.json").read_text())
+        assert metadata["artifact_kind"] == "hatch_opencode_run"
+        assert metadata["outcome"] == "succeeded"
+        assert metadata["session_id"] == "ses_12345678"
+        assert metadata["inspect_argv"][-2:] == ["export", "ses_12345678"]
+        assert metadata["resume_argv"] is None
 
     def test_open_code_progress_prefers_tool_title_and_elapsed_time(self):
         """Tool progress should use OpenCode titles when available."""
@@ -441,6 +453,9 @@ class TestOpenCodeStreamRunSync:
         assert result.return_code == 0
         assert result.final_output is None
         assert result.error_message == "AWS session expired"
+        assert Path(result.artifact_path or "").is_dir()
+        metadata = json.loads((Path(result.artifact_path or "") / "metadata.json").read_text())
+        assert metadata["outcome"] == "failed"
 
     def test_timeout_preserves_partial_stream_and_isolated_session_state(self, tmp_path, monkeypatch):
         artifact_root = tmp_path / "timeouts"
@@ -478,6 +493,7 @@ class TestOpenCodeStreamRunSync:
         assert "partial finding" in (artifact / "stdout.jsonl").read_text()
         metadata = json.loads((artifact / "metadata.json").read_text())
         assert metadata["session_id"] == "ses_timeout123"
+        assert metadata["outcome"] == "timed_out"
         assert metadata["model"] == "openrouter/moonshotai/kimi-k3"
         assert metadata["provider"] == "openrouter"
         assert metadata["credential_env_var"] == "OPENROUTER_API_KEY"

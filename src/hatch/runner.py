@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -531,12 +532,12 @@ def run_opencode_stream_sync(
     progress_handler: Callable[[str], None] | None = None,
     heartbeat_s: int = 30,
 ) -> OpenCodeStreamRunResult:
-    """Run OpenCode with per-invocation writable state.
+    """Run OpenCode with isolated, durable per-invocation writable state.
 
     OpenCode's SQLite store has no busy timeout, so sharing XDG_DATA_HOME
     between concurrent one-shot Hatch processes can fail immediately with
-    ``database is locked``. Hatch passes provider credentials explicitly and
-    does not resume OpenCode sessions, so its data and state are disposable.
+    ``database is locked``. Each run starts in a private temporary directory,
+    then moves that state into Hatch's run artifact root before returning.
     Config and cache remain on the reviewed shared paths supplied by callers.
     """
     runtime_path = Path(tempfile.mkdtemp(prefix="hatch-opencode-"))
@@ -558,38 +559,36 @@ def run_opencode_stream_sync(
             progress_handler=progress_handler,
             heartbeat_s=heartbeat_s,
         )
+        artifact_root_value = os.environ.get("HATCH_RUN_ARTIFACT_ROOT")
         if result.timed_out:
-            artifact_root = Path(
-                os.environ.get("HATCH_TIMEOUT_ARTIFACT_ROOT", "~/.local/state/hatch/timeouts")
-            ).expanduser()
-            artifact_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-            os.chmod(artifact_root, 0o700)
-            session_label = (result.session_id or "unknown-session").replace("/", "-")
-            destination = artifact_root / f"{int(time.time())}-{session_label}"
-            shutil.move(str(runtime_path), destination)
-            (destination / "stdout.jsonl").write_text(result.stdout, encoding="utf-8")
-            (destination / "stderr.log").write_text(result.stderr, encoding="utf-8")
-            provider = model.split("/", 1)[0] if model and "/" in model else None
-            credential_env_var = {
-                "openai": "OPENAI_API_KEY",
-                "openrouter": "OPENROUTER_API_KEY",
-                "amazon-bedrock": "AWS_PROFILE",
-            }.get(provider)
-            resume_argv = None
-            resume_command = None
-            inspect_argv = None
-            if result.session_id:
-                saved_environment = [
-                    f"XDG_DATA_HOME={destination / 'data'}",
-                    f"XDG_STATE_HOME={destination / 'state'}",
-                ]
-                inspect_argv = [
-                    "env",
-                    *saved_environment,
-                    "opencode",
-                    "export",
-                    result.session_id,
-                ]
+            artifact_root_value = os.environ.get("HATCH_TIMEOUT_ARTIFACT_ROOT", artifact_root_value)
+        artifact_root = Path(artifact_root_value or "~/.local/state/hatch/runs").expanduser()
+        artifact_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(artifact_root, 0o700)
+
+        run_id = f"hatch-{uuid.uuid4()}"
+        session_label = (result.session_id or "unknown-session").replace("/", "-")
+        destination = artifact_root / f"{int(time.time())}-{session_label}-{run_id[-8:]}"
+        shutil.move(str(runtime_path), destination)
+        (destination / "stdout.jsonl").write_text(result.stdout, encoding="utf-8")
+        (destination / "stderr.log").write_text(result.stderr, encoding="utf-8")
+
+        provider = model.split("/", 1)[0] if model and "/" in model else None
+        credential_env_var = {
+            "openai": "OPENAI_API_KEY",
+            "openrouter": "OPENROUTER_API_KEY",
+            "amazon-bedrock": "AWS_PROFILE",
+        }.get(provider)
+        saved_environment = [
+            f"XDG_DATA_HOME={destination / 'data'}",
+            f"XDG_STATE_HOME={destination / 'state'}",
+        ]
+        inspect_argv = None
+        resume_argv = None
+        resume_command = None
+        if result.session_id:
+            inspect_argv = ["env", *saved_environment, "opencode", "export", result.session_id]
+            if result.timed_out:
                 resume_argv = [
                     "env",
                     *saved_environment,
@@ -599,13 +598,7 @@ def run_opencode_stream_sync(
                 ]
                 if cwd:
                     resume_argv.extend(["--dir", cwd])
-                resume_argv.extend([
-                    "--print-logs",
-                    "--log-level",
-                    "ERROR",
-                    "--format",
-                    "json",
-                ])
+                resume_argv.extend(["--print-logs", "--log-level", "ERROR", "--format", "json"])
                 if model:
                     resume_argv.extend(["-m", model])
                 resume_argv.extend([
@@ -614,28 +607,41 @@ def run_opencode_stream_sync(
                     "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.",
                 ])
                 resume_command = shlex.join(resume_argv)
-            metadata = {
-                "session_id": result.session_id,
-                "cwd": cwd,
-                "model": model,
-                "provider": provider,
-                "credential_env_var": credential_env_var,
-                "timed_out_at": int(time.time()),
-                "environment": {
-                    "XDG_DATA_HOME": str(destination / "data"),
-                    "XDG_STATE_HOME": str(destination / "state"),
-                },
-                "inspect_argv": inspect_argv,
-                "resume_argv": resume_argv,
-                "resume_command": resume_command,
-            }
-            (destination / "metadata.json").write_text(
-                json.dumps(metadata, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            os.chmod(destination, 0o700)
-            result.artifact_path = str(destination)
-            result.resume_command = resume_command
+
+        if result.timed_out:
+            outcome = "timed_out"
+        elif result.return_code != 0 or (result.error_message and not result.final_output):
+            outcome = "failed"
+        else:
+            outcome = "succeeded"
+        metadata = {
+            "artifact_kind": "hatch_opencode_run",
+            "schema_version": 1,
+            "run_id": run_id,
+            "outcome": outcome,
+            "session_id": result.session_id,
+            "cwd": cwd,
+            "model": model,
+            "provider": provider,
+            "credential_env_var": credential_env_var,
+            "completed_at": int(time.time()),
+            "output_present": bool(result.final_output),
+            "warnings_present": bool(result.stderr),
+            "environment": {
+                "XDG_DATA_HOME": str(destination / "data"),
+                "XDG_STATE_HOME": str(destination / "state"),
+            },
+            "inspect_argv": inspect_argv,
+            "resume_argv": resume_argv,
+            "resume_command": resume_command,
+        }
+        (destination / "metadata.json").write_text(
+            json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        os.chmod(destination, 0o700)
+        result.artifact_path = str(destination)
+        result.resume_command = resume_command
         return result
     finally:
         if runtime_path.exists():

@@ -752,9 +752,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     start = time.monotonic()
     opencode_error: str | None = None
     cursor_error: str | None = None
-    timeout_artifact_path: str | None = None
-    timeout_session_id: str | None = None
-
     try:
         if use_internal_claude_stream:
             stream_result = run_claude_stream_sync(
@@ -802,8 +799,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             return_code = stream_result.return_code
             timed_out = stream_result.timed_out
             opencode_error = stream_result.error_message
-            timeout_artifact_path = stream_result.artifact_path
-            timeout_session_id = stream_result.session_id
         else:
             raw_stdout = ""
             stdout, stderr, return_code, timed_out = run_sync(
@@ -853,9 +848,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             duration_ms=duration_ms,
             error=f"Agent timed out after {args.timeout}s",
             stderr=stderr or None,
-            artifact_path=timeout_artifact_path,
-            session_id=timeout_session_id,
-            resume_command=stream_result.resume_command if use_internal_opencode_stream else None,
         )
     elif return_code != 0:
         result = AgentResult(
@@ -910,6 +902,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             duration_ms=duration_ms,
             stderr=stderr,
         )
+
+    if use_internal_opencode_stream:
+        result.artifact_path = stream_result.artifact_path
+        result.session_id = stream_result.session_id
+        result.resume_command = stream_result.resume_command
 
     # Output
     if args.json_output:

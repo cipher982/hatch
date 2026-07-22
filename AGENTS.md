@@ -72,6 +72,9 @@ Machine callers:
   investigate proportionally, and synthesize once evidence is sufficient
 - set `HATCH_DISABLE_SECRET_HELPER=1` when you need tests or subprocesses to fail fast instead of loading secrets from the local helper
 - surfaced Claude/Codex/Cursor runs stream terse live progress to stderr while preserving only the final answer on stdout/JSON
+- surfaced OpenCode runs preserve private provider state plus raw stdout/stderr
+  under `~/.local/state/hatch/runs/`; JSON results carry the artifact path and
+  provider session ID for every outcome
 
 ## Architecture
 
@@ -151,5 +154,6 @@ print(result.output if result.ok else result.error)
 - (2026-07-07) [routing] `hatch claude` must use the official local Claude Code CLI OAuth/subscription path and fail closed with OpenRouter/API-key/Bedrock env stripped. OpenRouter Claude was an expensive accidental fallback after Bedrock access ended; do not make it implicit again.
 - (2026-06-29) [subprocess] Always use `subprocess.DEVNULL` (never `None`) for stdin when no stdin_data is supplied. `None` inherits the caller's stdin — harmless in a TTY, but in non-TTY callers (Cursor Composer, CI, pipes) OpenCode sees an open pipe and hangs until the hatch timeout fires.
 - (2026-07-16) [cursor] `cursor-agent -p` is the one-shot hatch path. Pass prompt as argv (stdin hangs). Use `--trust --force`, binary name `cursor-agent` (not `agent`), and verify the pinned model with `hatch doctor` because Cursor model IDs can be retired. Auth is Cursor login; optional `CURSOR_API_KEY`.
-- (2026-07-17) [timeouts] A surfaced Codex/OpenCode timeout preserves partial JSONL, stderr, isolated session state, session id, and inspect/resume argv under `~/.local/state/hatch/timeouts/`; never collapse a long review timeout to empty output.
+- (2026-07-17) [timeouts] A surfaced Codex/OpenCode timeout preserves partial JSONL, stderr, isolated session state, session id, and inspect/resume argv under the durable run artifact root; never collapse a long review timeout to empty output.
 - (2026-07-21) [timeouts] Agent runs carry a provider-neutral 15-minute behavioral contract with a 30-minute hard backstop. Timeout artifacts record an env-complete manual resume command plus non-secret model/provider/credential-name metadata; never persist credential values or echo reasoning content.
+- (2026-07-22) [durability] A collapsed caller transcript is not lost output, and `artifact_path: null` must not be used as a recovery verdict. Preserve every surfaced OpenCode run, propagate provider session identity on all outcomes, and keep result capture, provider-state retention, and Longhouse archival as separate facts.

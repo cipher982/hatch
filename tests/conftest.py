@@ -25,6 +25,12 @@ def disable_local_dcg(monkeypatch):
     monkeypatch.setattr("hatch.backends._dcg_binary", lambda: None)
 
 
+@pytest.fixture(autouse=True)
+def isolate_hatch_run_artifacts(monkeypatch, tmp_path):
+    """Keep durable run artifacts inside each test's temporary directory."""
+    monkeypatch.setenv("HATCH_RUN_ARTIFACT_ROOT", str(tmp_path / "hatch-runs"))
+
+
 @pytest.fixture
 def laptop_context() -> ExecutionContext:
     """Context for laptop environment (not in container, writable home)."""
