@@ -302,13 +302,49 @@ func writePrivate(path string, data []byte) error {
 }
 
 func atomicPrivate(path string, data []byte) error {
+	return atomicPrivateWithOps(path, data, atomicFileOps{})
+}
+
+type atomicTempFile interface {
+	io.Writer
+	Name() string
+	Chmod(os.FileMode) error
+	Sync() error
+	Close() error
+}
+
+type atomicSyncDir interface {
+	Sync() error
+	Close() error
+}
+
+type atomicFileOps struct {
+	createTemp func(string, string) (atomicTempFile, error)
+	rename     func(string, string) error
+	openDir    func(string) (atomicSyncDir, error)
+	remove     func(string) error
+}
+
+func atomicPrivateWithOps(path string, data []byte, ops atomicFileOps) error {
+	if ops.createTemp == nil {
+		ops.createTemp = func(dir, pattern string) (atomicTempFile, error) { return os.CreateTemp(dir, pattern) }
+	}
+	if ops.rename == nil {
+		ops.rename = os.Rename
+	}
+	if ops.openDir == nil {
+		ops.openDir = func(path string) (atomicSyncDir, error) { return os.Open(path) }
+	}
+	if ops.remove == nil {
+		ops.remove = os.Remove
+	}
 	dir := filepath.Dir(path)
-	temp, err := os.CreateTemp(dir, ".manifest-*")
+	temp, err := ops.createTemp(dir, ".manifest-*")
 	if err != nil {
 		return err
 	}
 	tempPath := temp.Name()
-	defer os.Remove(tempPath)
+	defer ops.remove(tempPath)
 	if err := temp.Chmod(0o600); err != nil {
 		temp.Close()
 		return err
@@ -324,10 +360,10 @@ func atomicPrivate(path string, data []byte) error {
 	if err := temp.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(tempPath, path); err != nil {
+	if err := ops.rename(tempPath, path); err != nil {
 		return err
 	}
-	directory, err := os.Open(dir)
+	directory, err := ops.openDir(dir)
 	if err != nil {
 		return err
 	}

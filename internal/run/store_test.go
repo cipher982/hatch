@@ -1,7 +1,9 @@
 package run
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -44,6 +46,79 @@ func TestStorePreparesPrivateDurableRun(t *testing.T) {
 	}
 	if disk.RunID != artifact.Manifest.RunID || disk.Capture.ArtifactPath != artifact.Path {
 		t.Fatalf("disk manifest mismatch: %#v", disk)
+	}
+}
+
+type faultFile struct {
+	bytes.Buffer
+	fail string
+}
+
+func (f *faultFile) Name() string { return "/tmp/fault-temp" }
+func (f *faultFile) Chmod(os.FileMode) error {
+	if f.fail == "chmod" {
+		return errors.New("chmod")
+	}
+	return nil
+}
+func (f *faultFile) Sync() error {
+	if f.fail == "sync" {
+		return errors.New("sync")
+	}
+	return nil
+}
+func (f *faultFile) Close() error {
+	if f.fail == "close" {
+		return errors.New("close")
+	}
+	return nil
+}
+func (f *faultFile) Write(data []byte) (int, error) {
+	if f.fail == "write" {
+		return 0, errors.New("write")
+	}
+	return f.Buffer.Write(data)
+}
+
+type faultDir struct{ fail bool }
+
+func (d faultDir) Sync() error {
+	if d.fail {
+		return errors.New("dir sync")
+	}
+	return nil
+}
+func (faultDir) Close() error { return nil }
+
+func TestAtomicPrivatePropagatesEveryPersistenceBoundary(t *testing.T) {
+	tests := []string{"create", "chmod", "write", "sync", "close", "rename", "open_dir", "dir_sync"}
+	for _, fail := range tests {
+		t.Run(fail, func(t *testing.T) {
+			ops := atomicFileOps{
+				createTemp: func(string, string) (atomicTempFile, error) {
+					if fail == "create" {
+						return nil, errors.New("create")
+					}
+					return &faultFile{fail: fail}, nil
+				},
+				rename: func(string, string) error {
+					if fail == "rename" {
+						return errors.New("rename")
+					}
+					return nil
+				},
+				openDir: func(string) (atomicSyncDir, error) {
+					if fail == "open_dir" {
+						return nil, errors.New("open dir")
+					}
+					return faultDir{fail: fail == "dir_sync"}, nil
+				},
+				remove: func(string) error { return nil },
+			}
+			if err := atomicPrivateWithOps(filepath.Join(t.TempDir(), "manifest.json"), []byte("data"), ops); err == nil {
+				t.Fatalf("%s failure was ignored", fail)
+			}
+		})
 	}
 }
 
