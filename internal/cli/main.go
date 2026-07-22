@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cipher982/hatch/internal/doctor"
 	"github.com/cipher982/hatch/internal/provider"
 	runner "github.com/cipher982/hatch/internal/run"
 )
@@ -16,6 +17,9 @@ var Version = "0.1.0-go-dev"
 var Commit = "unknown"
 
 func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bool) int {
+	if len(args) > 0 && args[0] == "doctor" {
+		return runDoctor(args[1:], stdout, stderr)
+	}
 	request, err := Parse(args, stdoutTTY)
 	if err != nil {
 		return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, err)
@@ -109,6 +113,37 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 		fmt.Fprintf(stderr, "Error: %s\n", strings.TrimRight(*result.Error, "\n"))
 	}
 	return result.CLIExitCode()
+}
+
+func runDoctor(args []string, stdout, stderr io.Writer) int {
+	jsonOutput := false
+	for _, arg := range args {
+		if arg == "--json" {
+			jsonOutput = true
+			continue
+		}
+		return renderConfigError(jsonOutput, stdout, stderr, fmt.Errorf("unrecognized argument: %s", arg))
+	}
+	checks := doctor.Run()
+	ok := true
+	for _, check := range checks {
+		ok = ok && check.OK
+	}
+	if jsonOutput {
+		_ = json.NewEncoder(stdout).Encode(map[string]any{"ok": ok, "checks": checks})
+	} else {
+		for _, check := range checks {
+			status := "FAIL"
+			if check.OK {
+				status = "PASS"
+			}
+			fmt.Fprintf(stdout, "%s %s: %s\n", status, check.Name, check.Detail)
+		}
+	}
+	if ok {
+		return 0
+	}
+	return 4
 }
 
 func readPrompt(args []string, input io.Reader) (string, error) {

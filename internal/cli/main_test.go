@@ -70,3 +70,29 @@ func TestMainFailsClosedBeforeProviderWhenArtifactRootUnavailable(t *testing.T) 
 		t.Fatalf("unexpected result: %#v", result)
 	}
 }
+
+func TestMainDoctorJSON(t *testing.T) {
+	directory := t.TempDir()
+	binary := filepath.Join(directory, "cursor-agent")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory)
+	var stdout, stderr bytes.Buffer
+	if exit := Main([]string{"doctor", "--json"}, bytes.NewReader(nil), &stdout, &stderr, true); exit != 0 {
+		t.Fatalf("exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Checks []struct {
+			Name string `json:"name"`
+			OK   bool   `json:"ok"`
+		} `json:"checks"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || len(result.Checks) != 1 || result.Checks[0].Name != "cursor.grok" || !result.Checks[0].OK {
+		t.Fatalf("doctor = %#v", result)
+	}
+}
