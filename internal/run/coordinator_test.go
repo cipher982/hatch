@@ -227,6 +227,9 @@ func TestCoordinatorTimeoutKillsProcessGroup(t *testing.T) {
 	if result.Output != "partial output\n" {
 		t.Fatalf("partial output lost: %q", result.Output)
 	}
+	if result.Run == nil || result.Run.Process == nil || result.Run.Process.ProcessGroup == nil || *result.Run.Process.ProcessGroup != result.Run.Process.PID || result.Run.Process.StartIdentity == nil || *result.Run.Process.StartIdentity == "" {
+		t.Fatalf("process identity missing: %#v", result.Run)
+	}
 }
 
 func TestCoordinatorTimeoutKillsDescendants(t *testing.T) {

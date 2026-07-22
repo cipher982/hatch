@@ -63,7 +63,7 @@ func TestStoreLifecycleAndEvidenceDigest(t *testing.T) {
 	stdout.Close()
 	stderr.Close()
 	started := time.Now()
-	if err := store.MarkRunning(artifact, 123, started); err != nil {
+	if err := store.MarkRunning(artifact, 123, started, "test-start"); err != nil {
 		t.Fatal(err)
 	}
 	resultFile, err := store.WriteResult(artifact, []byte("answer\n"))

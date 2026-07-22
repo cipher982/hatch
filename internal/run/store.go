@@ -29,7 +29,7 @@ type StreamSink interface {
 type RunStore interface {
 	Prepare(PreparedRun) (*Artifact, error)
 	OpenStreams(*Artifact) (StreamSink, StreamSink, error)
-	MarkRunning(*Artifact, int, time.Time) error
+	MarkRunning(*Artifact, int, time.Time, string) error
 	MarkHTTPRunning(*Artifact, time.Time) error
 	WriteResult(*Artifact, []byte) (string, error)
 	CommitTerminal(*Artifact, Outcome, int, Result, State, []Warning) error
@@ -120,9 +120,13 @@ func executionOrDefault(value string) string {
 	return value
 }
 
-func (s Store) MarkRunning(artifact *Artifact, pid int, started time.Time) error {
+func (s Store) MarkRunning(artifact *Artifact, pid int, started time.Time, identity string) error {
 	artifact.Manifest.Lifecycle = LifecycleRunning
-	artifact.Manifest.Process = &Process{PID: pid, StartedAt: started.UTC()}
+	processGroup := pid
+	artifact.Manifest.Process = &Process{PID: pid, ProcessGroup: &processGroup, StartedAt: started.UTC()}
+	if identity != "" {
+		artifact.Manifest.Process.StartIdentity = &identity
+	}
 	artifact.Manifest.UpdatedAt = s.Now().UTC()
 	return s.writeManifest(artifact)
 }

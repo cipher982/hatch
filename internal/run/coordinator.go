@@ -100,7 +100,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		result.Run = &artifact.Manifest
 		return result
 	}
-	if err := c.Store.MarkRunning(artifact, cmd.Process.Pid, c.Now()); err != nil {
+	if err := c.Store.MarkRunning(artifact, cmd.Process.Pid, c.Now(), processStartIdentity(cmd.Process.Pid)); err != nil {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 		artifact.Manifest.Capture.State = "degraded"
 	}
