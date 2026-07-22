@@ -117,8 +117,8 @@ Python production files stay in the branch until `scripts/check-field-evidence.s
 The latest audit observed 18 Go records: ten predate the explicit
 `writer={implementation:go, contract_revision:1}` marker, three were live
 nonterminal records, two were durable explained Kimi model-resolution failures,
-and one successful request used the raw diagnostic surface. A stable Kimi K3
-review and a stable Cursor run are the first two eligible surfaced successes.
+and one successful request used the raw diagnostic surface. Stable Kimi K3,
+Claude Fable, and two Cursor runs are the first four eligible surfaced successes.
 Synthetic paid calls are not counted merely to accelerate deletion.
 
 Kimi's final review run
