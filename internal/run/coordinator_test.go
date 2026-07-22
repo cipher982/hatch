@@ -299,14 +299,18 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 				t.Fatalf("structured evidence mismatch: %#v", result.Run)
 			}
 			if test.backend == "opencode" {
-				stateFile := filepath.Join(*result.ArtifactPath, "provider", "opencode", "data", "opencode", "session.db")
+				if result.Run.ProviderState.SnapshotPath == nil {
+					t.Fatal("OpenCode snapshot path is missing")
+				}
+				snapshotRoot := filepath.Join(*result.ArtifactPath, filepath.FromSlash(*result.Run.ProviderState.SnapshotPath))
+				stateFile := filepath.Join(snapshotRoot, "data", "opencode", "session.db")
 				if data, err := os.ReadFile(stateFile); err != nil || string(data) != "fake opencode state" {
 					t.Fatalf("provider state not preserved: %q, %v", data, err)
 				}
 				if len(progress) < 3 || progress[0][:12] != "[hatch] run " {
 					t.Fatalf("progress = %#v", progress)
 				}
-				if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider", "opencode", "data", "opencode", "auth.json")); !os.IsNotExist(err) {
+				if _, err := os.Stat(filepath.Join(snapshotRoot, "data", "opencode", "auth.json")); !os.IsNotExist(err) {
 					t.Fatalf("untrusted provider auth state retained: %v", err)
 				}
 			}
@@ -617,7 +621,7 @@ func TestCoordinatorThirtyTwoConcurrentRunsAreIsolated(t *testing.T) {
 	}
 }
 
-func TestPruneOpenCodeStateUsesExplicitAllowlist(t *testing.T) {
+func TestFreezeOpenCodeStateUsesExplicitAllowlist(t *testing.T) {
 	artifact := &Artifact{Path: t.TempDir()}
 	root := filepath.Join(artifact.Path, "provider", "opencode", "data", "opencode")
 	if err := os.MkdirAll(root, 0o700); err != nil {
@@ -631,14 +635,61 @@ func TestPruneOpenCodeStateUsesExplicitAllowlist(t *testing.T) {
 	if err := os.Symlink(filepath.Join(root, "opencode.db"), filepath.Join(root, "opencode.db-shm")); err != nil {
 		t.Fatal(err)
 	}
-	approved, err := pruneOpenCodeState(artifact)
-	if err != nil || approved != 2 {
-		t.Fatalf("approved=%d err=%v", approved, err)
+	lateWriter, err := os.OpenFile(filepath.Join(root, "opencode.db"), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
 	}
+	snapshot, approved, err := freezeOpenCodeState(artifact)
+	if err != nil || approved != 2 || snapshot != "provider/opencode-snapshot" {
+		t.Fatalf("snapshot=%q approved=%d err=%v", snapshot, approved, err)
+	}
+	if _, err := lateWriter.WriteString("late detached write"); err != nil {
+		t.Fatal(err)
+	}
+	if err := lateWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	liveRoot := filepath.Join(artifact.Path, "provider", "opencode")
+	liveInfo, err := os.Stat(liveRoot)
+	if err != nil || !liveInfo.IsDir() || liveInfo.Mode().Perm() != 0o500 {
+		t.Fatalf("live provider state is not locked: info=%v err=%v", liveInfo, err)
+	}
+	snapshotRoot := filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "data", "opencode")
 	for _, name := range []string{"auth.json", "log.txt", "opencode.db-shm"} {
-		if _, err := os.Lstat(filepath.Join(root, name)); !os.IsNotExist(err) {
+		if _, err := os.Lstat(filepath.Join(snapshotRoot, name)); !os.IsNotExist(err) {
 			t.Fatalf("%s retained: %v", name, err)
 		}
+	}
+	for _, name := range []string{"opencode.db", "opencode.db-wal"} {
+		if _, err := os.Stat(filepath.Join(snapshotRoot, name)); err != nil {
+			t.Fatalf("%s missing: %v", name, err)
+		}
+	}
+	database, err := os.ReadFile(filepath.Join(snapshotRoot, "opencode.db"))
+	if err != nil || string(database) != "db" {
+		t.Fatalf("snapshot changed through retired descriptor: %q err=%v", database, err)
+	}
+}
+
+func TestFreezeOpenCodeStateDoesNotFollowSymlinkedParents(t *testing.T) {
+	artifact := &Artifact{Path: t.TempDir()}
+	external := t.TempDir()
+	if err := os.WriteFile(filepath.Join(external, "opencode.db"), []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dataRoot := filepath.Join(artifact.Path, "provider", "opencode", "data")
+	if err := os.MkdirAll(dataRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(external, filepath.Join(dataRoot, "opencode")); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, approved, err := freezeOpenCodeState(artifact)
+	if err != nil || snapshot != "" || approved != 0 {
+		t.Fatalf("snapshot=%q approved=%d err=%v", snapshot, approved, err)
+	}
+	if data, err := os.ReadFile(filepath.Join(external, "opencode.db")); err != nil || string(data) != "outside" {
+		t.Fatalf("external state changed: %q err=%v", data, err)
 	}
 }
 

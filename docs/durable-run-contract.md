@@ -297,7 +297,7 @@ Illustrative V1 shape:
       "recovery_hint": "best_effort_same_version",
       "snapshot": "supported"
     },
-    "snapshot_path": "provider/opencode"
+    "snapshot_path": "provider/opencode-snapshot"
   },
   "archive": {
     "state": "not_requested",
@@ -412,7 +412,10 @@ and must record that evidence is incomplete.
 Provider snapshots require an adapter-owned allowlist. In particular, OpenCode
 snapshotting must prove which XDG database/WAL/state files are needed and exclude
 auth files, tokens, credential caches, and unrelated provider caches before the
-snapshot may be exported or included in an archive digest.
+snapshot may be exported or included in an archive digest. Terminalization
+copies a hash-stable allowlisted view onto new inodes, then retires the live XDG
+tree. A provider holding an old SQLite descriptor therefore cannot mutate the
+content-addressed terminal evidence after Hatch returns.
 
 Artifacts created by `48b1cac` and the older Expert cache are read-only legacy
 inputs. Compatibility readers may inspect them, but never rename or rewrite them
@@ -466,7 +469,7 @@ session manager. Four small adapters plus a raw-text adapter are enough.
 |---|---|---|---|---|
 | `hatch claude` and raw Claude/Bedrock | `session_id` from Claude init event | `provider_owned` in Claude's native history | identify; recovery hint only when configured/proven | Preserve full stream; capture ID; use terminal result or last assistant text; never copy all of `~/.claude` |
 | `hatch cursor grok` | `session_id` from Cursor init event | `unknown` until Cursor's durable store contract is proven | identify only | Preserve stream; require successful terminal result; record no resume/export claim |
-| surfaced Codex/OpenRouter through OpenCode | `sessionID` from step event | `hatch_preserved` isolated XDG database | identify, inspect snapshot; same-version timeout recovery hint | Move an allowlisted isolated data/state snapshot into `provider/opencode`; preserve exact OpenCode version/model/env names; never delete on normal exit |
+| surfaced Codex/OpenRouter through OpenCode | `sessionID` from step event | `hatch_preserved` isolated XDG database | identify, inspect snapshot; same-version timeout recovery hint | Copy a hash-stable allowlisted data/state snapshot into `provider/opencode-snapshot`, retire the live XDG tree, and preserve exact OpenCode version/model/env names |
 | `hatch expert` | OpenAI `response_id` | `remote_provider` plus local raw-response snapshots | identify, poll while active, inspect | Create Hatch run before POST; store every response snapshot and terminal projection; unify old Expert cache artifact into the run directory |
 | raw `codex exec` | unavailable unless a stable structured event is added | `provider_owned` or `unknown`; do not guess | none initially | Use raw-text adapter; durable request/stdout/stderr/result still guaranteed |
 | raw Gemini | unavailable unless CLI exposes one | `unknown` | none initially | Use raw-text adapter; durable request/stdout/stderr/result still guaranteed |

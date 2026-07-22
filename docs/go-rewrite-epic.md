@@ -341,7 +341,8 @@ Implement the companion specification directly in Go:
   sync, rename, and directory sync at lifecycle boundaries;
 - close and hash the evidence set before the terminal transition;
 - preserve incomplete artifacts after crashes;
-- use allowlisted provider snapshots;
+- use allowlisted provider snapshots copied onto terminal-only inodes so a
+  detached provider writer cannot mutate hashed evidence;
 - never serialize credential values or prompt-bearing argv;
 - keep current Python/OpenCode and Expert artifacts read-only.
 

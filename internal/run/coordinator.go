@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -289,13 +290,12 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		state.NativeID = &interpretation.NativeID
 	}
 	if req.Invocation.Adapter == "opencode" {
-		approved, pruneErr := pruneOpenCodeState(artifact)
+		snapshot, approved, pruneErr := freezeOpenCodeState(artifact)
 		if pruneErr != nil {
 			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
 			artifact.Manifest.Capture.State = "degraded"
 		}
 		if approved > 0 {
-			snapshot := "provider/opencode"
 			state.SnapshotPath = &snapshot
 			state.Retention = "hatch_preserved"
 			state.Capabilities["snapshot"] = "supported"
@@ -303,8 +303,8 @@ func (c Coordinator) Execute(req Request) PublicResult {
 				state.ProviderVersion = &req.Invocation.ProviderVersion
 			}
 			if state.NativeID != nil && req.Invocation.ProviderVersion != "" {
-				dataEnv := "XDG_DATA_HOME=" + filepath.Join(artifact.Path, "provider", "opencode", "data")
-				stateEnv := "XDG_STATE_HOME=" + filepath.Join(artifact.Path, "provider", "opencode", "state")
+				dataEnv := "XDG_DATA_HOME=" + filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "data")
+				stateEnv := "XDG_STATE_HOME=" + filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "state")
 				state.InspectHint = &OperatorHint{
 					Argv:         []string{"env", dataEnv, stateEnv, "opencode", "export", *state.NativeID},
 					VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion,
@@ -628,30 +628,160 @@ var openCodeStateAllowlist = map[string]bool{
 	"data/opencode/session.db":      true, // Hermetic compatibility oracle.
 }
 
-func pruneOpenCodeState(artifact *Artifact) (int, error) {
-	root := filepath.Join(artifact.Path, "provider", "opencode")
-	approved := 0
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+func freezeOpenCodeState(artifact *Artifact) (snapshot string, approved int, resultErr error) {
+	providerRoot := filepath.Join(artifact.Path, "provider")
+	liveRoot := filepath.Join(providerRoot, "opencode")
+	tempRoot, err := os.MkdirTemp(providerRoot, ".opencode-snapshot-")
+	if err != nil {
+		return "", 0, err
+	}
+	finished := false
+	defer func() {
+		if !finished {
+			_ = os.RemoveAll(tempRoot)
+			_ = os.RemoveAll(liveRoot)
 		}
-		if entry.IsDir() {
-			return nil
+	}()
+
+	for attempt := 0; attempt < 3; attempt++ {
+		if err := os.RemoveAll(tempRoot); err != nil {
+			return "", 0, err
 		}
-		relative, err := filepath.Rel(root, path)
+		if err := os.MkdirAll(tempRoot, 0o700); err != nil {
+			return "", 0, err
+		}
+		before, err := approvedOpenCodeFingerprints(liveRoot)
+		if err != nil {
+			return "", 0, err
+		}
+		if len(before) == 0 {
+			if err := os.RemoveAll(liveRoot); err != nil {
+				return "", 0, err
+			}
+			if err := os.MkdirAll(liveRoot, 0o500); err != nil {
+				return "", 0, err
+			}
+			if err := os.Chmod(liveRoot, 0o500); err != nil {
+				return "", 0, err
+			}
+			finished = true
+			return "", 0, nil
+		}
+		if err := copyApprovedOpenCodeState(liveRoot, tempRoot, before); err != nil {
+			if attempt == 2 {
+				return "", 0, err
+			}
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		after, err := approvedOpenCodeFingerprints(liveRoot)
+		if err != nil {
+			if attempt == 2 {
+				return "", 0, err
+			}
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		copied, err := approvedOpenCodeFingerprints(tempRoot)
+		if err == nil && maps.Equal(before, after) && maps.Equal(before, copied) {
+			approved = len(copied)
+			break
+		}
+		if attempt == 2 {
+			return "", 0, fmt.Errorf("OpenCode state did not quiesce for a coherent snapshot")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	snapshotRoot := filepath.Join(providerRoot, "opencode-snapshot")
+	if err := os.Rename(tempRoot, snapshotRoot); err != nil {
+		return "", 0, err
+	}
+	if err := os.RemoveAll(liveRoot); err != nil {
+		return "", 0, err
+	}
+	if err := os.MkdirAll(liveRoot, 0o500); err != nil {
+		return "", 0, err
+	}
+	if err := os.Chmod(liveRoot, 0o500); err != nil {
+		return "", 0, err
+	}
+	finished = true
+	return "provider/opencode-snapshot", approved, nil
+}
+
+func approvedOpenCodeFingerprints(root string) (map[string]string, error) {
+	result := map[string]string{}
+	for relative := range openCodeStateAllowlist {
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		safe, err := regularPathWithoutSymlinkParents(root, relative)
+		if err != nil {
+			return nil, err
+		}
+		if !safe {
+			// Never follow provider-created links or preserve special files.
+			// They are removed with the retired live state below.
+			continue
+		}
+		digest, err := hashFile(path)
+		if err != nil {
+			return nil, err
+		}
+		result[relative] = digest
+	}
+	return result, nil
+}
+
+func regularPathWithoutSymlinkParents(root, relative string) (bool, error) {
+	current := root
+	components := strings.Split(filepath.ToSlash(relative), "/")
+	for index, component := range components {
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return false, nil
+		}
+		if index < len(components)-1 && !info.IsDir() {
+			return false, nil
+		}
+		if index == len(components)-1 && !info.Mode().IsRegular() {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func copyApprovedOpenCodeState(sourceRoot, destinationRoot string, files map[string]string) error {
+	for relative := range files {
+		source := filepath.Join(sourceRoot, filepath.FromSlash(relative))
+		destination := filepath.Join(destinationRoot, filepath.FromSlash(relative))
+		if err := secureMkdirAll(filepath.Dir(destination)); err != nil {
+			return err
+		}
+		input, err := os.Open(source)
 		if err != nil {
 			return err
 		}
-		relative = filepath.ToSlash(relative)
-		info, err := entry.Info()
+		output, err := openPrivate(destination)
 		if err != nil {
+			input.Close()
 			return err
 		}
-		if openCodeStateAllowlist[relative] && info.Mode().IsRegular() {
-			approved++
-			return os.Chmod(path, 0o600)
+		_, copyErr := io.Copy(output, input)
+		inputCloseErr := input.Close()
+		syncErr := output.Sync()
+		outputCloseErr := output.Close()
+		for _, err := range []error{copyErr, inputCloseErr, syncErr, outputCloseErr} {
+			if err != nil {
+				return err
+			}
 		}
-		return os.Remove(path)
-	})
-	return approved, err
+	}
+	return nil
 }
