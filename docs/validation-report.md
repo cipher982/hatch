@@ -23,6 +23,39 @@ At commit `23c3641`:
 - Ten-second fuzz campaigns: provider interpretation, manifest reader, evidence paths, and argv redaction all pass.
 - Release binary: 6.2 MiB stripped darwin/arm64. Go help startup median was 6.44 ms versus 71.17 ms for Python/uv in the Phase 5 benchmark.
 
+## Post-cutover contract audit
+
+A requirement-by-requirement audit at `75c579b` replaced broad test-suite claims
+with `testdata/contracts/v1-traceability.json`. Its 36 V1 rows name executable
+proofs for identity, independent axes, schema compatibility, storage ordering,
+security, adapters, failures, inspection, entrypoint parity, Python
+compatibility, and release. `TestContractV1Traceability` rejects missing or
+nonexistent proof functions, while the normal suite executes those functions.
+
+The audit found and corrected gaps that the earlier green suite and independent
+review had missed:
+
+- the sorted evidence hash manifest is now persisted as `evidence.sha256` before
+  terminal commit, and its content digest is asserted byte-for-byte;
+- canonical `backend` and `provider_tool_version` axes are emitted, with the
+  preview `provider_version` spelling read and emitted as a temporary alias;
+- V1 manifests are validated before every write;
+- inspection enumerates exact files and reports live/nonterminal process and
+  suspected-orphan observations without mutating lifecycle;
+- subprocess and HTTP execution now carry parent cancellation; SIGINT/SIGTERM
+  produce durable `cancelled` records and CLI exit 130;
+- HTTP snapshot capture uses the same 32 MiB public-memory bound as subprocess
+  capture while raw evidence remains complete on disk.
+
+Independent Fable review run
+`hatch_20260722T184942.786954000Z_7490badd23006613` returned `SHIP` and identified
+two cancellation races plus lower-severity inspection issues. Commit `13644b1`
+disposed every concrete finding: completed results win simultaneous
+cancellation, second SIGINT restores default termination, atomic rename races
+do not break inspection, zombies are not reported alive, cleanup signal evidence
+comes from the kill primitive, warning arrays stay explicit, and the preview
+provider-version wire alias remains additive.
+
 ## Live proofs
 
 Successful durable Go runs:
@@ -35,8 +68,26 @@ Successful durable Go runs:
 | OpenRouter through Agent Home helper | `hatch_20260722T182128.895358000Z_2ca54c557616aeed` |
 | Expert | `hatch_20260722T181400.888737000Z_0bff83afcd45825d` |
 | Installed Go 0.2.0 Claude smoke | `hatch_20260722T183023.763928000Z_c83eedab5798a439` |
+| Post-audit Fable review and durable wrapper-loss recovery | `hatch_20260722T184942.786954000Z_7490badd23006613` |
 
 The first Codex proof exposed stale prompt-index metadata after DCG removed an argv element. It produced no credential leak, but duplicated the harmless test prompt in the local manifest. The implementation now carries a complete pre-redacted argv and mutates raw/redacted forms together; mismatches fail closed before provider launch. The subsequent live Codex and OpenRouter manifests contain `<prompt>`.
+
+The Fable review also reproduced the original operational failure mode: its
+outer execution wrapper returned only progress while the provider remained
+alive. `hatch runs inspect` showed the matching PID/start identity and running
+artifact; the same run later committed its complete answer, provider identity,
+sorted evidence manifest, and terminal digest. No duplicate provider call was
+needed.
+
+Provider tools recorded on the proof date: Claude Code 2.1.198, Cursor Agent
+2026.07.20-8cc9c0b, OpenCode 1.17.20, and Codex CLI 0.144.6. Expert used the
+Responses API and recorded the resolved model/response ID in its artifact.
+
+Operational measurements include 11.1 MiB maximum resident memory for installed
+`hatch --help`, 13,136.75 MB/s capture-writer throughput, 11.55 ms terminal
+artifact commit, 237.8 ns run-ID generation, 32 concurrent isolated provider
+runs, bounded timeout/cancellation cleanup, and one reused HTTP connection
+across Expert POST/poll in `TestRunPollsAndReturnsMetadata`.
 
 ## Cutover and rollback
 
@@ -52,4 +103,4 @@ Rollback remains `scripts/install-local.sh --select python` and does not mutate 
 
 ## Remaining deletion gate
 
-Python production files stay in the branch until `scripts/check-field-evidence.sh` observes at least 50 genuine schema-v1 runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert, and no nonterminal or degraded capture. The gate currently has seven genuine runs. Synthetic paid calls are not counted merely to accelerate deletion.
+Python production files stay in the branch until `scripts/check-field-evidence.sh` observes at least 50 genuine schema-v1 runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert, and no nonterminal or degraded capture. The gate currently has eight genuine runs: Claude 3, Codex 2, Cursor 1, OpenRouter 1, and Expert 1. Synthetic paid calls are not counted merely to accelerate deletion.
