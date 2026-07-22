@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -225,6 +226,39 @@ func TestCoordinatorTimeoutKillsProcessGroup(t *testing.T) {
 	}
 	if result.Output != "partial output\n" {
 		t.Fatalf("partial output lost: %q", result.Output)
+	}
+}
+
+func TestCoordinatorThirtyTwoConcurrentRunsAreIsolated(t *testing.T) {
+	fake := buildTestProvider(t)
+	store := NewStore(filepath.Join(t.TempDir(), "runs"))
+	const count = 32
+	results := make(chan PublicResult, count)
+	var group sync.WaitGroup
+	for index := 0; index < count; index++ {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			results <- NewCoordinator(store).Execute(Request{
+				Surface: "gemini.raw", Provider: "google", Prompt: "concurrent", Timeout: 5 * time.Second,
+				Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
+			})
+		}()
+	}
+	group.Wait()
+	close(results)
+	ids, paths := map[string]bool{}, map[string]bool{}
+	for result := range results {
+		if !result.OK || result.Run == nil || result.ArtifactPath == nil {
+			t.Fatalf("concurrent result = %#v", result)
+		}
+		if ids[result.Run.RunID] || paths[*result.ArtifactPath] {
+			t.Fatalf("duplicate identity: %s %s", result.Run.RunID, *result.ArtifactPath)
+		}
+		ids[result.Run.RunID], paths[*result.ArtifactPath] = true, true
+	}
+	if len(ids) != count || len(paths) != count {
+		t.Fatalf("ids=%d paths=%d", len(ids), len(paths))
 	}
 }
 
