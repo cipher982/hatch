@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 func TestParseCursorModelIDs(t *testing.T) {
@@ -24,11 +26,11 @@ func TestParseOpenCodeModelIDs(t *testing.T) {
 func TestCheckOpenCodeModels(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-pro' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-pro' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	check := checkOpenCodeModels("openrouter.catalog", "openrouter", OpenRouterModels)
+	check := checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", Credential{Value: "expected-secret"}, modelValues(provider.OpenRouterSurfaceModels))
 	if !check.OK || check.Name != "openrouter.catalog" {
 		t.Fatalf("check = %#v", check)
 	}
@@ -41,9 +43,30 @@ func TestCheckOpenCodeModelsDetectsDrift(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	check := checkOpenCodeModels("openrouter.catalog", "openrouter", OpenRouterModels)
+	check := checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", Credential{Value: "expected-secret"}, modelValues(provider.OpenRouterSurfaceModels))
 	if check.OK || !strings.Contains(check.Detail, "~moonshotai/kimi-latest") || !strings.Contains(check.Detail, "--refresh") {
 		t.Fatalf("check = %#v", check)
+	}
+}
+
+func TestCheckOpenCodeModelsDistinguishesMissingCredential(t *testing.T) {
+	check := checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", Credential{}, modelValues(provider.CodexSurfaceModels))
+	if check.OK || !strings.Contains(check.Detail, "OPENAI_API_KEY is unavailable") {
+		t.Fatalf("check = %#v", check)
+	}
+}
+
+func TestCheckOpenCodeModelsReportsCredentialResolverFailure(t *testing.T) {
+	check := checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", Credential{ResolutionError: os.ErrPermission}, modelValues(provider.CodexSurfaceModels))
+	if check.OK || !strings.Contains(check.Detail, "credential resolver failed") {
+		t.Fatalf("check = %#v", check)
+	}
+}
+
+func TestCodexDoctorCoversEverySurfaceAlias(t *testing.T) {
+	models := modelValues(provider.CodexSurfaceModels)
+	if len(models) != 6 {
+		t.Fatalf("doctor covers %d Codex models, want 6: %v", len(models), models)
 	}
 }
 

@@ -40,20 +40,46 @@ mv "$root/failed-run/manifest.next" "$root/failed-run/manifest.json"
 cp -R "$root/openrouter-1" "$root/raw-run"
 sed 's/"surface":"openrouter.deepseek-v4-pro"/"surface":"openrouter.raw"/' "$root/raw-run/manifest.json" > "$root/raw-run/manifest.next"
 mv "$root/raw-run/manifest.next" "$root/raw-run/manifest.json"
+cp -R "$root/expert-1" "$root/incomplete-run"
+sed 's/"lifecycle":"terminal"/"lifecycle":"running"/' "$root/incomplete-run/manifest.json" > "$root/incomplete-run/manifest.next"
+mv "$root/incomplete-run/manifest.next" "$root/incomplete-run/manifest.json"
+mkdir -p "$root/precontract-incomplete"
+printf '{"schema_version":1,"run_id":"old-crash","surface":"claude.haiku","lifecycle":"running","capture":{"state":"degraded"}}\n' > "$root/precontract-incomplete/manifest.json"
 output=$(HATCH_RUN_ARTIFACT_ROOT="$root" HATCH_FIELD_MIN_TOTAL=25 "$(dirname "$0")/check-field-evidence.sh")
 printf '%s\n' "$output" | grep -q 'field evidence gate passed'
-printf '%s\n' "$output" | grep -q 'observed=28 excluded-pre-contract=1 non-success=1 non-surfaced=1 unsafe=0'
+printf '%s\n' "$output" | grep -q 'observed=30 excluded-pre-contract=2 incomplete=1 non-success=1 non-surfaced=1 unsafe=0'
 
 if HATCH_RUN_ARTIFACT_ROOT="$root" HATCH_FIELD_MIN_TOTAL=26 "$(dirname "$0")/check-field-evidence.sh" >/dev/null 2>&1; then
   echo "field evidence checker accepted an insufficient total" >&2
   exit 1
 fi
 
-sed 's/"durable"/"degraded"/' "$root/claude-1/manifest.json" > "$root/claude-1/manifest.next"
-mv "$root/claude-1/manifest.next" "$root/claude-1/manifest.json"
-if HATCH_RUN_ARTIFACT_ROOT="$root" HATCH_FIELD_MIN_TOTAL=25 "$(dirname "$0")/check-field-evidence.sh" >/dev/null 2>&1; then
+cp -R "$root/claude-1" "$root/degraded-run"
+sed 's/"durable"/"degraded"/' "$root/degraded-run/manifest.json" > "$root/degraded-run/manifest.next"
+mv "$root/degraded-run/manifest.next" "$root/degraded-run/manifest.json"
+if output=$(HATCH_RUN_ARTIFACT_ROOT="$root" HATCH_FIELD_MIN_TOTAL=25 "$(dirname "$0")/check-field-evidence.sh" 2>&1); then
   echo "field evidence checker accepted degraded capture" >&2
   exit 1
 fi
+printf '%s\n' "$output" | grep -q 'unsafe=1'
+rm -rf "$root/degraded-run"
+
+cp -R "$root/claude-1" "$root/corrupt-file-run"
+printf 'tampered\n' >> "$root/corrupt-file-run/stdout.log"
+if output=$(HATCH_RUN_ARTIFACT_ROOT="$root" HATCH_FIELD_MIN_TOTAL=25 "$(dirname "$0")/check-field-evidence.sh" 2>&1); then
+  echo "field evidence checker accepted corrupted evidence bytes" >&2
+  exit 1
+fi
+printf '%s\n' "$output" | grep -q 'unsafe=1'
+rm -rf "$root/corrupt-file-run"
+
+cp -R "$root/claude-1" "$root/corrupt-digest-run"
+sed 's/"evidence_sha256":"[0-9a-f]*"/"evidence_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"/' "$root/corrupt-digest-run/manifest.json" > "$root/corrupt-digest-run/manifest.next"
+mv "$root/corrupt-digest-run/manifest.next" "$root/corrupt-digest-run/manifest.json"
+if output=$(HATCH_RUN_ARTIFACT_ROOT="$root" HATCH_FIELD_MIN_TOTAL=25 "$(dirname "$0")/check-field-evidence.sh" 2>&1); then
+  echo "field evidence checker accepted corrupted recorded digest" >&2
+  exit 1
+fi
+printf '%s\n' "$output" | grep -q 'unsafe=1'
 
 echo "field evidence checker passed"

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 type Request struct {
@@ -30,16 +32,10 @@ var surfaces = map[string]struct {
 	backend string
 	models  map[string]string
 }{
-	"claude": {"claude", map[string]string{"haiku": "haiku", "sonnet": "sonnet", "opus": "opus", "fable": "fable"}},
-	"cursor": {"cursor", map[string]string{"grok": "cursor-grok-4.5-high"}},
-	"codex": {"opencode", map[string]string{
-		"sol": "openai/gpt-5.6-sol", "terra": "openai/gpt-5.6-terra", "luna": "openai/gpt-5.6-luna",
-		"nano": "openai/gpt-5.4-nano", "mini": "openai/gpt-5.4-mini", "max": "openai/gpt-5.5",
-	}},
-	"openrouter": {"opencode", map[string]string{
-		"deepseek-v4-pro": "openrouter/deepseek/deepseek-v4-pro",
-		"kimi-k3":         "openrouter/~moonshotai/kimi-latest",
-	}},
+	"claude":     {"claude", map[string]string{"haiku": "haiku", "sonnet": "sonnet", "opus": "opus", "fable": "fable"}},
+	"cursor":     {"cursor", map[string]string{"grok": "cursor-grok-4.5-high"}},
+	"codex":      {"opencode", provider.CodexSurfaceModels},
+	"openrouter": {"opencode", provider.OpenRouterSurfaceModels},
 }
 
 var flagsWithValue = map[string]bool{

@@ -200,6 +200,19 @@ func TestCoordinatorReturnsAnswerWhenMarkRunningPersistenceFails(t *testing.T) {
 	}
 }
 
+func TestCoordinatorCleansUpTimeoutWhenMarkRunningPersistenceFails(t *testing.T) {
+	fake := buildTestProvider(t)
+	store := markRunningFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
+	result := NewCoordinator(store).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 50 * time.Millisecond,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang"}},
+	})
+	if result.Run == nil || result.Run.Outcome == nil || *result.Run.Outcome != OutcomeTimedOut || result.Run.Process == nil ||
+		result.Run.Process.TimeoutCleanup == nil || result.Run.Capture.State != "degraded" {
+		t.Fatalf("result=%#v", result)
+	}
+}
+
 func TestCoordinatorReturnsAnswerWhenResultPersistenceFails(t *testing.T) {
 	fake := buildTestProvider(t)
 	store := writeResultFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}

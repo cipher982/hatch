@@ -3,15 +3,26 @@ package doctor
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 const CursorGrok = "cursor-grok-4.5-high"
 
-var CodexModels = []string{"openai/gpt-5.6-sol", "openai/gpt-5.6-terra", "openai/gpt-5.6-luna"}
-var OpenRouterModels = []string{"openrouter/deepseek/deepseek-v4-pro", "openrouter/~moonshotai/kimi-latest"}
+type Credential struct {
+	Value           string
+	ResolutionError error
+}
+
+type Options struct {
+	OpenAI     Credential
+	OpenRouter Credential
+}
 
 type Check struct {
 	Name   string `json:"name"`
@@ -31,12 +42,21 @@ func ParseCursorModelIDs(output string) map[string]struct{} {
 	return result
 }
 
-func Run() []Check {
+func Run(options Options) []Check {
 	return []Check{
 		checkCursorModel(),
-		checkOpenCodeModels("codex.catalog", "openai", CodexModels),
-		checkOpenCodeModels("openrouter.catalog", "openrouter", OpenRouterModels),
+		checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", options.OpenAI, modelValues(provider.CodexSurfaceModels)),
+		checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", options.OpenRouter, modelValues(provider.OpenRouterSurfaceModels)),
 	}
+}
+
+func modelValues(catalog map[string]string) []string {
+	models := make([]string, 0, len(catalog))
+	for _, model := range catalog {
+		models = append(models, model)
+	}
+	sort.Strings(models)
+	return models
 }
 
 func ParseOpenCodeModelIDs(output string) map[string]struct{} {
@@ -49,10 +69,17 @@ func ParseOpenCodeModelIDs(output string) map[string]struct{} {
 	return result
 }
 
-func checkOpenCodeModels(name, provider string, required []string) Check {
+func checkOpenCodeModels(name, providerName, credentialName string, credential Credential, required []string) Check {
+	if credential.ResolutionError != nil {
+		return Check{Name: name, Detail: "credential resolver failed for catalog probe: " + credential.ResolutionError.Error()}
+	}
+	if strings.TrimSpace(credential.Value) == "" {
+		return Check{Name: name, Detail: credentialName + " is unavailable for catalog probe"}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "opencode", "models", provider)
+	cmd := exec.CommandContext(ctx, "opencode", "models", providerName)
+	cmd.Env = replaceEnvironment(os.Environ(), credentialName, credential.Value)
 	stdout, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
 		return Check{Name: name, Detail: "opencode models timed out after 30s"}
@@ -75,9 +102,20 @@ func checkOpenCodeModels(name, provider string, required []string) Check {
 		}
 	}
 	if len(missing) > 0 {
-		return Check{Name: name, Detail: fmt.Sprintf("configured models unavailable: %s; run `opencode models %s --refresh` and update Hatch aliases", strings.Join(missing, ", "), provider)}
+		return Check{Name: name, Detail: fmt.Sprintf("configured models unavailable: %s; run `opencode models %s --refresh` and update Hatch aliases", strings.Join(missing, ", "), providerName)}
 	}
 	return Check{Name: name, OK: true, Detail: fmt.Sprintf("%d configured models are available", len(required))}
+}
+
+func replaceEnvironment(environment []string, name, value string) []string {
+	prefix := name + "="
+	result := make([]string, 0, len(environment)+1)
+	for _, item := range environment {
+		if !strings.HasPrefix(item, prefix) {
+			result = append(result, item)
+		}
+	}
+	return append(result, prefix+value)
 }
 
 func checkCursorModel() Check {

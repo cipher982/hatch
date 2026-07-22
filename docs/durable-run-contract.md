@@ -318,6 +318,12 @@ Required rules:
 - `writer.contract_revision` identifies the exact Hatch-owned persistence
   protocol needed for field-soak and migration gates. It is not provider
   capability metadata and never substitutes for `schema_version`.
+- Field gates classify the writer revision before lifecycle or capture state.
+  Records from earlier writers are excluded, nonterminal final-writer records
+  are retained and reported as incomplete incidents, and only terminal
+  final-writer capture/hash corruption is unsafe. Explained terminal provider
+  failures remain evidence but receive no success credit. No gate may require
+  deleting a crash artifact in order to pass.
 - `run_id` is sortable and collision-resistant; it is never derived from a
   provider ID. Implement it with the standard library; no new dependency is
   justified for IDs.

@@ -1,6 +1,11 @@
 #!/bin/sh
 set -eu
 
+if ! command -v jq >/dev/null 2>&1; then
+  echo "field evidence checker requires jq" >&2
+  exit 2
+fi
+
 root=${HATCH_RUN_ARTIFACT_ROOT:-"$HOME/.local/state/hatch/runs"}
 minimum_total=${HATCH_FIELD_MIN_TOTAL:-50}
 minimum_surface=${HATCH_FIELD_MIN_SURFACE:-5}
@@ -9,9 +14,12 @@ surfaces="claude codex cursor openrouter expert"
 if command -v sha256sum >/dev/null 2>&1; then
   sha256_file() { sha256sum "$1" | awk '{print $1}'; }
   verify_hash_manifest() { (cd "$1" && sha256sum -c "$2" >/dev/null 2>&1); }
-else
+elif command -v shasum >/dev/null 2>&1; then
   sha256_file() { shasum -a 256 "$1" | awk '{print $1}'; }
   verify_hash_manifest() { (cd "$1" && shasum -a 256 -c "$2" >/dev/null 2>&1); }
+else
+  echo "field evidence checker requires sha256sum or shasum" >&2
+  exit 2
 fi
 
 tmp=$(mktemp -d)
@@ -25,6 +33,7 @@ observed=0
 excluded=0
 non_success=0
 non_surfaced=0
+incomplete=0
 unsafe=0
 
 if [ -d "$root" ]; then
@@ -34,26 +43,36 @@ fi
 while IFS= read -r manifest; do
   [ "$(jq -r '.schema_version // 0' "$manifest")" = 1 ] || continue
   observed=$((observed + 1))
+  writer=$(jq -r '.writer.implementation // ""' "$manifest")
+  contract_revision=$(jq -r '.writer.contract_revision // 0' "$manifest")
+  if [ "$writer" != go ] || [ "$contract_revision" -ne 1 ]; then
+    excluded=$((excluded + 1))
+    continue
+  fi
+
   lifecycle=$(jq -r '.lifecycle // ""' "$manifest")
+  if [ "$lifecycle" != terminal ]; then
+    incomplete=$((incomplete + 1))
+    continue
+  fi
+
   capture=$(jq -r '.capture.state // ""' "$manifest")
   capture_failures=$(jq '[.warnings[]? | select(.code == "capture_persistence_failed")] | length' "$manifest")
-  if [ "$lifecycle" != terminal ] || [ "$capture" != durable ] || [ "$capture_failures" -ne 0 ]; then
+  if [ "$capture" != durable ] || [ "$capture_failures" -ne 0 ]; then
     unsafe=$((unsafe + 1))
     continue
   fi
 
   backend=$(jq -r '.backend // ""' "$manifest")
-  writer=$(jq -r '.writer.implementation // ""' "$manifest")
-  contract_revision=$(jq -r '.writer.contract_revision // 0' "$manifest")
   evidence_file=$(jq -r '.capture.evidence_manifest_file // ""' "$manifest")
   expected_digest=$(jq -r '.capture.evidence_sha256 // ""' "$manifest")
   case "$evidence_file" in
-    ""|/*|*..*) excluded=$((excluded + 1)); continue ;;
+    ""|/*|*..*) unsafe=$((unsafe + 1)); continue ;;
   esac
   run_dir=$(dirname "$manifest")
   evidence_path="$run_dir/$evidence_file"
-  if [ "$writer" != go ] || [ "$contract_revision" -ne 1 ] || [ -z "$backend" ] || [ "$backend" = unknown ] || [ ! -f "$evidence_path" ] || [ "${#expected_digest}" -ne 64 ]; then
-    excluded=$((excluded + 1))
+  if [ -z "$backend" ] || [ "$backend" = unknown ] || [ ! -f "$evidence_path" ] || [ "${#expected_digest}" -ne 64 ]; then
+    unsafe=$((unsafe + 1))
     continue
   fi
   actual_digest=$(sha256_file "$evidence_path")
@@ -75,12 +94,16 @@ while IFS= read -r manifest; do
     expert) surface=expert ;;
     *) non_surfaced=$((non_surfaced + 1)); continue ;;
   esac
-  run_id=$(jq -r '.run_id' "$manifest")
+  run_id=$(jq -r '.run_id // ""' "$manifest")
+  if [ -z "$run_id" ]; then
+    unsafe=$((unsafe + 1))
+    continue
+  fi
   printf '%s\t%s\n' "$surface" "$run_id" >> "$records"
 done < "$manifests"
 
 eligible=$(wc -l < "$records" | tr -d ' ')
-printf 'Go field evidence: eligible=%s/%s observed=%s excluded-pre-contract=%s non-success=%s non-surfaced=%s unsafe=%s\n' "$eligible" "$minimum_total" "$observed" "$excluded" "$non_success" "$non_surfaced" "$unsafe"
+printf 'Go field evidence: eligible=%s/%s observed=%s excluded-pre-contract=%s incomplete=%s non-success=%s non-surfaced=%s unsafe=%s\n' "$eligible" "$minimum_total" "$observed" "$excluded" "$incomplete" "$non_success" "$non_surfaced" "$unsafe"
 
 passed=true
 [ "$eligible" -ge "$minimum_total" ] || passed=false

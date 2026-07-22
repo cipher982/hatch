@@ -183,7 +183,12 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		}
 		return renderConfigError(jsonOutput, stdout, stderr, fmt.Errorf("unrecognized argument: %s", arg))
 	}
-	checks := doctor.Run()
+	openAI, openAIErr := resolveCredential("", "OPENAI_API_KEY")
+	openRouter, openRouterErr := resolveCredential("", "OPENROUTER_API_KEY")
+	checks := doctor.Run(doctor.Options{
+		OpenAI:     doctor.Credential{Value: openAI, ResolutionError: openAIErr},
+		OpenRouter: doctor.Credential{Value: openRouter, ResolutionError: openRouterErr},
+	})
 	ok := true
 	for _, check := range checks {
 		ok = ok && check.OK

@@ -7,7 +7,7 @@ Status: Go 0.2.0 cut over on 2026-07-22; Python retirement soak in progress.
 - Frozen Python baseline: `python-v0.1.0-final` at `4f07b783`.
 - Migration ledger: 316 live pytest nodes (304 frozen plus 12 shared contract cases), each classified with an executable Go proof, exact corpus case, or explicit retired/obsolete disposition.
 - Shared process oracle: Python and Go execute the same fake provider across 12 cases, including success, nonzero exit, structured error, missing terminal marker, malformed output, and timeout.
-- Independent reviews: Fable and Kimi initially returned no-ship findings; the remediated branch received a Fable `SHIP` verdict with no cutover blockers.
+- Independent reviews: Fable and Kimi initially returned no-ship findings; the remediated branch received a Fable `SHIP` verdict. A final Kimi review returned `CONDITIONAL SHIP`; every concrete condition is dispositioned below.
 
 ## Final pre-cutover checks
 
@@ -114,10 +114,34 @@ Rollback remains `scripts/install-local.sh --select python` and does not mutate 
 
 Python production files stay in the branch until `scripts/check-field-evidence.sh` verifies at least 50 genuine contract-complete runs, with at least five each across Claude, Codex, Cursor, OpenRouter, and Expert. The checker validates terminal/durable state, rejects capture-persistence warnings, verifies the persisted evidence-manifest digest, and verifies every file hash in that closed set.
 
-Thirteen genuine Go runs have been observed. Ten predate the explicit
-`writer={implementation:go, contract_revision:1}` marker; two final-writer Kimi
-attempts are durable explained model-resolution failures; and one successful
-final-writer request used the raw diagnostic surface. They remain provider and
-failure-semantics evidence but are conservatively excluded from surfaced
-Python-retirement credit. The final writer deletion gate remains 0/50.
+The latest audit observed 18 Go records: ten predate the explicit
+`writer={implementation:go, contract_revision:1}` marker, three were live
+nonterminal records, two were durable explained Kimi model-resolution failures,
+and one successful request used the raw diagnostic surface. A stable Kimi K3
+review and a stable Cursor run are the first two eligible surfaced successes.
 Synthetic paid calls are not counted merely to accelerate deletion.
+
+Kimi's final review run
+`hatch_20260722T191640.922141000Z_f4d6146899934d0a` found one high-severity gate
+bug: preserved crash records could permanently poison retirement. The checker
+now establishes the writer contract first, excludes pre-contract records,
+reports nonterminal final-writer records as incomplete without awarding credit,
+and reserves unsafe status for terminal final-writer capture or hash failure.
+Tests cover degraded capture, evidence-byte tampering, recorded-digest
+tampering, old-writer crashes, and final-writer incompletes. This preserves
+incident evidence instead of incentivizing deletion.
+
+The same review found that doctor used ambient credentials and checked only
+three of six Codex aliases. Doctor now resolves OpenAI and OpenRouter credentials
+through Hatch's normal explicit/environment/helper authority, injects them only
+into the corresponding catalog probe, reports missing versus resolver failure
+distinctly, and derives every checked model from the CLI's shared catalog.
+
+The Kimi route intentionally uses OpenRouter's floating
+`~moonshotai/kimi-latest` alias because the direct K3 slug advertised by the
+installed OpenCode catalog was rejected at execution time. Field credit belongs
+to the stable Hatch `openrouter.kimi-k3` surface, not an immutable upstream model
+generation. If OpenRouter repoints the alias away from K3, Hatch must re-alias or
+rename the surface and restart the affected provider proof; `hatch doctor`
+detects disappearance, not semantic repointing. Successful explicit raw-model
+diagnostics remain diagnostic evidence and never receive surfaced soak credit.

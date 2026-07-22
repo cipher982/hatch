@@ -123,9 +123,22 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		_ = stderrFile.Close()
 		return c.finalizePrelaunchFailure(artifact, started, -2, OutcomeLaunch, err.Error(), nil)
 	}
-	if err := c.Store.MarkRunning(artifact, cmd.Process.Pid, c.Now(), processStartIdentity(cmd.Process.Pid)); err != nil {
+	providerStarted := c.Now()
+	processIdentity := processStartIdentity(cmd.Process.Pid)
+	if err := c.Store.MarkRunning(artifact, cmd.Process.Pid, providerStarted, processIdentity); err != nil {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 		artifact.Manifest.Capture.State = "degraded"
+	}
+	// A persistence failure must not erase the in-memory ownership observation
+	// needed to clean up a later timeout or cancellation. Store implementations
+	// normally populate this while writing the running manifest, but the
+	// coordinator retains the process truth independently of that write.
+	if artifact.Manifest.Process == nil {
+		processGroup := cmd.Process.Pid
+		artifact.Manifest.Process = &Process{PID: cmd.Process.Pid, ProcessGroup: &processGroup, StartedAt: providerStarted.UTC()}
+		if processIdentity != "" {
+			artifact.Manifest.Process.StartIdentity = &processIdentity
+		}
 	}
 
 	waited := make(chan error, 1)
