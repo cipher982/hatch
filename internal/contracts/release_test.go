@@ -14,38 +14,25 @@ import (
 
 func TestReleaseInstall(t *testing.T) {
 	root := repoRoot(t)
-	targets := [][2]string{{"darwin", "arm64"}, {"darwin", "amd64"}, {"linux", "amd64"}, {"linux", "arm64"}}
-	for _, target := range targets {
-		name := target[0] + "_" + target[1]
-		t.Run(name, func(t *testing.T) {
-			output := filepath.Join(t.TempDir(), "hatch")
-			build := exec.Command("go", "build", "-buildvcs=false", "-trimpath", "-o", output, "./cmd/hatch")
-			build.Dir = root
-			build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS="+target[0], "GOARCH="+target[1])
-			if data, err := build.CombinedOutput(); err != nil {
-				t.Fatalf("cross-build: %v\n%s", err, data)
-			}
-			if info, err := os.Stat(output); err != nil || info.Size() == 0 {
-				t.Fatalf("binary: %v %#v", err, info)
-			}
-		})
-	}
-
-	build := func(path string) []byte {
-		command := exec.Command("go", "build", "-buildvcs=false", "-trimpath", "-ldflags", "-X github.com/cipher982/hatch/internal/cli.Version=test-release -X github.com/cipher982/hatch/internal/cli.Commit=test-commit -X github.com/cipher982/hatch/internal/cli.Dirty=false", "-o", path, "./cmd/hatch")
+	build := func(directory string) {
+		command := exec.Command("sh", filepath.Join(root, "scripts", "build-release.sh"))
 		command.Dir = root
-		command.Env = append(os.Environ(), "CGO_ENABLED=0")
+		command.Env = append(os.Environ(), "DIST_DIR="+directory, "VERSION=test-release", "COMMIT=test-commit")
 		if data, err := command.CombinedOutput(); err != nil {
-			t.Fatalf("native build: %v\n%s", err, data)
+			t.Fatalf("release build: %v\n%s", err, data)
 		}
-		return mustRead(t, path)
 	}
-	first := build(filepath.Join(t.TempDir(), "hatch-one"))
-	secondPath := filepath.Join(t.TempDir(), "hatch-two")
-	second := build(secondPath)
-	if sha256.Sum256(first) != sha256.Sum256(second) {
-		t.Fatal("identical release inputs produced different binaries")
+	firstDir, secondDir := t.TempDir(), t.TempDir()
+	build(firstDir)
+	build(secondDir)
+	for _, target := range []string{"darwin_arm64", "darwin_amd64", "linux_amd64", "linux_arm64"} {
+		first := mustRead(t, filepath.Join(firstDir, "hatch_test-release_"+target, "hatch"))
+		second := mustRead(t, filepath.Join(secondDir, "hatch_test-release_"+target, "hatch"))
+		if len(first) == 0 || sha256.Sum256(first) != sha256.Sum256(second) {
+			t.Fatalf("release target %s was empty or non-reproducible", target)
+		}
 	}
+	secondPath := filepath.Join(secondDir, "hatch_test-release_"+runtime.GOOS+"_"+runtime.GOARCH, "hatch")
 
 	version := exec.Command(secondPath, "--version")
 	versionOutput, err := version.Output()

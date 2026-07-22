@@ -52,6 +52,16 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 		}
 	})
 
+	t.Run("explicit claude stream remains raw", func(t *testing.T) {
+		got, err := Build(Request{Backend: "claude", Model: "opus", Prompt: "p", OutputFormat: "stream-json", RawStructuredOutput: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Adapter != "raw" || got.StreamFormat != "jsonl" {
+			t.Fatalf("explicit stream invocation = %#v", got)
+		}
+	})
+
 	t.Run("raw codex", func(t *testing.T) {
 		got, err := Build(Request{
 			Backend: "codex", Model: "gpt-5.6", Prompt: "p", APIKey: "secret",

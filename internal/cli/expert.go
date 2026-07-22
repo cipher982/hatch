@@ -42,7 +42,7 @@ func runExpert(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
 	if apiKey == "" {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENAI_API_KEY not set and no credential helper is configured"))
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENAI_API_KEY is not set or available from the configured credential helper"))
 	}
 	root, err := runner.DefaultRoot()
 	if err != nil {

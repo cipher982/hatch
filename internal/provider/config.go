@@ -15,6 +15,7 @@ type Request struct {
 	CWD                    string
 	ReasoningEffort        string
 	OutputFormat           string
+	RawStructuredOutput    bool
 	APIKey                 string
 	Resume                 string
 	SkipGitRepoCheck       bool
@@ -64,8 +65,10 @@ func Build(req Request) (Invocation, error) {
 			argv = append(argv, "--resume", req.Resume)
 		}
 		adapter, streamFormat := "raw", "text"
-		if outputFormat == "stream-json" {
+		if outputFormat == "stream-json" && !req.RawStructuredOutput {
 			adapter, streamFormat = "claude", "jsonl"
+		} else if outputFormat == "stream-json" {
+			streamFormat = "jsonl"
 		}
 		return Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
@@ -98,8 +101,10 @@ func Build(req Request) (Invocation, error) {
 			argv = append(argv, "--resume", req.Resume)
 		}
 		adapter, streamFormat := "raw", "text"
-		if outputFormat == "stream-json" {
+		if outputFormat == "stream-json" && !req.RawStructuredOutput {
 			adapter, streamFormat = "claude", "jsonl"
+		} else if outputFormat == "stream-json" {
+			streamFormat = "jsonl"
 		}
 		return Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,

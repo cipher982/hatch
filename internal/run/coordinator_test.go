@@ -106,6 +106,18 @@ type transientCommitStore struct {
 	attempts *int
 }
 
+type markRunningFailureStore struct{ Store }
+
+func (s markRunningFailureStore) MarkRunning(*Artifact, int, time.Time, string) error {
+	return errors.New("injected mark-running failure")
+}
+
+type writeResultFailureStore struct{ Store }
+
+func (s writeResultFailureStore) WriteResult(*Artifact, []byte) (string, error) {
+	return "", errors.New("injected result-write failure")
+}
+
 func (s transientCommitStore) CommitTerminal(artifact *Artifact, outcome Outcome, exitCode int, result Result, state State, warnings []Warning) error {
 	(*s.attempts)++
 	if *s.attempts == 1 {
@@ -172,6 +184,30 @@ func TestCoordinatorRetriesTerminalCommitAsDegraded(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(result.Run.Capture.ArtifactPath, "manifest.json"))
 	if err != nil || !bytes.Contains(data, []byte(`"lifecycle": "terminal"`)) || !bytes.Contains(data, []byte("injected terminal commit failure")) {
 		t.Fatalf("disk manifest=%s err=%v", data, err)
+	}
+}
+
+func TestCoordinatorReturnsAnswerWhenMarkRunningPersistenceFails(t *testing.T) {
+	fake := buildTestProvider(t)
+	store := markRunningFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
+	result := NewCoordinator(store).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
+	})
+	if !result.OK || result.Output != "fake provider output\n" || result.Run == nil || result.Run.Capture.State != "degraded" || result.ArtifactPath != nil {
+		t.Fatalf("result=%#v", result)
+	}
+}
+
+func TestCoordinatorReturnsAnswerWhenResultPersistenceFails(t *testing.T) {
+	fake := buildTestProvider(t)
+	store := writeResultFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
+	result := NewCoordinator(store).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
+	})
+	if !result.OK || result.Output != "fake provider output\n" || result.Run == nil || result.Run.Result.OutputFile != nil || result.Run.Capture.State != "degraded" || result.ArtifactPath != nil {
+		t.Fatalf("result=%#v", result)
 	}
 }
 

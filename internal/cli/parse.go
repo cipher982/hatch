@@ -14,6 +14,7 @@ type Request struct {
 	TimeoutSeconds         int
 	ReasoningEffort        string
 	OutputFormat           string
+	OutputFormatExplicit   bool
 	APIKey                 string
 	Resume                 string
 	SkipGitRepoCheck       bool
@@ -114,6 +115,7 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 					return req, fmt.Errorf("invalid output format %q", value)
 				}
 				req.OutputFormat = value
+				req.OutputFormatExplicit = true
 			case "--api-key":
 				req.APIKey = value
 			case "-r", "--resume":

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -46,6 +47,21 @@ func TestStorePreparesPrivateDurableRun(t *testing.T) {
 	}
 	if disk.RunID != artifact.Manifest.RunID || disk.Capture.ArtifactPath != artifact.Path {
 		t.Fatalf("disk manifest mismatch: %#v", disk)
+	}
+}
+
+func TestStorePermissionsIgnoreCallerUmask(t *testing.T) {
+	for _, mask := range []int{0o000, 0o077} {
+		old := syscall.Umask(mask)
+		store := NewStore(filepath.Join(t.TempDir(), "runs"))
+		artifact, err := store.Prepare(PreparedRun{Request: "prompt"})
+		syscall.Umask(old)
+		if err != nil {
+			t.Fatalf("umask %#o: %v", mask, err)
+		}
+		assertMode(t, store.Root, 0o700)
+		assertMode(t, artifact.Path, 0o700)
+		assertMode(t, filepath.Join(artifact.Path, "request.txt"), 0o600)
 	}
 }
 

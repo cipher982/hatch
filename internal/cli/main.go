@@ -93,15 +93,16 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 		}
 	}
 	if strings.HasPrefix(request.Model, "openrouter/") && apiKey == "" {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENROUTER_API_KEY not set and no credential helper is configured"))
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENROUTER_API_KEY is not set or available from the configured credential helper"))
 	}
 	if (strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex") && apiKey == "" {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENAI_API_KEY not set and no credential helper is configured"))
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENAI_API_KEY is not set or available from the configured credential helper"))
 	}
 	invocation, err := provider.Build(provider.Request{
 		Backend: request.Backend, Model: request.Model, Prompt: prompt, CWD: request.CWD,
 		ReasoningEffort: request.ReasoningEffort, OutputFormat: request.OutputFormat, APIKey: apiKey,
-		Resume: request.Resume, SkipGitRepoCheck: request.SkipGitRepoCheck,
+		RawStructuredOutput: request.OutputFormatExplicit && request.OutputFormat == "stream-json",
+		Resume:              request.Resume, SkipGitRepoCheck: request.SkipGitRepoCheck,
 		IncludePartialMessages: request.IncludePartialMessages,
 	})
 	if err != nil {

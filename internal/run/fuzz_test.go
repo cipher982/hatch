@@ -1,6 +1,7 @@
 package run
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,29 @@ func FuzzEvidencePath(f *testing.F) {
 		unsafe := name == "" || strings.HasPrefix(name, "/") || name == ".." || strings.HasPrefix(name, "../") || strings.Contains(name, "/../") || strings.Contains(name, "//") || strings.HasSuffix(name, "/.")
 		if unsafe && err == nil {
 			t.Fatalf("unsafe path accepted: %q -> %q", name, path)
+		}
+	})
+}
+
+func FuzzManifestReader(f *testing.F) {
+	f.Add([]byte(`{"schema_version":1,"run_id":"hatch_seed","lifecycle":"terminal","outcome":"succeeded","capture":{"state":"durable"},"provider_state":{"retention":"unknown"}}`))
+	f.Add([]byte(`{"schema_version":99}`))
+	f.Add([]byte(`not-json`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		var raw map[string]any
+		if json.Unmarshal(data, &raw) != nil {
+			return
+		}
+		encoded, err := json.Marshal(raw)
+		if err != nil {
+			return
+		}
+		var manifest Manifest
+		if json.Unmarshal(encoded, &manifest) != nil {
+			return
+		}
+		if manifest.SchemaVersion == 1 {
+			normalizeUnknownEnums(&manifest)
 		}
 	})
 }
