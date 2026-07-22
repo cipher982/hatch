@@ -54,4 +54,9 @@ func TestReleaseInstall(t *testing.T) {
 	if err := json.Unmarshal(doctorOutput, &doctorResult); err != nil || doctorResult["ok"] != false {
 		t.Fatalf("doctor=%s err=%v", doctorOutput, err)
 	}
+	rehearsal := exec.Command("sh", filepath.Join(root, "scripts", "test-install-local.sh"))
+	rehearsal.Dir = root
+	if output, err := rehearsal.CombinedOutput(); err != nil || !bytes.Contains(output, []byte("rollback rehearsal passed")) {
+		t.Fatalf("local rollback rehearsal: %v\n%s", err, output)
+	}
 }
