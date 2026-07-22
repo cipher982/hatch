@@ -134,3 +134,16 @@ func TestMainDoctorJSON(t *testing.T) {
 		t.Fatalf("doctor = %#v", result)
 	}
 }
+
+func TestMainAdvancedHelpSeparatesRawFlags(t *testing.T) {
+	var normal, advanced, stderr bytes.Buffer
+	if exit := Main([]string{"--help"}, bytes.NewReader(nil), &normal, &stderr, true); exit != 0 {
+		t.Fatal(exit)
+	}
+	if exit := Main([]string{"--advanced-help"}, bytes.NewReader(nil), &advanced, &stderr, true); exit != 0 {
+		t.Fatal(exit)
+	}
+	if bytes.Contains(normal.Bytes(), []byte("--api-key")) || !bytes.Contains(advanced.Bytes(), []byte("--api-key")) || !bytes.Contains(advanced.Bytes(), []byte("--automation")) {
+		t.Fatalf("normal=%s\nadvanced=%s", normal.String(), advanced.String())
+	}
+}

@@ -35,7 +35,11 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 		return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, err)
 	}
 	if request.Help {
-		fmt.Fprint(stdout, Help)
+		if request.AdvancedHelp {
+			fmt.Fprint(stdout, AdvancedHelp)
+		} else {
+			fmt.Fprint(stdout, Help)
+		}
 		return 0
 	}
 	if request.Version {
@@ -245,6 +249,44 @@ const Help = `usage: hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
        hatch cursor grok [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4-pro|kimi-k3> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
+	   hatch runs <list|inspect> [OPTIONS]
 
 One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls
+
+Start here:
+  hatch codex sol "Review this branch"
+  hatch claude sonnet "Review this diff"
+  hatch cursor grok "Review this branch"
+  hatch openrouter kimi-k3 "Review this branch"
+  hatch expert "Is this refactor direction sound?"
+
+Common options:
+  -C, --cwd DIR        Working directory for the agent
+  -t, --timeout SEC    Hard timeout (default: 1800)
+  --json               Emit exactly one JSON document on stdout
+  --advanced-help      Show raw/backend-specific flags
+
+Other commands:
+  hatch doctor [--json]
+  hatch runs list [--status STATUS] [--json]
+  hatch runs inspect <run-id> [--json]
+`
+
+const AdvancedHelp = Help + `
+Advanced raw/backend options:
+  -b, --backend NAME
+  --model MODEL
+  --reasoning-effort LEVEL
+  --skip-git-repo-check
+  --output-format <text|json|stream-json>
+  --include-partial-messages
+  --api-key KEY
+  -r, --resume SESSION_ID
+  --automation
+
+Credential helper:
+  HATCH_CREDENTIAL_HELPER must name an explicitly configured absolute executable.
+
+Provider environment:
+  OPENAI_API_KEY, OPENROUTER_API_KEY, CURSOR_API_KEY, AWS_PROFILE, AWS_REGION
 `
