@@ -23,8 +23,10 @@ func TestBuildPayload(t *testing.T) {
 
 func TestRunPollsAndReturnsMetadata(t *testing.T) {
 	requests := 0
+	connections := map[string]bool{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		requests++
+		connections[request.RemoteAddr] = true
 		if request.Header.Get("Authorization") != "Bearer test-key" {
 			t.Errorf("authorization = %q", request.Header.Get("Authorization"))
 		}
@@ -48,8 +50,8 @@ func TestRunPollsAndReturnsMetadata(t *testing.T) {
 		Store: runner.NewStore(filepath.Join(t.TempDir(), "runs")),
 	})
 	if !result.OK || result.Output != "Use the simple design." || result.ResponseID == nil || *result.ResponseID != "resp_123" ||
-		result.ResolvedModel == nil || *result.ResolvedModel != "gpt-resolved" || len(result.Citations) != 1 || len(result.Sources) != 1 || requests != 2 || result.Run == nil || result.Run.Execution != "http" {
-		t.Fatalf("result = %#v requests=%d", result, requests)
+		result.ResolvedModel == nil || *result.ResolvedModel != "gpt-resolved" || len(result.Citations) != 1 || len(result.Sources) != 1 || requests != 2 || len(connections) != 1 || result.Run == nil || result.Run.Execution != "http" {
+		t.Fatalf("result = %#v requests=%d connections=%d", result, requests, len(connections))
 	}
 }
 
