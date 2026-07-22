@@ -61,20 +61,22 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	stdoutFile, stderrFile, err := c.Store.OpenStreams(artifact)
 	if err != nil {
 		message := fmt.Sprintf("open durable streams: %v", err)
-		return failedResult(-3, started, c.Now(), message, &artifactPath)
+		return c.finalizePrelaunchFailure(artifact, started, -3, OutcomeFailed, message, []Warning{{Code: "capture_persistence_failed", Message: err.Error()}})
 	}
 	cleanupProviderState, err := prepareProviderState(artifact, &req.Invocation)
 	if err != nil {
 		_ = stdoutFile.Close()
 		_ = stderrFile.Close()
 		message := fmt.Sprintf("prepare provider state: %v", err)
-		return failedResult(-3, started, c.Now(), message, &artifactPath)
+		return c.finalizePrelaunchFailure(artifact, started, -3, OutcomeFailed, message, nil)
 	}
 	defer cleanupProviderState()
 
 	if len(req.Invocation.Argv) == 0 {
 		message := "provider invocation is empty"
-		return failedResult(-2, started, c.Now(), message, &artifactPath)
+		_ = stdoutFile.Close()
+		_ = stderrFile.Close()
+		return c.finalizePrelaunchFailure(artifact, started, -2, OutcomeLaunch, message, nil)
 	}
 	cmd := exec.Command(req.Invocation.Argv[0], req.Invocation.Argv[1:]...)
 	configureProcess(cmd)
@@ -100,13 +102,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	if err := cmd.Start(); err != nil {
 		_ = stdoutFile.Close()
 		_ = stderrFile.Close()
-		message := err.Error()
-		outcome := OutcomeLaunch
-		resultState := Result{Output: "absent", TerminalMarker: "not_applicable", Error: &message}
-		_ = c.Store.CommitTerminal(artifact, outcome, -2, resultState, unknownState(), nil)
-		result := failedResult(-2, started, c.Now(), message, &artifactPath)
-		result.Run = &artifact.Manifest
-		return result
+		return c.finalizePrelaunchFailure(artifact, started, -2, OutcomeLaunch, err.Error(), nil)
 	}
 	if err := c.Store.MarkRunning(artifact, cmd.Process.Pid, c.Now(), processStartIdentity(cmd.Process.Pid)); err != nil {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
@@ -277,6 +273,31 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 	if req.Progress != nil && req.ProgressLabel != "" && (req.Invocation.Adapter == "" || req.Invocation.Adapter == "raw") {
 		req.Progress(fmt.Sprintf("[hatch] %s completed", req.ProgressLabel))
+	}
+	return result
+}
+
+func (c Coordinator) finalizePrelaunchFailure(artifact *Artifact, started time.Time, exitCode int, outcome Outcome, message string, warnings []Warning) PublicResult {
+	resultFile, writeErr := c.Store.WriteResult(artifact, nil)
+	resultState := Result{Output: "absent", TerminalMarker: "not_applicable", Error: &message}
+	if writeErr == nil {
+		resultState.OutputFile = &resultFile
+	} else {
+		artifact.Manifest.Capture.State = "degraded"
+		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: writeErr.Error()})
+	}
+	if err := c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, unknownState(), warnings); err != nil {
+		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+	}
+	artifactPath := artifact.Path
+	result := failedResult(exitCode, started, c.Now(), message, &artifactPath)
+	result.Run = &artifact.Manifest
+	if artifact.Manifest.Capture.State != "durable" {
+		result.ArtifactPath = nil
+	}
+	if err := c.Store.WritePublicProjection(artifact, result); err != nil {
+		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
+		result.ArtifactPath = nil
 	}
 	return result
 }

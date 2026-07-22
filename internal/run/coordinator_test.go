@@ -80,6 +80,42 @@ func (f failingStreamStore) OpenStreams(*Artifact) (StreamSink, StreamSink, erro
 	return failingStreamSink{}, failingStreamSink{}, nil
 }
 
+type unavailableStreamStore struct{ Store }
+
+func (u unavailableStreamStore) OpenStreams(*Artifact) (StreamSink, StreamSink, error) {
+	return nil, nil, errors.New("streams unavailable")
+}
+
+func TestCoordinatorPersistsLaunchFailure(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "runs")
+	result := NewCoordinator(NewStore(root)).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Invocation: provider.Invocation{Argv: []string{filepath.Join(t.TempDir(), "missing-provider")}},
+	})
+	if result.OK || result.ExitCode != -2 || result.Run == nil || result.ArtifactPath == nil ||
+		result.Run.Lifecycle != LifecycleTerminal || result.Run.Outcome == nil || *result.Run.Outcome != OutcomeLaunch {
+		t.Fatalf("launch result = %#v", result)
+	}
+	for _, name := range []string{"manifest.json", "result.json", "result.txt"} {
+		if _, err := os.Stat(filepath.Join(*result.ArtifactPath, name)); err != nil {
+			t.Fatalf("%s missing after launch failure: %v", name, err)
+		}
+	}
+}
+
+func TestCoordinatorReturnsCanonicalRunWhenStreamsUnavailable(t *testing.T) {
+	store := unavailableStreamStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
+	result := NewCoordinator(store).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Invocation: provider.Invocation{Argv: []string{"unused-provider"}},
+	})
+	if result.OK || result.ExitCode != -3 || result.Run == nil || result.ArtifactPath != nil ||
+		result.Run.Lifecycle != LifecycleTerminal || result.Run.Outcome == nil || *result.Run.Outcome != OutcomeFailed ||
+		result.Run.Capture.State != "degraded" {
+		t.Fatalf("stream-open result = %#v", result)
+	}
+}
+
 func TestCaptureWriterPreservesAnswerAfterSinkFailure(t *testing.T) {
 	var memory bytes.Buffer
 	w := &captureWriter{memory: &memory, sink: alwaysFailWriter{}}
