@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "name": "raw_gemini_success",
+  "arguments": ["-b", "gemini", "--json", "-"],
+  "stdin": "oracle prompt",
+  "scenario": "success_text",
+  "expected": {
+    "exit_code": 0,
+    "ok": true,
+    "status": "ok",
+    "output": "fake provider output\n",
+    "provider_argv": [
+      "gemini",
+      "--model",
+      "gemini-3-pro-preview",
+      "--yolo",
+      "--skip-trust",
+      "-p",
+      "-"
+    ],
+    "provider_stdin_sha256": "0eb7749ad17c17ce3323e0628fc9a6fc040d640d95edb7d6839f983ac354ee54",
+    "provider_stdin_bytes": 570
+  }
+}

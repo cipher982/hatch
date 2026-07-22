@@ -1,0 +1,1842 @@
+{
+  "schema_version": 1,
+  "baseline": {
+    "commit": "4f07b78313697030ad221294e63b2c31b8bec25e",
+    "collected_tests": 304,
+    "hermetic_result": "295 passed, 9 skipped"
+  },
+  "dispositions": [
+    "preserved_by_contract",
+    "preserved_by_go_unit",
+    "intentional_change",
+    "retired_python_library_only",
+    "obsolete_implementation_detail"
+  ],
+  "tests": [
+    {
+      "node_id": "tests/test_aws_preflight.py::test_uses_bedrock_aws_for_opencode_bedrock_model",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/aws_preflight",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_aws_preflight.py::test_uses_bedrock_aws_for_raw_claude_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/aws_preflight",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_aws_preflight.py::test_bedrock_aws_profile_defaults_to_hatch_profile",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/aws_preflight",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_aws_preflight.py::test_preflight_skips_non_bedrock_models",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/aws_preflight",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_aws_preflight.py::test_uses_bedrock_aws_requires_both_model_prefix_and_env_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/aws_preflight",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_aws_preflight.py::test_preflight_skips_codex_with_bedrock_env_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/aws_preflight",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_aws_preflight.py::test_preflight_raises_actionable_sso_error",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/aws_preflight",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendEnum::test_backend_values",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendEnum::test_backend_from_string",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendEnum::test_invalid_backend",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendEnum::test_backend_is_string",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendConfig::test_build_env_merges_correctly",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendConfig::test_build_env_unsets_vars",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendConfig::test_build_env_overrides_existing",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendConfig::test_build_env_strips_dcg_bypass",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestBackendConfig::test_stdin_data_default_none",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_requires_api_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_uses_env_api_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_api_key_argument_overrides_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_command_structure",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_command_with_stream_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_env_vars_set_correctly",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_unsets_bedrock_vars",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_prompt_via_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_custom_model",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_custom_base_url",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_container_readonly_sets_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureZai::test_container_writable_no_home_override",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureBedrock::test_command_structure",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureBedrock::test_command_with_stream_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureBedrock::test_env_vars_set_correctly",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureBedrock::test_custom_aws_profile",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureBedrock::test_custom_aws_region",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureBedrock::test_custom_model",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_requires_explicit_model",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_command_structure_for_openai",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_dcg_uses_isolated_config_without_pure",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_required_dcg_rejects_missing_or_foreign_opencode_plugin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_required_dcg_rejects_indirect_or_symlinked_plugin_source[False]",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_required_dcg_rejects_indirect_or_symlinked_plugin_source[True]",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_command_structure_for_openrouter",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_command_structure_for_openrouter_kimi_k3",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_opencode_explicitly_sets_workspace_directory",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_reasoning_effort_maps_to_variant",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_agent_flag_is_forwarded",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_bedrock_defaults",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_bedrock_ignores_ambient_aws_profile",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_bedrock_uses_marked_roulette_profile",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_discovers_observatory_ca_without_inherited_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_container_readonly_sets_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_prompt_via_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_unsets_incompatible_anthropic_vars",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_command_structure",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_dcg_settings_overlay_preserves_local_only_sources",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_required_dcg_missing_fails_closed",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_malformed_dcg_declaration_fails_closed[null]",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_malformed_dcg_declaration_fails_closed[[]]",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_malformed_dcg_declaration_fails_closed[\"yes\"]",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_malformed_dcg_declaration_fails_closed[{}]",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_malformed_dcg_declaration_fails_closed[{\"required\":\"true\"}]",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_command_with_stream_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_strips_api_key_and_provider_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_prompt_via_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureClaude::test_container_readonly_sets_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCursor::test_command_structure",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCursor::test_optional_api_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCursor::test_strips_competing_provider_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCursor::test_container_readonly_sets_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_requires_api_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_uses_env_api_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_api_key_argument_overrides_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_command_structure_full_auto",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_command_structure_no_full_auto",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_custom_model",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_reasoning_effort",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_no_reasoning_effort_by_default",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_skip_git_repo_check",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_prompt_via_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_container_readonly_sets_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureCodex::test_unsets_leaked_bedrock_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureGemini::test_command_structure",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureGemini::test_no_api_key_required",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureGemini::test_prompt_via_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureGemini::test_minimal_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureGemini::test_container_readonly_sets_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestConfigureGemini::test_unsets_leaked_bedrock_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_zai_backend_is_disabled",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_dispatches_to_bedrock",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_dispatches_to_claude",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_dispatches_to_cursor",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_dispatches_to_codex",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_dispatches_to_gemini",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_dispatches_to_opencode",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_passes_kwargs",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_wraps_every_dispatched_agent_prompt",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestGetConfig::test_bounded_contract_preserves_explicit_depth_request",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestUnicodePrompts::test_zai_unicode_prompt",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestUnicodePrompts::test_codex_unicode_prompt",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestUnicodePrompts::test_gemini_unicode_prompt",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestUnicodePrompts::test_opencode_unicode_prompt",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_backends.py::TestLargePrompts::test_large_prompt_via_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/provider_commands",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_parser_creates",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_default_backend_requires_explicit_surface",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_backend_short_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_backend_long_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_all_backends_valid",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_invalid_backend_reaches_main_validation",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_timeout_default",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_expert_timeout_default_remains_900",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_timeout_short_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_timeout_long_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_cwd_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_skip_git_repo_check_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_cwd_short_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_model_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_output_format_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_output_format_default",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_include_partial_messages_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_api_key_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_json_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_json_flag_default_false",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_prompt_captured",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_prompt_with_spaces",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_prompt_optional",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_dash_means_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_version_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_help_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_help_text_shows_surfaced_usage",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_help_text_hides_advanced_flags",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestCreateParser::test_advanced_help_text_shows_advanced_flags",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestSpecialCommands::test_expert_dispatches_single_call",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestSpecialCommands::test_expert_can_disable_web_search",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestGetPrompt::test_prompt_from_args",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestGetPrompt::test_stdin_on_dash",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestGetPrompt::test_stdin_on_none",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestGetPrompt::test_empty_stdin_exits",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestResultToExitCode::test_success",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestResultToExitCode::test_timeout",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestResultToExitCode::test_not_found",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestResultToExitCode::test_agent_error",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_leaves_plain_prompt_unchanged",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_empty_argv_stays_empty",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_codex_requires_explicit_model",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_codex_model_aliases_work",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_claude_model_aliases_work",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_explicit_backend_wins",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_explicit_model_wins",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_all_surfaced_aliases_map_correctly",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_surfaced_codex_preserves_reasoning_effort_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_invalid_surfaced_model_is_rejected",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_cursor_raw_model_override",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_openrouter_requires_explicit_model",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_option_value_named_like_provider_is_not_rewritten",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_double_dash_forces_literal_prompt",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestNormalizeArgv::test_help_flags_bypass_surfaced_alias_errors",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestInferMachineDefaults::test_non_tty_defaults_to_json_and_automation",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestInferMachineDefaults::test_tty_keeps_human_defaults",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestInferMachineDefaults::test_explicit_json_and_automation_are_respected",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestLonghouseAutomationEnv::test_mark_longhouse_automation_env_sets_origin_and_parent_context",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestLonghouseAutomationEnv::test_mark_longhouse_automation_env_prefers_managed_session_context",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestLonghouseAutomationEnv::test_opencode_step_start_writes_sidecar",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_success_output",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_json_output",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_error_to_stderr",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_json_error",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_opencode_structured_error_surfaces_in_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_opencode_success_surfaces_durable_run_identity",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_surfaced_claude_uses_claude_runner_not_opencode_or_bedrock",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_surfaced_cursor_streams_progress_and_keeps_json_final_result",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_automation_run_passes_longhouse_hatch_origin_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_timeout_exit_code",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_opencode_timeout_prints_recovery_details",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_missing_api_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_missing_api_key_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_cli_not_found",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_bare_prompt_requires_explicit_provider",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_backend_passed_correctly",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_explicit_model_routes_to_opencode_backend",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_model_kwarg_passed",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_api_key_kwarg_passed",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_openrouter_uses_openrouter_credential_policy",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_openrouter_kimi_k3_uses_openrouter_credential_policy",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_timeout_passed",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_invalid_timeout",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_invalid_timeout_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_invalid_backend",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_invalid_backend_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_skip_git_repo_check_rejected_for_surfaced_codex",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_reasoning_effort_rejected_for_claude",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_zai_model_rejected_on_shared_runtime",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_cwd_passed",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_surfaced_codex_timeout_passed_to_opencode_runner",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_surfaced_codex_cwd_passed_to_opencode_runner",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_surfaced_codex_passes_cwd_to_opencode_config",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_surfaced_codex_json_still_passes_progress_handler",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_surfaced_codex_passes_model_to_timeout_artifacts",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_invalid_cwd",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_invalid_cwd_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_missing_surfaced_model_returns_config_error",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_missing_surfaced_model_json_returns_config_error",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_strips_trailing_whitespace",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_raw_bedrock_defaults_to_internal_stream_json",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_hydrated_kwargs_passed_to_get_config",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMain::test_uses_sys_argv_when_no_argv_provided",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_cli.py::TestMainWithStdin::test_reads_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/cli",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestExecutionContext::test_laptop_effective_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestExecutionContext::test_container_writable_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestExecutionContext::test_container_readonly_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestExecutionContext::test_no_home_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestExecutionContext::test_frozen_dataclass",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestContainerDetection::test_no_container_indicators",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestContainerDetection::test_dockerenv_present",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestContainerDetection::test_podman_containerenv",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestContainerDetection::test_cgroup_docker",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestContainerDetection::test_cgroup_containerd",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestContainerDetection::test_cgroup_kubepods",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestContainerDetection::test_cgroup_permission_denied",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestHomeWritableCheck::test_writable_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestHomeWritableCheck::test_readonly_home",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestHomeWritableCheck::test_home_not_set",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestDetectContext::test_caches_result",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestDetectContext::test_cache_clear_works",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestDetectContext::test_returns_execution_context",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_context.py::TestContextIntegration::test_real_detection_runs",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/context",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_returns_input_for_backend_without_secret",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_preserves_explicit_api_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_uses_helper_before_ambient_openai_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_uses_env_when_helper_missing",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_uses_marked_roulette_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_uses_helper_when_env_missing",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_raises_clear_error_when_secret_unavailable",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_openrouter_uses_openrouter_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_cursor_skips_infisical_hydration",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_resolve_env_secret_ignores_whitespace_env",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_credentials.py::TestHydrateBackendKwargs::test_ensure_opencode_credentials_raises_for_missing_openrouter",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/credentials",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_doctor.py::test_parse_cursor_model_ids",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/doctor",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_doctor.py::test_cursor_model_check_passes_for_configured_model",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/doctor",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_doctor.py::test_cursor_model_check_explains_stale_mapping",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/doctor",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_doctor.py::test_cursor_model_check_handles_missing_cli",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/doctor",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_doctor.py::test_doctor_command_reports_success",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/doctor",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_doctor.py::test_doctor_command_reports_json_failure",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/doctor",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_expert.py::test_build_payload_keeps_expert_sync_and_enables_web_search_by_default",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/expert",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_expert.py::test_build_payload_can_disable_web_search",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/expert",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_expert.py::test_build_payload_can_disable_background_storage",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/expert",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_expert.py::test_build_payload_can_enable_web_search",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/expert",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_expert.py::test_run_expert_sync_returns_output_and_metadata",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/expert",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_expert.py::test_run_expert_sync_polls_background_response",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/expert",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_expert.py::test_run_expert_sync_timeout_leaves_background_response_running",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/expert",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestZaiIntegration::test_simple_math_question",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestZaiIntegration::test_plain_text_output",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestZaiIntegration::test_stdin_input",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestZaiIntegration::test_working_directory",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestCodexIntegration::test_simple_math_question",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestCodexIntegration::test_plain_text_output",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestGeminiIntegration::test_simple_math_question",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestErrorHandling::test_missing_api_key",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestErrorHandling::test_invalid_backend_in_code",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestCLIFlags::test_version_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestCLIFlags::test_help_flag",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestCLIFlags::test_empty_prompt_error",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestTimeout::test_short_timeout",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestDurationTracking::test_duration_reported",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestLargePrompts::test_large_prompt_via_stdin",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/integration",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_integration.py::TestUvxInstallation::test_uvx_hatch_help",
+      "disposition": "intentional_change",
+      "proof": "TestReleaseInstall",
+      "reason": "The standalone Go binary replaces uv/uvx Python package installation."
+    },
+    {
+      "node_id": "tests/test_integration.py::TestUvxInstallation::test_uvx_hatch_execution",
+      "disposition": "intentional_change",
+      "proof": "TestReleaseInstall",
+      "reason": "The standalone Go binary replaces uv/uvx Python package installation."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAgentResult::test_ok_result_status",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAgentResult::test_timeout_status",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAgentResult::test_not_found_status",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAgentResult::test_error_status",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAgentResult::test_to_dict",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAgentResult::test_to_dict_with_error",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAgentResult::test_library_hard_timeout_defaults_to_30_minutes",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestRunSubprocess::test_successful_execution",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestRunSubprocess::test_stdin_data",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestRunSubprocess::test_nonzero_exit_code",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestRunSubprocess::test_stderr_captured",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestRunSubprocess::test_timeout_kills_process",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestRunSubprocess::test_working_directory",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestRunSync::test_basic_execution",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestClaudeStreamRunSync::test_extracts_final_result_and_progress",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestClaudeStreamRunSync::test_falls_back_to_last_text_when_result_line_missing",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestCursorStreamRunSync::test_extracts_terminal_result_and_progress",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestCursorStreamRunSync::test_heartbeat_and_missing_terminal_result",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestCursorStreamRunSync::test_nonzero_exit_preserves_stderr",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestCursorStreamRunSync::test_terminal_error_result_is_not_success",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestOpenCodeStreamRunSync::test_parallel_runs_use_isolated_durable_sqlite_roots",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestOpenCodeStreamRunSync::test_extracts_final_text_progress_and_writes_sidecar",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestOpenCodeStreamRunSync::test_open_code_progress_prefers_tool_title_and_elapsed_time",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestOpenCodeStreamRunSync::test_extracts_structured_error_message",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestOpenCodeStreamRunSync::test_timeout_preserves_partial_stream_and_isolated_session_state",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestOpenCodeStreamRunSync::test_recovers_bedrock_error_from_print_logs_stderr",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_success_result",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_run_marks_longhouse_hatch_origin_env",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_timeout_result",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_invalid_timeout_returns_error",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_invalid_cwd_returns_error",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_error_result",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_empty_output_is_error",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_cli_not_found",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_unexpected_exception",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_duration_tracked",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_cwd_passed_to_subprocess",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestAsyncRun::test_backend_kwargs_passed",
+      "disposition": "preserved_by_go_unit",
+      "proof": "internal/run.TestCoordinatorLegacy",
+      "reason": "The Python import API retires, but its coordinator mechanics remain required."
+    },
+    {
+      "node_id": "tests/test_runner.py::TestRunIntegrationWithRealCommands::test_echo_command",
+      "disposition": "preserved_by_contract",
+      "proof": "TestLegacyParity/execution",
+      "reason": null
+    }
+  ]
+}
+
