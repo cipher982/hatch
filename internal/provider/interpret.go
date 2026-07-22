@@ -1,15 +1,16 @@
 package provider
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
+	"regexp"
 	"strings"
 )
 
 type Interpretation struct {
 	Output         []byte
 	Error          string
+	Warnings       []string
 	TerminalMarker string
 	NativeID       string
 	NativeIDState  string
@@ -28,40 +29,59 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 	}
 	result.TerminalMarker = "not_observed"
 	result.NativeIDState = "unavailable"
-	var lastText string
-	scanner := bufio.NewScanner(bytes.NewReader(stdout))
-	buffer := make([]byte, 64*1024)
-	scanner.Buffer(buffer, 16*1024*1024)
-	for scanner.Scan() {
+	var textChunks, finalChunks []string
+	for _, line := range bytes.Split(stdout, []byte{'\n'}) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
 		var event map[string]any
-		if json.Unmarshal(scanner.Bytes(), &event) != nil {
+		if json.Unmarshal(line, &event) != nil {
 			continue
 		}
 		typeName, _ := event["type"].(string)
 		switch adapter {
-		case "claude", "cursor":
+		case "claude":
 			if typeName == "system" && event["subtype"] == "init" {
-				if id, ok := event["session_id"].(string); ok && id != "" {
-					result.NativeID, result.NativeIDState = id, "observed"
-				}
+				observeSession(&result, event, "session_id")
 			}
 			if typeName == "assistant" {
-				lastText = assistantText(event)
+				if text := assistantText(event); text != "" {
+					textChunks = append(textChunks, text)
+				}
 			}
 			if typeName == "result" {
-				if value, ok := event["result"].(string); ok {
-					if adapter == "cursor" && (event["is_error"] == true || event["subtype"] == "error") {
-						result.Error = value
-					} else {
-						result.Output = []byte(value)
-						result.TerminalMarker = "observed"
+				result.TerminalMarker = "observed"
+				if value, ok := event["result"].(string); ok && strings.TrimSpace(value) != "" {
+					finalChunks = []string{value}
+				}
+			}
+		case "cursor":
+			if typeName == "system" && event["subtype"] == "init" {
+				observeSession(&result, event, "session_id")
+			}
+			if typeName == "assistant" {
+				if text := assistantText(event); text != "" {
+					textChunks = append(textChunks, text)
+				}
+			}
+			if typeName == "result" {
+				result.TerminalMarker = "observed"
+				value, _ := event["result"].(string)
+				if event["subtype"] != "success" || event["is_error"] == true {
+					if strings.TrimSpace(value) == "" {
+						value = "Cursor returned an error result"
 					}
+					result.Error = value
+				} else if strings.TrimSpace(value) == "" {
+					result.Error = "Cursor result event did not contain output"
+				} else {
+					finalChunks = []string{value}
 				}
 			}
 		case "opencode":
 			if typeName == "step_start" {
-				if id, ok := event["sessionID"].(string); ok && id != "" {
-					result.NativeID, result.NativeIDState = id, "observed"
+				observeSession(&result, event, "sessionID")
+				if result.NativeID != "" {
 					result.Retention = "hatch_preserved"
 					result.Capabilities["snapshot"] = "supported"
 				}
@@ -69,27 +89,46 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 			if typeName == "text" {
 				if part, ok := event["part"].(map[string]any); ok {
 					text, _ := part["text"].(string)
-					lastText = text
-					if isFinalOpenCodeText(part) {
-						result.Output = []byte(text)
+					if text != "" {
+						textChunks = append(textChunks, text)
+						if isFinalOpenCodeText(part) {
+							finalChunks = append(finalChunks, text)
+						}
 					}
 				}
 			}
-			if typeName == "step_finish" && len(result.Output) > 0 {
-				result.TerminalMarker = "observed"
+			if typeName == "step_finish" {
+				part, _ := event["part"].(map[string]any)
+				if part["reason"] == "stop" {
+					result.TerminalMarker = "observed"
+				}
 			}
 			if typeName == "error" {
-				result.Error = nestedErrorMessage(event)
+				if message := nestedErrorMessage(event); message != "" {
+					result.Error = message
+				}
 			}
 		}
 	}
-	if len(result.Output) == 0 && lastText != "" {
-		result.Output = []byte(lastText)
+	chunks := finalChunks
+	if len(chunks) == 0 {
+		chunks = textChunks
 	}
-	if scanner.Err() != nil && result.Error == "" {
-		result.Error = scanner.Err().Error()
+	result.Output = []byte(strings.Join(chunks, ""))
+	if adapter == "opencode" && result.Error == "" && len(result.Output) == 0 {
+		result.Error = extractOpenCodeLogError(string(stderr))
+	}
+	if result.Error != "" && result.TerminalMarker == "observed" && len(result.Output) > 0 {
+		result.Warnings = append(result.Warnings, result.Error)
+		result.Error = ""
 	}
 	return result
+}
+
+func observeSession(result *Interpretation, event map[string]any, name string) {
+	if id, ok := event[name].(string); ok && strings.TrimSpace(id) != "" {
+		result.NativeID, result.NativeIDState = id, "observed"
+	}
 }
 
 func assistantText(event map[string]any) string {
@@ -116,6 +155,43 @@ func isFinalOpenCodeText(part map[string]any) bool {
 func nestedErrorMessage(event map[string]any) string {
 	errorValue, _ := event["error"].(map[string]any)
 	data, _ := errorValue["data"].(map[string]any)
-	message, _ := data["message"].(string)
-	return message
+	for _, value := range []any{data["message"], errorValue["message"], errorValue["name"]} {
+		if message, ok := value.(string); ok && message != "" {
+			return message
+		}
+	}
+	return ""
+}
+
+var statusCodePattern = regexp.MustCompile(`"statusCode":\s*(\d{3})`)
+var dataMessagePattern = regexp.MustCompile(`"data":\{"message":"((?:[^"\\]|\\.)*)"`)
+var messagePattern = regexp.MustCompile(`"message":"((?:[^"\\]|\\.)*)"`)
+
+func extractOpenCodeLogError(stderr string) string {
+	best, status := "", ""
+	for _, line := range strings.Split(stderr, "\n") {
+		if !strings.Contains(line, "ERROR") || !strings.Contains(line, "error=") {
+			continue
+		}
+		if match := statusCodePattern.FindStringSubmatch(line); len(match) > 1 {
+			status = match[1]
+		}
+		if match := dataMessagePattern.FindStringSubmatch(line); len(match) > 1 {
+			best = unescapeJSONString(match[1])
+		} else if match := messagePattern.FindStringSubmatch(line); len(match) > 1 {
+			best = unescapeJSONString(match[1])
+		}
+	}
+	if best != "" && status != "" {
+		return "Bedrock error " + status + ": " + best
+	}
+	return best
+}
+
+func unescapeJSONString(value string) string {
+	var decoded string
+	if json.Unmarshal([]byte(`"`+value+`"`), &decoded) == nil {
+		return decoded
+	}
+	return value
 }

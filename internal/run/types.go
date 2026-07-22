@@ -10,10 +10,11 @@ const (
 	LifecycleRunning  Lifecycle = "running"
 	LifecycleTerminal Lifecycle = "terminal"
 
-	OutcomeSucceeded Outcome = "succeeded"
-	OutcomeFailed    Outcome = "failed"
-	OutcomeTimedOut  Outcome = "timed_out"
-	OutcomeLaunch    Outcome = "launch_failed"
+	OutcomeSucceeded         Outcome = "succeeded"
+	OutcomeSucceededWarnings Outcome = "succeeded_with_warnings"
+	OutcomeFailed            Outcome = "failed"
+	OutcomeTimedOut          Outcome = "timed_out"
+	OutcomeLaunch            Outcome = "launch_failed"
 )
 
 type Manifest struct {

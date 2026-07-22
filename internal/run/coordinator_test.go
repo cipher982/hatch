@@ -113,6 +113,46 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 	}
 }
 
+func TestCoordinatorStructuredFailureAndRecovery(t *testing.T) {
+	fake := buildTestProvider(t)
+	tests := []struct {
+		name, backend, model, scenario, output, errorText string
+		ok                                                bool
+		outcome                                           Outcome
+		warnings                                          int
+	}{
+		{"cursor error", "cursor", "cursor-grok-4.5-high", "cursor_error", "", "request rejected", false, OutcomeFailed, 0},
+		{"opencode error", "opencode", "openrouter/moonshotai/kimi-k3", "opencode_error", "", "provider unavailable", false, OutcomeFailed, 0},
+		{"opencode recovered", "opencode", "openrouter/moonshotai/kimi-k3", "opencode_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
+		{"opencode missing terminal", "opencode", "openrouter/moonshotai/kimi-k3", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 0},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			invocation, err := provider.Build(provider.Request{Backend: test.backend, Model: test.model, Prompt: "oracle", APIKey: "fake"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			invocation.Argv[0] = fake
+			invocation.SetEnv["HATCH_TEST_SCENARIO"] = test.scenario
+			result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+				Surface: test.backend, Provider: test.backend, Model: test.model, Prompt: "oracle",
+				Timeout: 5 * time.Second, Invocation: invocation,
+			})
+			if result.OK != test.ok || result.Output != test.output || stringValue(result.Error) != chooseError(test.errorText) ||
+				result.Run == nil || result.Run.Outcome == nil || *result.Run.Outcome != test.outcome || len(result.Run.Warnings) != test.warnings {
+				t.Fatalf("result = %#v", result)
+			}
+		})
+	}
+}
+
+func chooseError(value string) string {
+	if value == "" {
+		return "<nil>"
+	}
+	return value
+}
+
 func stringValue(value *string) string {
 	if value == nil {
 		return "<nil>"

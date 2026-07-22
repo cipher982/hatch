@@ -80,6 +80,20 @@ func main() {
 		emitJSON(map[string]any{
 			"type": "step_finish", "part": map[string]any{"reason": "stop"},
 		})
+	case "cursor_error":
+		emitJSON(map[string]any{"type": "system", "subtype": "init", "session_id": "cursor-error-session"})
+		emitJSON(map[string]any{"type": "result", "subtype": "error", "is_error": true, "result": "request rejected"})
+	case "opencode_error":
+		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_error"})
+		emitJSON(map[string]any{"type": "error", "error": map[string]any{"data": map[string]any{"message": "provider unavailable"}}})
+	case "opencode_transient_then_success":
+		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_recovered"})
+		emitJSON(map[string]any{"type": "error", "error": map[string]any{"data": map[string]any{"message": "transient transport error"}}})
+		emitJSON(map[string]any{"type": "text", "part": map[string]any{"text": "recovered answer", "metadata": map[string]any{"openai": map[string]any{"phase": "final_answer"}}}})
+		emitJSON(map[string]any{"type": "step_finish", "part": map[string]any{"reason": "stop"}})
+	case "opencode_missing_terminal":
+		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_incomplete"})
+		emitJSON(map[string]any{"type": "text", "part": map[string]any{"text": "useful evidence"}})
 	case "stderr_nonzero":
 		fmt.Fprintln(os.Stderr, "fake provider failure")
 		os.Exit(23)

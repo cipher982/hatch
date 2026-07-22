@@ -119,6 +119,9 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 
 	interpretation := provider.Interpret(req.Invocation.Adapter, stdout.Bytes(), stderr.Bytes())
+	for _, message := range interpretation.Warnings {
+		warnings = append(warnings, Warning{Code: "provider_warning", Message: message})
+	}
 	output := interpretation.Output
 	resultFile, resultWriteErr := c.Store.WriteResult(artifact, output)
 	if resultWriteErr != nil {
@@ -134,7 +137,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 
 	outcome := OutcomeSucceeded
-	ok := exitCode == 0 && !timedOut && interpretation.Error == "" && interpretation.TerminalMarker != "not_observed"
+	ok := exitCode == 0 && !timedOut && interpretation.Error == "" && interpretation.TerminalMarker != "not_observed" && len(output) > 0
 	status := "ok"
 	var resultErr *string
 	if timedOut {
@@ -161,6 +164,13 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		status = "error"
 		message := "structured provider output did not contain a terminal marker"
 		resultErr = &message
+	} else if len(output) == 0 {
+		outcome = OutcomeFailed
+		status = "error"
+		message := "Empty output from agent"
+		resultErr = &message
+	} else if len(interpretation.Warnings) > 0 {
+		outcome = OutcomeSucceededWarnings
 	}
 	resultState.Error = resultErr
 	state := State{
