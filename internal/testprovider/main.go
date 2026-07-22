@@ -57,21 +57,7 @@ func main() {
 			"duration_ms": 1250, "result": "fake cursor output",
 		})
 	case "success_opencode":
-		if dataHome := os.Getenv("XDG_DATA_HOME"); dataHome != "" {
-			stateDir := filepath.Join(dataHome, "opencode")
-			if err := os.MkdirAll(stateDir, 0o700); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(94)
-			}
-			if err := os.WriteFile(filepath.Join(stateDir, "session.db"), []byte("fake opencode state"), 0o600); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(94)
-			}
-			if err := os.WriteFile(filepath.Join(stateDir, "auth.json"), []byte("fake credential that must be pruned"), 0o600); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(94)
-			}
-		}
+		writeOpenCodeState()
 		emitJSON(map[string]any{
 			"type": "step_start", "sessionID": "ses_oracle1234",
 		})
@@ -99,6 +85,11 @@ func main() {
 	case "opencode_missing_terminal":
 		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_incomplete"})
 		emitJSON(map[string]any{"type": "text", "part": map[string]any{"text": "useful evidence"}})
+	case "hang_opencode":
+		writeOpenCodeState()
+		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_timeout"})
+		emitJSON(map[string]any{"type": "text", "part": map[string]any{"text": "partial evidence"}})
+		time.Sleep(10 * time.Second)
 	case "stderr_nonzero":
 		fmt.Fprintln(os.Stderr, "fake provider failure")
 		os.Exit(23)
@@ -122,6 +113,24 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "testprovider: unknown scenario %q\n", os.Getenv("HATCH_TEST_SCENARIO"))
 		os.Exit(96)
+	}
+}
+
+func writeOpenCodeState() {
+	if dataHome := os.Getenv("XDG_DATA_HOME"); dataHome != "" {
+		stateDir := filepath.Join(dataHome, "opencode")
+		if err := os.MkdirAll(stateDir, 0o700); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(94)
+		}
+		if err := os.WriteFile(filepath.Join(stateDir, "session.db"), []byte("fake opencode state"), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(94)
+		}
+		if err := os.WriteFile(filepath.Join(stateDir, "auth.json"), []byte("fake credential that must be pruned"), 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(94)
+		}
 	}
 }
 

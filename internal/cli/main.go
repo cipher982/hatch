@@ -94,6 +94,7 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer, stdoutTTY bo
 	if err := applyHostContext(&invocation, request.Backend, DetectContext()); err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
+	populateProviderVersion(&invocation)
 	if err := preflightBedrock(request.Model, invocation); err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}

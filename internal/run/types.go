@@ -79,11 +79,21 @@ type Capture struct {
 }
 
 type State struct {
-	Retention     string            `json:"retention"`
-	NativeID      *string           `json:"native_id"`
-	NativeIDState string            `json:"native_id_state"`
-	Capabilities  map[string]string `json:"capabilities"`
-	SnapshotPath  *string           `json:"snapshot_path"`
+	Retention       string            `json:"retention"`
+	NativeID        *string           `json:"native_id"`
+	NativeIDState   string            `json:"native_id_state"`
+	Capabilities    map[string]string `json:"capabilities"`
+	SnapshotPath    *string           `json:"snapshot_path"`
+	ProviderVersion *string           `json:"provider_version,omitempty"`
+	InspectHint     *OperatorHint     `json:"inspect_hint,omitempty"`
+	RecoveryHint    *OperatorHint     `json:"recovery_hint,omitempty"`
+}
+
+type OperatorHint struct {
+	Argv                   []string `json:"argv"`
+	VersionBound           bool     `json:"version_bound"`
+	ProviderVersion        string   `json:"provider_version,omitempty"`
+	RequiresApprovalBypass bool     `json:"requires_approval_bypass"`
 }
 
 type Archive struct {

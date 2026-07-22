@@ -226,6 +226,27 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			state.SnapshotPath = &snapshot
 			state.Retention = "hatch_preserved"
 			state.Capabilities["snapshot"] = "supported"
+			if req.Invocation.ProviderVersion != "" {
+				state.ProviderVersion = &req.Invocation.ProviderVersion
+			}
+			if state.NativeID != nil {
+				dataEnv := "XDG_DATA_HOME=" + filepath.Join(artifact.Path, "provider", "opencode", "data")
+				stateEnv := "XDG_STATE_HOME=" + filepath.Join(artifact.Path, "provider", "opencode", "state")
+				state.InspectHint = &OperatorHint{
+					Argv:         []string{"env", dataEnv, stateEnv, "opencode", "export", *state.NativeID},
+					VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion,
+				}
+				state.Capabilities["inspect"] = versionBoundCapability(req.Invocation.ProviderVersion)
+				if timedOut && req.Invocation.ProviderVersion != "" {
+					argv := []string{"env", dataEnv, stateEnv, "opencode", "run", "--dangerously-skip-permissions"}
+					if req.CWD != "" {
+						argv = append(argv, "--dir", req.CWD)
+					}
+					argv = append(argv, "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model, "--session", *state.NativeID, "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.")
+					state.RecoveryHint = &OperatorHint{Argv: argv, VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion, RequiresApprovalBypass: true}
+					state.Capabilities["recovery_hint"] = "supported"
+				}
+			}
 		} else {
 			state.Retention = "unavailable"
 			state.Capabilities["snapshot"] = "unsupported"
@@ -246,6 +267,10 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		result.ArtifactPath = nil
 	}
 	result.SessionID = state.NativeID
+	if state.RecoveryHint != nil {
+		rendered := shellJoin(state.RecoveryHint.Argv)
+		result.ResumeCommand = &rendered
+	}
 	if err := c.Store.WritePublicProjection(artifact, result); err != nil {
 		_ = c.Store.MarkCaptureDegraded(artifact, Warning{Code: "capture_persistence_failed", Message: err.Error()})
 		result.ArtifactPath = nil
@@ -254,6 +279,27 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		req.Progress(fmt.Sprintf("[hatch] %s completed", req.ProgressLabel))
 	}
 	return result
+}
+
+func versionBoundCapability(version string) string {
+	if version == "" {
+		return "best_effort"
+	}
+	return "supported"
+}
+
+func shellJoin(argv []string) string {
+	quoted := make([]string, len(argv))
+	for index, arg := range argv {
+		if arg != "" && strings.IndexFunc(arg, func(r rune) bool {
+			return !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && !strings.ContainsRune("_@%+=:,./-", r)
+		}) == -1 {
+			quoted[index] = arg
+		} else {
+			quoted[index] = "'" + strings.ReplaceAll(arg, "'", "'\"'\"'") + "'"
+		}
+	}
+	return strings.Join(quoted, " ")
 }
 
 type captureWriter struct {

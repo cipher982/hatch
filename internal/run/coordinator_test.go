@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -234,6 +235,32 @@ func TestCoordinatorTimeoutKillsProcessGroup(t *testing.T) {
 	}
 	if result.Run == nil || result.Run.Process == nil || result.Run.Process.ProcessGroup == nil || *result.Run.Process.ProcessGroup != result.Run.Process.PID || result.Run.Process.StartIdentity == nil || *result.Run.Process.StartIdentity == "" {
 		t.Fatalf("process identity missing: %#v", result.Run)
+	}
+}
+
+func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
+	fake := buildTestProvider(t)
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/moonshotai/kimi-k3", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	invocation.Argv[0] = fake
+	invocation.ProviderVersion = "opencode 1.2.3"
+	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "hang_opencode"
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "openrouter.kimi-k3", Provider: "openrouter", Model: "openrouter/moonshotai/kimi-k3", CWD: t.TempDir(), Prompt: "prompt",
+		Timeout: 300 * time.Millisecond, Invocation: invocation,
+	})
+	if result.Status != "timeout" || result.Run == nil || result.Run.ProviderState.RecoveryHint == nil ||
+		result.Run.ProviderState.InspectHint == nil || result.Run.ProviderState.ProviderVersion == nil ||
+		*result.Run.ProviderState.ProviderVersion != "opencode 1.2.3" || result.ResumeCommand == nil ||
+		!result.Run.ProviderState.RecoveryHint.VersionBound || !result.Run.ProviderState.RecoveryHint.RequiresApprovalBypass {
+		t.Fatalf("result = %#v", result)
+	}
+	for _, arg := range result.Run.ProviderState.RecoveryHint.Argv {
+		if strings.Contains(arg, "fake") || strings.Contains(arg, "KEY") {
+			t.Fatalf("credential-like recovery arg: %q", arg)
+		}
 	}
 }
 

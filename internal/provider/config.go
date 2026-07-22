@@ -22,12 +22,13 @@ type Request struct {
 }
 
 type Invocation struct {
-	Argv         []string
-	SetEnv       map[string]string
-	UnsetEnv     []string
-	Stdin        []byte
-	StreamFormat string
-	Adapter      string
+	Argv            []string
+	SetEnv          map[string]string
+	UnsetEnv        []string
+	Stdin           []byte
+	StreamFormat    string
+	Adapter         string
+	ProviderVersion string
 }
 
 func PreparePrompt(prompt string) string {
