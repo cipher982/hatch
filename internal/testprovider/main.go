@@ -66,6 +66,10 @@ func main() {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(94)
 			}
+			if err := os.WriteFile(filepath.Join(stateDir, "auth.json"), []byte("fake credential that must be pruned"), 0o600); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(94)
+			}
 		}
 		emitJSON(map[string]any{
 			"type": "step_start", "sessionID": "ses_oracle1234",

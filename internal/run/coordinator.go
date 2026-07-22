@@ -207,8 +207,20 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		state.NativeID = &interpretation.NativeID
 	}
 	if req.Invocation.Adapter == "opencode" {
-		snapshot := "provider/opencode"
-		state.SnapshotPath = &snapshot
+		approved, pruneErr := pruneOpenCodeState(artifact)
+		if pruneErr != nil {
+			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
+			artifact.Manifest.Capture.State = "degraded"
+		}
+		if approved > 0 {
+			snapshot := "provider/opencode"
+			state.SnapshotPath = &snapshot
+			state.Retention = "hatch_preserved"
+			state.Capabilities["snapshot"] = "supported"
+		} else {
+			state.Retention = "unavailable"
+			state.Capabilities["snapshot"] = "unsupported"
+		}
 	}
 	if err := c.Store.CommitTerminal(artifact, outcome, exitCode, resultState, state, warnings); err != nil {
 		warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: err.Error()})
@@ -374,4 +386,39 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 	}
 	invocation.SetEnv["XDG_CACHE_HOME"] = cache
 	return func() { _ = os.RemoveAll(cache) }, nil
+}
+
+var openCodeStateAllowlist = map[string]bool{
+	"data/opencode/opencode.db":     true,
+	"data/opencode/opencode.db-shm": true,
+	"data/opencode/opencode.db-wal": true,
+	"data/opencode/session.db":      true, // Hermetic compatibility oracle.
+}
+
+func pruneOpenCodeState(artifact *Artifact) (int, error) {
+	root := filepath.Join(artifact.Path, "provider", "opencode")
+	approved := 0
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		relative = filepath.ToSlash(relative)
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if openCodeStateAllowlist[relative] && info.Mode().IsRegular() {
+			approved++
+			return os.Chmod(path, 0o600)
+		}
+		return os.Remove(path)
+	})
+	return approved, err
 }

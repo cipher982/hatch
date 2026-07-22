@@ -154,6 +154,9 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 				if data, err := os.ReadFile(stateFile); err != nil || string(data) != "fake opencode state" {
 					t.Fatalf("provider state not preserved: %q, %v", data, err)
 				}
+				if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider", "opencode", "data", "opencode", "auth.json")); !os.IsNotExist(err) {
+					t.Fatalf("untrusted provider auth state retained: %v", err)
+				}
 			}
 		})
 	}
@@ -222,6 +225,31 @@ func TestCoordinatorTimeoutKillsProcessGroup(t *testing.T) {
 	}
 	if result.Output != "partial output\n" {
 		t.Fatalf("partial output lost: %q", result.Output)
+	}
+}
+
+func TestPruneOpenCodeStateUsesExplicitAllowlist(t *testing.T) {
+	artifact := &Artifact{Path: t.TempDir()}
+	root := filepath.Join(artifact.Path, "provider", "opencode", "data", "opencode")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, value := range map[string]string{"opencode.db": "db", "opencode.db-wal": "wal", "auth.json": "secret", "log.txt": "prompt"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(value), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join(root, "opencode.db"), filepath.Join(root, "opencode.db-shm")); err != nil {
+		t.Fatal(err)
+	}
+	approved, err := pruneOpenCodeState(artifact)
+	if err != nil || approved != 2 {
+		t.Fatalf("approved=%d err=%v", approved, err)
+	}
+	for _, name := range []string{"auth.json", "log.txt", "opencode.db-shm"} {
+		if _, err := os.Lstat(filepath.Join(root, name)); !os.IsNotExist(err) {
+			t.Fatalf("%s retained: %v", name, err)
+		}
 	}
 }
 
