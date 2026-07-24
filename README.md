@@ -12,7 +12,7 @@ service, an MCP server, or a workflow engine.
 
 ```sh
 hatch codex terra -C . "Review this branch for correctness risks"
-hatch claude sonnet -C . "Explain the failure and propose the smallest fix"
+hatch claude opus -C . "Explain the failure and propose the smallest fix"
 hatch cursor grok -C . "Find the race condition"
 ```
 
