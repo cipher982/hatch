@@ -20,7 +20,7 @@ explicit emergency rollback.
 ## Entrypoints
 
 Public surface:
-- `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`fable` = Fable-class, higher capability)
+- `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`opus` = Opus 5, current default-strength Claude; `fable` = Fable-class, higher capability)
 - `hatch codex <sol|terra|luna>` → GPT-5.6 on OpenAI (`nano|mini|max` remain compatibility aliases)
 - `hatch cursor grok` → Grok 4.5 High via local Cursor Agent CLI
 - `hatch openrouter <deepseek-v4-pro|kimi-k3>` → OpenRouter models via OpenCode
@@ -28,10 +28,11 @@ Public surface:
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
 Default tiers:
-- Start with `sonnet` for Claude and `sol` for Codex
+- Start with `opus` for Claude (Opus 5 supersedes `sonnet`/`fable` for most work as of 2026-07-24) and `sol` for Codex
+- Use `sonnet` for cheaper/faster Claude calls where Opus-level capability isn't needed
 - Use `terra` for a lower-cost balance or `luna` for efficient high-volume work
 - GPT-5.6 reasoning accepts `none`, `low`, `medium`, `high`, `xhigh`, and `max`
-- Use `fable` for Fable-class Claude (higher capability, always-on adaptive thinking)
+- Use `fable` only when Fable-class traits (always-on adaptive thinking) are specifically wanted over Opus 5
 - Use `cursor grok` for Grok 4.5 High via Cursor
 - Use `openrouter deepseek-v4-pro` as the default non-OpenAI/non-Anthropic option; `kimi-k3` for complex coding and long-horizon agentic workflows
 
@@ -49,7 +50,7 @@ hatch doctor
 hatch openrouter deepseek-v4-pro "Review this branch"
 hatch openrouter kimi-k3 "Review this branch"
 hatch codex sol --reasoning-effort high "Write unit tests"
-hatch claude sonnet "Review this diff"
+hatch claude opus "Review this diff"
 hatch codex luna "What is 2+2?"
 hatch expert --reasoning-effort low "Is this refactor direction sound?"
 hatch codex sol --json "Analyze this" | jq .output
@@ -173,3 +174,4 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
 - (2026-07-22) [rewrite] Go 0.2.0 is the selected production Hatch. Every
   surface uses the same durable coordinator. Python production source is
   retired; the frozen ledger, fixtures, and tagged release preserve history.
+- (2026-07-24) [models] Opus 5 shipped and is now the default `hatch claude opus` target via the local Claude Code CLI's own `--model opus` alias resolution (no hatch code change needed). It supersedes `sonnet`/`fable` as the default Claude choice for most work; keep `sonnet` for cheap/fast calls and `fable` only for Fable-specific traits.
