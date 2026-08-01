@@ -51,7 +51,7 @@ private; Hatch does not run a daemon or upload them anywhere.
 | `hatch claude <haiku\|sonnet\|opus\|fable>` | Local Claude Code CLI login |
 | `hatch codex <sol\|terra\|luna>` | OpenCode with an OpenAI model alias |
 | `hatch cursor grok` | Local Cursor Agent CLI login |
-| `hatch openrouter <deepseek-v4-pro\|kimi-k3>` | OpenCode with an OpenRouter model alias |
+| `hatch openrouter <deepseek-v4-flash\|kimi-k3>` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 
 The model aliases are intentionally small and opinionated. For raw or

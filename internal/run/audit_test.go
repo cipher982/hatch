@@ -13,7 +13,7 @@ import (
 func TestAuditFieldEvidenceClassifiesAndPassesCompleteFixture(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "runs")
 	store := NewStore(root)
-	for _, surface := range []string{"claude.haiku", "codex.terra", "cursor.grok", "openrouter.deepseek-v4-pro", "expert"} {
+	for _, surface := range []string{"claude.haiku", "codex.terra", "cursor.grok", "openrouter.deepseek-v4-flash", "expert"} {
 		for range 5 {
 			createAuditRun(t, store, surface, OutcomeSucceeded)
 		}

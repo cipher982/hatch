@@ -268,7 +268,7 @@ func identity(backend, model string) (string, string) {
 const Help = `usage: hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor grok [OPTIONS] "prompt"
-       hatch openrouter <deepseek-v4-pro|kimi-k3> [OPTIONS] "prompt"
+       hatch openrouter <deepseek-v4-flash|kimi-k3> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
 	   hatch runs <list|inspect> [OPTIONS]
 

@@ -134,7 +134,7 @@ func TestMainDoctorJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4-pro' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
+	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4-flash' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	helper := filepath.Join(directory, "credential-helper")
