@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/cipher982/hatch/internal/cli"
+	"github.com/cipher982/hatch/internal/provider"
 	runner "github.com/cipher982/hatch/internal/run"
 )
 
@@ -229,12 +230,13 @@ type contractCase struct {
 }
 
 type contractResult struct {
-	OK       bool    `json:"ok"`
-	Status   string  `json:"status"`
-	Output   string  `json:"output"`
-	ExitCode int     `json:"exit_code"`
-	Error    *string `json:"error"`
-	Stderr   *string `json:"stderr"`
+	OK              bool                      `json:"ok"`
+	Status          string                    `json:"status"`
+	Output          string                    `json:"output"`
+	ExitCode        int                       `json:"exit_code"`
+	Error           *string                   `json:"error"`
+	Stderr          *string                   `json:"stderr"`
+	ReasoningPolicy *provider.ReasoningPolicy `json:"reasoning_policy"`
 }
 
 func TestContractLegacyParity(t *testing.T) {
@@ -297,6 +299,9 @@ func TestContractLegacyParity(t *testing.T) {
 				result.Output != expectedResult.Output || result.ExitCode != expectedResult.ExitCode ||
 				!reflect.DeepEqual(result.Error, expectedResult.Error) || !reflect.DeepEqual(result.Stderr, expectedResult.Stderr) {
 				t.Errorf("target result mismatch: %#v expected %#v", result, expectedResult)
+			}
+			if expectedResult.ReasoningPolicy != nil && result.ReasoningPolicy != *expectedResult.ReasoningPolicy {
+				t.Errorf("reasoning policy mismatch: %#v expected %#v", result.ReasoningPolicy, *expectedResult.ReasoningPolicy)
 			}
 			if result.ArtifactPath == nil || result.Run == nil || result.Run.RunID == "" || result.Run.Capture.State != "durable" {
 				t.Fatalf("target durability missing: %#v", result)

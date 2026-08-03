@@ -125,6 +125,11 @@ func TestApplyDCGOpenCodeIsolation(t *testing.T) {
 	if flagValueIndex(invocation.Argv, "--pure") >= 0 || invocation.SetEnv["OPENCODE_CONFIG_DIR"] != filepath.Join(root, "opencode") {
 		t.Fatalf("OpenCode invocation = %#v", invocation)
 	}
+	for _, name := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
+		if invocation.SetEnv[name] != "" {
+			t.Fatalf("DCG should not own per-run %s: %#v", name, invocation.SetEnv)
+		}
+	}
 	if len(invocation.RedactedArgv) != len(invocation.Argv) || invocation.RedactedArgv[len(invocation.RedactedArgv)-1] != "<prompt>" || strings.Contains(strings.Join(invocation.RedactedArgv, " "), "User task:") {
 		t.Fatalf("OpenCode redaction drift: argv=%#v redacted=%#v", invocation.Argv, invocation.RedactedArgv)
 	}

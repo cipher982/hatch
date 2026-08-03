@@ -19,7 +19,7 @@
       "resume_command": null
     },
     "provider_argv": [
-      "codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "-m", "gpt-test",
+      "codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral", "-m", "gpt-test",
       "-c", "model_reasoning_effort=high", "--skip-git-repo-check"
     ],
     "provider_stdin_sha256": "0eb7749ad17c17ce3323e0628fc9a6fc040d640d95edb7d6839f983ac354ee54",

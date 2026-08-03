@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 type Store struct {
@@ -48,6 +50,7 @@ type PreparedRun struct {
 	Execution                                       string
 	RedactedArgv                                    []string
 	CredentialNames                                 []string
+	ReasoningPolicy                                 provider.ReasoningPolicy
 	StructuredStdout                                bool
 }
 
@@ -99,6 +102,7 @@ func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
 		RunID: runID, CreatedAt: now, UpdatedAt: now,
 		Lifecycle: LifecyclePrepared, Surface: valueOrUnknown(spec.Surface), Backend: valueOrUnknown(spec.Backend), Provider: valueOrUnknown(spec.Provider),
 		Model: valueOrUnknown(spec.Model), CWD: spec.CWD, Execution: executionOrDefault(spec.Execution),
+		ReasoningPolicy: spec.ReasoningPolicy,
 		Invocation: Invocation{
 			RequestFile: "request.txt", RequestSHA256: hex.EncodeToString(digest[:]),
 			RedactedArgv: append([]string(nil), spec.RedactedArgv...), CredentialEnvNames: append([]string(nil), spec.CredentialNames...),

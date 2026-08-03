@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cipher982/hatch/internal/expert"
+	"github.com/cipher982/hatch/internal/provider"
 	runner "github.com/cipher982/hatch/internal/run"
 )
 
@@ -34,6 +35,10 @@ func runExpert(ctx context.Context, args []string, stdin io.Reader, stdout, stde
 		fmt.Fprint(stdout, ExpertHelp)
 		return 0
 	}
+	policy, err := provider.ResolveReasoning("expert", request.Model, request.ReasoningEffort)
+	if err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
 	prompt, err := readPrompt(request.PromptArgs, stdin)
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
@@ -49,9 +54,9 @@ func runExpert(ctx context.Context, args []string, stdin io.Reader, stdout, stde
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
-	fmt.Fprintf(stderr, "[hatch] expert call started: model=%s reasoning=%s web_search=%t\n", request.Model, request.ReasoningEffort, request.WebSearch)
+	fmt.Fprintf(stderr, "[hatch] expert call started: model=%s reasoning=%s source=%s support=%s web_search=%t\n", request.Model, policy.Effort, policy.Source, policy.Support, request.WebSearch)
 	result := expert.Run(expert.Options{
-		Context: ctx, Prompt: prompt, Model: request.Model, ReasoningEffort: request.ReasoningEffort, WebSearch: request.WebSearch,
+		Context: ctx, Prompt: prompt, Model: request.Model, ReasoningEffort: request.ReasoningEffort, ReasoningPolicy: policy, WebSearch: request.WebSearch,
 		Timeout: time.Duration(request.TimeoutSeconds) * time.Second, APIKey: apiKey,
 		BaseURL: strings.TrimSpace(os.Getenv("HATCH_EXPERT_RESPONSES_URL")), Store: runner.NewStore(root),
 		Progress: func(message string) { fmt.Fprintln(stderr, message) },
@@ -76,7 +81,7 @@ func parseExpert(args []string) (expertRequest, error) {
 	if model == "" {
 		model = expert.DefaultModel
 	}
-	result := expertRequest{Model: model, ReasoningEffort: "medium", TimeoutSeconds: 900, WebSearch: true}
+	result := expertRequest{Model: model, TimeoutSeconds: 900, WebSearch: true}
 	literal := false
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
@@ -142,7 +147,7 @@ const ExpertHelp = `usage: hatch expert [OPTIONS] "prompt"
 Ask one slow synchronous expert question using the Responses API.
 
 Options:
-  --reasoning-effort LEVEL
+  --reasoning-effort LEVEL  none|low|medium|high|xhigh|max (default: medium)
   --web-search / --no-web-search
   -t, --timeout SECONDS
   --model MODEL

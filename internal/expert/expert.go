@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cipher982/hatch/internal/provider"
 	runner "github.com/cipher982/hatch/internal/run"
 )
 
@@ -37,6 +38,7 @@ type Options struct {
 	WebSearch                      bool
 	Timeout                        time.Duration
 	APIKey, BaseURL                string
+	ReasoningPolicy                provider.ReasoningPolicy
 	Client                         *http.Client
 	PollInterval                   time.Duration
 	Store                          runner.RunStore
@@ -44,22 +46,23 @@ type Options struct {
 }
 
 type Result struct {
-	OK              bool             `json:"ok"`
-	Status          string           `json:"status"`
-	Output          string           `json:"output"`
-	DurationMS      int64            `json:"duration_ms"`
-	Error           *string          `json:"error"`
-	Model           string           `json:"model"`
-	ResolvedModel   *string          `json:"resolved_model"`
-	ReasoningEffort string           `json:"reasoning_effort"`
-	WebSearch       bool             `json:"web_search"`
-	Usage           any              `json:"usage"`
-	ResponseID      *string          `json:"response_id"`
-	Citations       []map[string]any `json:"citations"`
-	Sources         []map[string]any `json:"sources"`
-	ArtifactPath    *string          `json:"artifact_path"`
-	Run             *runner.Manifest `json:"run,omitempty"`
-	ExitCode        int              `json:"-"`
+	OK              bool                     `json:"ok"`
+	Status          string                   `json:"status"`
+	Output          string                   `json:"output"`
+	DurationMS      int64                    `json:"duration_ms"`
+	Error           *string                  `json:"error"`
+	Model           string                   `json:"model"`
+	ResolvedModel   *string                  `json:"resolved_model"`
+	ReasoningEffort string                   `json:"reasoning_effort"`
+	ReasoningPolicy provider.ReasoningPolicy `json:"reasoning_policy"`
+	WebSearch       bool                     `json:"web_search"`
+	Usage           any                      `json:"usage"`
+	ResponseID      *string                  `json:"response_id"`
+	Citations       []map[string]any         `json:"citations"`
+	Sources         []map[string]any         `json:"sources"`
+	ArtifactPath    *string                  `json:"artifact_path"`
+	Run             *runner.Manifest         `json:"run,omitempty"`
+	ExitCode        int                      `json:"-"`
 }
 
 func BuildPayload(prompt, model, effort string, webSearch bool) (map[string]any, error) {
@@ -82,9 +85,17 @@ func Run(options Options) Result {
 	if options.Model == "" {
 		options.Model = DefaultModel
 	}
-	if options.ReasoningEffort == "" {
-		options.ReasoningEffort = "medium"
+	policy := options.ReasoningPolicy
+	if policy.Effort == "" {
+		var err error
+		policy, err = provider.ResolveReasoning("expert", options.Model, options.ReasoningEffort)
+		if err != nil {
+			message := err.Error()
+			return Result{Status: "config_error", Error: &message, Model: options.Model, ReasoningEffort: options.ReasoningEffort, ReasoningPolicy: policy, WebSearch: options.WebSearch, Citations: []map[string]any{}, Sources: []map[string]any{}, ExitCode: 4}
+		}
 	}
+	options.ReasoningPolicy = policy
+	options.ReasoningEffort = policy.Effort
 	if options.Timeout <= 0 {
 		options.Timeout = 900 * time.Second
 	}
@@ -100,20 +111,20 @@ func Run(options Options) Result {
 	payload, payloadErr := BuildPayload(options.Prompt, options.Model, options.ReasoningEffort, options.WebSearch)
 	if payloadErr != nil {
 		message := payloadErr.Error()
-		return Result{Status: "error", Error: &message, Model: options.Model, ReasoningEffort: options.ReasoningEffort, WebSearch: options.WebSearch, Citations: []map[string]any{}, Sources: []map[string]any{}, ExitCode: 1}
+		return Result{Status: "error", Error: &message, Model: options.Model, ReasoningEffort: options.ReasoningEffort, ReasoningPolicy: policy, WebSearch: options.WebSearch, Citations: []map[string]any{}, Sources: []map[string]any{}, ExitCode: 1}
 	}
 	coordinator := runner.NewCoordinator(options.Store)
 	var final map[string]any
 	public := coordinator.ExecuteHTTP(runner.HTTPRequest{
 		Context: options.Context, Surface: "expert", Backend: "responses", Provider: "openai", Model: options.Model, Prompt: options.Prompt,
-		Timeout: options.Timeout, CredentialNames: []string{"OPENAI_API_KEY"}, Progress: options.Progress,
+		Timeout: options.Timeout, CredentialNames: []string{"OPENAI_API_KEY"}, ReasoningPolicy: policy, Progress: options.Progress,
 		Execute: func(ctx context.Context, record func([]byte) error) runner.HTTPOutcome {
 			return execute(ctx, options, payload, record, &final)
 		},
 	})
 	result := Result{
 		OK: public.OK, Status: public.Status, Output: public.Output, DurationMS: public.DurationMS, Error: public.Error,
-		Model: options.Model, ReasoningEffort: options.ReasoningEffort, WebSearch: options.WebSearch,
+		Model: options.Model, ReasoningEffort: options.ReasoningEffort, ReasoningPolicy: policy, WebSearch: options.WebSearch,
 		ArtifactPath: public.ArtifactPath, Run: public.Run, ExitCode: public.CLIExitCode(),
 		Citations: []map[string]any{}, Sources: []map[string]any{},
 	}

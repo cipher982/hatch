@@ -56,6 +56,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	artifact, err := c.Store.Prepare(PreparedRun{
 		Surface: req.Surface, Backend: req.Backend, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
 		Request: req.Prompt, RedactedArgv: redacted, CredentialNames: req.CredentialNames,
+		ReasoningPolicy:  req.Invocation.ReasoningPolicy,
 		StructuredStdout: req.Invocation.StreamFormat == "jsonl",
 	})
 	if err != nil {
@@ -64,6 +65,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	artifactPath := artifact.Path
 	if req.Progress != nil {
 		req.Progress(fmt.Sprintf("[hatch] run %s artifact %s", artifact.Manifest.RunID, artifact.Path))
+		req.Progress(fmt.Sprintf("[hatch] reasoning effort=%s source=%s support=%s", displayReasoningEffort(req.Invocation.ReasoningPolicy), req.Invocation.ReasoningPolicy.Source, req.Invocation.ReasoningPolicy.Support))
 		if req.ProgressLabel != "" && (req.Invocation.Adapter == "" || req.Invocation.Adapter == "raw") {
 			req.Progress(fmt.Sprintf("[hatch] %s started", req.ProgressLabel))
 		}
@@ -286,10 +288,17 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		Retention: interpretation.Retention, NativeIDState: interpretation.NativeIDState,
 		Capabilities: interpretation.Capabilities,
 	}
+	if isRawCodexInvocation(req.Invocation) {
+		state.Retention = "unavailable"
+		state.Capabilities["state_isolation"] = "hatch_per_run"
+		state.Capabilities["session_persistence"] = "disabled_ephemeral"
+		state.Capabilities["recovery"] = "unsupported_ephemeral"
+	}
 	if interpretation.NativeID != "" {
 		state.NativeID = &interpretation.NativeID
 	}
 	if req.Invocation.Adapter == "opencode" {
+		state.Capabilities["state_isolation"] = "hatch_per_run"
 		snapshot, approved, pruneErr := freezeOpenCodeState(artifact)
 		if pruneErr != nil {
 			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
@@ -303,19 +312,25 @@ func (c Coordinator) Execute(req Request) PublicResult {
 				state.ProviderVersion = &req.Invocation.ProviderVersion
 			}
 			if state.NativeID != nil && req.Invocation.ProviderVersion != "" {
-				dataEnv := "XDG_DATA_HOME=" + filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "data")
-				stateEnv := "XDG_STATE_HOME=" + filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "state")
+				envArgs := openCodeRecoveryEnvironment(artifact, snapshot, req.Invocation)
 				state.InspectHint = &OperatorHint{
-					Argv:         []string{"env", dataEnv, stateEnv, "opencode", "export", *state.NativeID},
+					Argv:         append(append([]string(nil), envArgs...), "opencode", "export", *state.NativeID),
 					VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion,
 				}
 				state.Capabilities["inspect"] = "supported_same_version"
 				if timedOut {
-					argv := []string{"env", dataEnv, stateEnv, "opencode", "run", "--dangerously-skip-permissions"}
+					argv := append(append([]string(nil), envArgs...), "opencode", "run", "--dangerously-skip-permissions")
 					if req.CWD != "" {
 						argv = append(argv, "--dir", req.CWD)
 					}
-					argv = append(argv, "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model, "--session", *state.NativeID, "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.")
+					if hasInvocationArg(req.Invocation.Argv, "--pure") {
+						argv = append(argv, "--pure")
+					}
+					argv = append(argv, "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model)
+					if req.Invocation.ReasoningPolicy.Effort != "" && req.Invocation.ReasoningPolicy.Support != "unsupported" {
+						argv = append(argv, "--variant", req.Invocation.ReasoningPolicy.Effort)
+					}
+					argv = append(argv, "--session", *state.NativeID, "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.")
 					state.RecoveryHint = &OperatorHint{Argv: argv, VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion, RequiresApprovalBypass: true}
 					state.Capabilities["recovery_hint"] = "best_effort_same_version"
 				}
@@ -336,7 +351,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	result := PublicResult{
 		OK: ok, Status: status, Output: string(output), ExitCode: exitCode,
 		DurationMS: c.Now().Sub(started).Milliseconds(), Error: resultErr,
-		Stderr: publicStderr, ArtifactPath: &artifactPath, Run: &artifact.Manifest,
+		Stderr: publicStderr, ArtifactPath: &artifactPath, ReasoningPolicy: artifact.Manifest.ReasoningPolicy, Run: &artifact.Manifest,
 	}
 	if artifact.Manifest.Capture.State != "durable" {
 		result.ArtifactPath = nil
@@ -388,6 +403,7 @@ func (c Coordinator) finalizePrelaunchFailure(artifact *Artifact, started time.T
 	} else if outcome == OutcomeTimedOut {
 		result.Status = "timeout"
 	}
+	result.ReasoningPolicy = artifact.Manifest.ReasoningPolicy
 	result.Run = &artifact.Manifest
 	if artifact.Manifest.Capture.State != "durable" {
 		result.ArtifactPath = nil
@@ -590,35 +606,88 @@ func effectiveCWD(cwd string) string {
 }
 
 func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (func(), error) {
-	if invocation.Adapter != "opencode" {
-		return func() {}, nil
-	}
 	if invocation.SetEnv == nil {
 		invocation.SetEnv = map[string]string{}
 	}
-	root := filepath.Join(artifact.Path, "provider", "opencode")
-	for name, envName := range map[string]string{
-		"data": "XDG_DATA_HOME", "state": "XDG_STATE_HOME",
-	} {
-		path := filepath.Join(root, name)
-		if err := os.MkdirAll(path, 0o700); err != nil {
+	if invocation.Adapter == "opencode" {
+		root := filepath.Join(artifact.Path, "provider", "opencode")
+		for name, envName := range map[string]string{
+			"data": "XDG_DATA_HOME", "state": "XDG_STATE_HOME",
+		} {
+			path := filepath.Join(root, name)
+			if err := secureMkdirAll(path); err != nil {
+				return nil, err
+			}
+			invocation.SetEnv[envName] = path
+		}
+		configHome := filepath.Join(artifact.Path, "provider", "opencode-config")
+		if err := secureMkdirAll(filepath.Join(configHome, "opencode")); err != nil {
 			return nil, err
 		}
-		if err := os.Chmod(path, 0o700); err != nil {
+		cacheHome := filepath.Join(artifact.Path, "provider", "opencode-cache")
+		if err := secureMkdirAll(cacheHome); err != nil {
 			return nil, err
 		}
-		invocation.SetEnv[envName] = path
+		invocation.SetEnv["XDG_CONFIG_HOME"] = configHome
+		invocation.SetEnv["XDG_CACHE_HOME"] = cacheHome
+		if strings.TrimSpace(invocation.SetEnv["OPENCODE_CONFIG_DIR"]) == "" {
+			invocation.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(configHome, "opencode")
+		}
+		invocation.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] = "1"
+		return func() {}, nil
 	}
-	cache, err := os.MkdirTemp("", "hatch-opencode-cache-*")
-	if err != nil {
-		return nil, err
+	if isRawCodexInvocation(*invocation) {
+		root := filepath.Join(artifact.Path, "provider", "codex")
+		if err := secureMkdirAll(root); err != nil {
+			return nil, err
+		}
+		invocation.SetEnv["CODEX_HOME"] = root
+		return func() {}, nil
 	}
-	if err := os.Chmod(cache, 0o700); err != nil {
-		os.RemoveAll(cache)
-		return nil, err
+	return func() {}, nil
+}
+
+func isRawCodexInvocation(invocation provider.Invocation) bool {
+	if len(invocation.Argv) == 0 || invocation.Adapter != "raw" {
+		return false
 	}
-	invocation.SetEnv["XDG_CACHE_HOME"] = cache
-	return func() { _ = os.RemoveAll(cache) }, nil
+	return filepath.Base(invocation.Argv[0]) == "codex" || hasInvocationArg(invocation.Argv, "--ignore-user-config")
+}
+
+func hasInvocationArg(argv []string, want string) bool {
+	for _, arg := range argv {
+		if arg == want {
+			return true
+		}
+	}
+	return false
+}
+
+func displayReasoningEffort(policy provider.ReasoningPolicy) string {
+	if policy.Effort == "" {
+		return "unsupported"
+	}
+	return policy.Effort
+}
+
+func openCodeRecoveryEnvironment(artifact *Artifact, snapshot string, invocation provider.Invocation) []string {
+	dataHome := filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "data")
+	stateHome := filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "state")
+	values := []struct{ name, value string }{
+		{"XDG_DATA_HOME", dataHome},
+		{"XDG_STATE_HOME", stateHome},
+		{"XDG_CONFIG_HOME", invocation.SetEnv["XDG_CONFIG_HOME"]},
+		{"XDG_CACHE_HOME", invocation.SetEnv["XDG_CACHE_HOME"]},
+		{"OPENCODE_CONFIG_DIR", invocation.SetEnv["OPENCODE_CONFIG_DIR"]},
+		{"OPENCODE_DISABLE_PROJECT_CONFIG", "1"},
+	}
+	args := []string{"env", "-u", "OPENCODE_CONFIG", "-u", "OPENCODE_CONFIG_CONTENT"}
+	for _, item := range values {
+		if item.value != "" {
+			args = append(args, item.name+"="+item.value)
+		}
+	}
+	return args
 }
 
 var openCodeStateAllowlist = map[string]bool{

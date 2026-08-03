@@ -31,6 +31,7 @@ type Invocation struct {
 	StreamFormat    string
 	Adapter         string
 	ProviderVersion string
+	ReasoningPolicy ReasoningPolicy
 }
 
 func PreparePrompt(prompt string) string {
@@ -38,6 +39,13 @@ func PreparePrompt(prompt string) string {
 }
 
 func Build(req Request) (Invocation, error) {
+	if req.Backend == "opencode" && req.Model == "" {
+		return Invocation{}, fmt.Errorf("OpenCode backend requires an explicit model")
+	}
+	policy, err := ResolveReasoning(req.Backend, req.Model, req.ReasoningEffort)
+	if err != nil {
+		return Invocation{}, err
+	}
 	prompt := PreparePrompt(req.Prompt)
 	switch req.Backend {
 	case "claude":
@@ -72,6 +80,7 @@ func Build(req Request) (Invocation, error) {
 		}
 		return redactInvocation(Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
+			ReasoningPolicy: policy,
 			UnsetEnv: []string{
 				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY",
 				"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
@@ -108,6 +117,7 @@ func Build(req Request) (Invocation, error) {
 		}
 		return redactInvocation(Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
+			ReasoningPolicy: policy,
 			SetEnv: map[string]string{
 				"CLAUDE_CODE_USE_BEDROCK": "1", "AWS_PROFILE": "zh-ml-mlengineer",
 				"AWS_REGION": "us-east-1", "ANTHROPIC_MODEL": model,
@@ -123,7 +133,7 @@ func Build(req Request) (Invocation, error) {
 			Argv: []string{
 				"cursor-agent", "--print", "--trust", "--model", model,
 				"--output-format", "stream-json", "--force", prompt,
-			}, StreamFormat: "jsonl", Adapter: "cursor", SetEnv: map[string]string{},
+			}, StreamFormat: "jsonl", Adapter: "cursor", ReasoningPolicy: policy, SetEnv: map[string]string{},
 			UnsetEnv: []string{
 				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
 				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
@@ -143,16 +153,18 @@ func Build(req Request) (Invocation, error) {
 			argv = append(argv, "--dir", req.CWD)
 		}
 		argv = append(argv, "--pure", "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model)
-		if req.ReasoningEffort != "" && strings.HasPrefix(req.Model, "openai/") {
-			argv = append(argv, "--variant", req.ReasoningEffort)
+		if policy.Effort != "" && policy.Support != "unsupported" && strings.HasPrefix(req.Model, "openai/") {
+			argv = append(argv, "--variant", policy.Effort)
 		}
 		argv = append(argv, prompt)
 		invocation := Invocation{
 			Argv:         argv,
 			SetEnv:       map[string]string{},
-			StreamFormat: "jsonl", Adapter: "opencode",
+			StreamFormat: "jsonl", Adapter: "opencode", ReasoningPolicy: policy,
 			UnsetEnv: []string{
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "OPENAI_API_KEY", "CODEX_API_KEY",
+				"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "OPENCODE_CONFIG_DIR", "OPENCODE_DISABLE_PROJECT_CONFIG",
+				"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME",
 			},
 		}
 		if strings.HasPrefix(req.Model, "openai/") && req.APIKey != "" {
@@ -170,20 +182,19 @@ func Build(req Request) (Invocation, error) {
 		if req.APIKey == "" {
 			return Invocation{}, fmt.Errorf("OPENAI_API_KEY not set and no api_key provided")
 		}
-		argv := []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox"}
+		argv := []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral"}
 		if req.Model != "" {
 			argv = append(argv, "-m", req.Model)
 		}
-		if req.ReasoningEffort != "" {
-			argv = append(argv, "-c", "model_reasoning_effort="+req.ReasoningEffort)
-		}
+		argv = append(argv, "-c", "model_reasoning_effort="+policy.Effort)
 		if req.SkipGitRepoCheck {
 			argv = append(argv, "--skip-git-repo-check")
 		}
 		return redactInvocation(Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: "text", Adapter: "raw",
-			SetEnv:   map[string]string{"OPENAI_API_KEY": req.APIKey},
-			UnsetEnv: []string{"CODEX_API_KEY", "CLAUDE_CODE_USE_BEDROCK"},
+			ReasoningPolicy: policy,
+			SetEnv:          map[string]string{"OPENAI_API_KEY": req.APIKey},
+			UnsetEnv:        []string{"CODEX_API_KEY", "CODEX_HOME", "CLAUDE_CODE_USE_BEDROCK"},
 		}), nil
 	case "gemini":
 		model := req.Model
@@ -193,7 +204,7 @@ func Build(req Request) (Invocation, error) {
 		return redactInvocation(Invocation{
 			Argv:         []string{"gemini", "--model", model, "--yolo", "--skip-trust", "-p", "-"},
 			Stdin:        []byte(prompt),
-			StreamFormat: "text", Adapter: "raw",
+			StreamFormat: "text", Adapter: "raw", ReasoningPolicy: policy,
 			UnsetEnv: []string{"CLAUDE_CODE_USE_BEDROCK"},
 		}), nil
 	default:

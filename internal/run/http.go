@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 type HTTPRequest struct {
@@ -11,6 +13,7 @@ type HTTPRequest struct {
 	Surface, Backend, Provider, Model, CWD, Prompt string
 	Timeout                                        time.Duration
 	CredentialNames                                []string
+	ReasoningPolicy                                provider.ReasoningPolicy
 	Progress                                       func(string)
 	Execute                                        func(context.Context, func([]byte) error) HTTPOutcome
 }
@@ -33,6 +36,7 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 	artifact, err := c.Store.Prepare(PreparedRun{
 		Surface: req.Surface, Backend: req.Backend, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
 		Request: req.Prompt, RedactedArgv: []string{"POST", "<responses-url>"}, CredentialNames: req.CredentialNames,
+		ReasoningPolicy:  req.ReasoningPolicy,
 		StructuredStdout: true, Execution: "http",
 	})
 	if err != nil {
@@ -154,7 +158,7 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 		artifact.Manifest.HTTP.LastStatus = &outcome.LastStatus
 	}
 	c.Store.StageTerminal(artifact, terminalOutcome, exitCode, resultState, state, warnings)
-	result := PublicResult{OK: ok, Status: status, Output: outcome.Output, ExitCode: exitCode, DurationMS: c.Now().Sub(started).Milliseconds(), Error: resultErr, ArtifactPath: &artifactPath, Run: &artifact.Manifest, SessionID: state.NativeID}
+	result := PublicResult{OK: ok, Status: status, Output: outcome.Output, ExitCode: exitCode, DurationMS: c.Now().Sub(started).Milliseconds(), Error: resultErr, ArtifactPath: &artifactPath, SessionID: state.NativeID, ReasoningPolicy: artifact.Manifest.ReasoningPolicy, Run: &artifact.Manifest}
 	if artifact.Manifest.Capture.State != "durable" {
 		result.ArtifactPath = nil
 	}

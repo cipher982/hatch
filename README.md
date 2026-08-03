@@ -61,6 +61,21 @@ Every surfaced agent receives a bounded-run instruction: stay within the task,
 investigate proportionally, and return a concise answer rather than silently
 turning a one-shot call into an open-ended session.
 
+Reasoning effort is a Hatch run policy, not inherited provider session state.
+Known Codex/OpenAI surfaces default to `medium`; pass
+`--reasoning-effort high` or another supported level to choose explicitly.
+Hatch records the effort, whether it came from the default or the user, and
+whether the provider supports it in both the run manifest and JSON result.
+Claude and Bedrock use a fixed `low` policy. OpenRouter, Cursor, and Gemini
+report reasoning as unsupported instead of accepting a misleading override.
+Unknown OpenAI models require an explicit effort before Hatch launches them.
+
+Provider state is isolated per run. OpenCode receives private XDG config,
+data, state, and cache paths while reviewed DCG configuration remains the only
+shared configuration. Raw Codex receives a private `CODEX_HOME`, ignores user
+configuration, and runs ephemerally, so a previous local Codex session cannot
+silently affect a Hatch run or be mistaken for a recoverable Hatch session.
+
 ## Quick start
 
 Hatch is a Go binary. Build it from a checkout:
@@ -86,6 +101,12 @@ JSON result, making it convenient for scripts and agent callers:
 
 ```sh
 ./hatch codex terra -C "$PWD" --json "Summarize the architecture" | jq .output
+```
+
+To make the reasoning choice explicit:
+
+```sh
+./hatch codex sol --reasoning-effort high "Review the risky parts of this change"
 ```
 
 Use the doctor after installing or upgrading Cursor or OpenCode. It checks the

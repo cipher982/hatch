@@ -101,8 +101,10 @@ func TestMainExpertJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	run, _ := result["run"].(map[string]any)
+	policy, _ := result["reasoning_policy"].(map[string]any)
 	if result["ok"] != true || result["output"] != "expert answer" || result["artifact_path"] == nil ||
-		run["surface"] != "expert" || run["backend"] != "responses" || run["provider"] != "openai" {
+		run["surface"] != "expert" || run["backend"] != "responses" || run["provider"] != "openai" ||
+		policy["effort"] != "medium" || policy["source"] != "default" || policy["support"] != "native" {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -177,7 +179,16 @@ func TestMainAdvancedHelpSeparatesRawFlags(t *testing.T) {
 	if exit := Main([]string{"--advanced-help"}, bytes.NewReader(nil), &advanced, &stderr, true); exit != 0 {
 		t.Fatal(exit)
 	}
-	if bytes.Contains(normal.Bytes(), []byte("--api-key")) || !bytes.Contains(advanced.Bytes(), []byte("--api-key")) || !bytes.Contains(advanced.Bytes(), []byte("--automation")) {
+	if bytes.Contains(normal.Bytes(), []byte("--api-key")) || !bytes.Contains(normal.Bytes(), []byte("--reasoning-effort")) ||
+		!bytes.Contains(advanced.Bytes(), []byte("--api-key")) || !bytes.Contains(advanced.Bytes(), []byte("--automation")) {
 		t.Fatalf("normal=%s\nadvanced=%s", normal.String(), advanced.String())
+	}
+}
+
+func TestMainRejectsMaxEffortForMaxTierAlias(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exit := Main([]string{"codex", "max", "--reasoning-effort", "max", "--json", "prompt"}, bytes.NewReader(nil), &stdout, &stderr, true)
+	if exit != 4 || !bytes.Contains(stdout.Bytes(), []byte("not supported")) {
+		t.Fatalf("exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
 	}
 }

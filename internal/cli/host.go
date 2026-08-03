@@ -119,10 +119,6 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 			}
 			return nil
 		}
-		invocation.SetEnv["XDG_CONFIG_HOME"] = filepath.Join(root, "xdg")
-		invocation.SetEnv["XDG_DATA_HOME"] = filepath.Join(root, "data")
-		invocation.SetEnv["XDG_CACHE_HOME"] = filepath.Join(root, "cache")
-		invocation.SetEnv["XDG_STATE_HOME"] = filepath.Join(root, "state")
 		invocation.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(root, "opencode")
 		invocation.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] = "1"
 		invocation.Argv = removeArg(invocation.Argv, "--pure")

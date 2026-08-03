@@ -71,11 +71,22 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := []string{
-			"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "-m", "gpt-5.6",
+			"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral", "-m", "gpt-5.6",
 			"-c", "model_reasoning_effort=high", "--skip-git-repo-check",
 		}
 		if !reflect.DeepEqual(got.Argv, want) || got.SetEnv["OPENAI_API_KEY"] != "secret" {
 			t.Fatalf("codex invocation = %#v", got)
+		}
+	})
+
+	t.Run("opencode defaults reasoning explicitly", func(t *testing.T) {
+		got, err := Build(Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "p", APIKey: "secret"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got.Argv[len(got.Argv)-3:], []string{"--variant", "medium", PreparePrompt("p")}) ||
+			got.ReasoningPolicy != (ReasoningPolicy{Effort: "medium", Source: "default", Support: "native"}) {
+			t.Fatalf("opencode invocation = %#v", got)
 		}
 	})
 

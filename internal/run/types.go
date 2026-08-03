@@ -3,6 +3,8 @@ package run
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 type Lifecycle string
@@ -22,27 +24,28 @@ const (
 )
 
 type Manifest struct {
-	SchemaVersion int        `json:"schema_version"`
-	Writer        Writer     `json:"writer"`
-	RunID         string     `json:"run_id"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	Lifecycle     Lifecycle  `json:"lifecycle"`
-	Outcome       *Outcome   `json:"outcome"`
-	Surface       string     `json:"surface"`
-	Backend       string     `json:"backend"`
-	Provider      string     `json:"provider"`
-	Model         string     `json:"model"`
-	CWD           string     `json:"cwd"`
-	Execution     string     `json:"execution"`
-	Invocation    Invocation `json:"invocation"`
-	Process       *Process   `json:"process"`
-	HTTP          *HTTP      `json:"http,omitempty"`
-	Result        Result     `json:"result"`
-	Capture       Capture    `json:"capture"`
-	ProviderState State      `json:"provider_state"`
-	Archive       Archive    `json:"archive"`
-	Warnings      []Warning  `json:"warnings"`
+	SchemaVersion   int                      `json:"schema_version"`
+	Writer          Writer                   `json:"writer"`
+	RunID           string                   `json:"run_id"`
+	CreatedAt       time.Time                `json:"created_at"`
+	UpdatedAt       time.Time                `json:"updated_at"`
+	Lifecycle       Lifecycle                `json:"lifecycle"`
+	Outcome         *Outcome                 `json:"outcome"`
+	Surface         string                   `json:"surface"`
+	Backend         string                   `json:"backend"`
+	Provider        string                   `json:"provider"`
+	Model           string                   `json:"model"`
+	ReasoningPolicy provider.ReasoningPolicy `json:"reasoning_policy"`
+	CWD             string                   `json:"cwd"`
+	Execution       string                   `json:"execution"`
+	Invocation      Invocation               `json:"invocation"`
+	Process         *Process                 `json:"process"`
+	HTTP            *HTTP                    `json:"http,omitempty"`
+	Result          Result                   `json:"result"`
+	Capture         Capture                  `json:"capture"`
+	ProviderState   State                    `json:"provider_state"`
+	Archive         Archive                  `json:"archive"`
+	Warnings        []Warning                `json:"warnings"`
 }
 
 type Writer struct {
@@ -160,17 +163,18 @@ type Warning struct {
 }
 
 type PublicResult struct {
-	OK            bool      `json:"ok"`
-	Status        string    `json:"status"`
-	Output        string    `json:"output"`
-	ExitCode      int       `json:"exit_code"`
-	DurationMS    int64     `json:"duration_ms"`
-	Error         *string   `json:"error"`
-	Stderr        *string   `json:"stderr"`
-	ArtifactPath  *string   `json:"artifact_path"`
-	SessionID     *string   `json:"session_id"`
-	ResumeCommand *string   `json:"resume_command"`
-	Run           *Manifest `json:"run,omitempty"`
+	OK              bool                     `json:"ok"`
+	Status          string                   `json:"status"`
+	Output          string                   `json:"output"`
+	ExitCode        int                      `json:"exit_code"`
+	DurationMS      int64                    `json:"duration_ms"`
+	Error           *string                  `json:"error"`
+	Stderr          *string                  `json:"stderr"`
+	ArtifactPath    *string                  `json:"artifact_path"`
+	SessionID       *string                  `json:"session_id"`
+	ResumeCommand   *string                  `json:"resume_command"`
+	ReasoningPolicy provider.ReasoningPolicy `json:"reasoning_policy"`
+	Run             *Manifest                `json:"run,omitempty"`
 }
 
 func (r PublicResult) CLIExitCode() int {

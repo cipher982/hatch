@@ -63,7 +63,7 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("No default model is configured; choose an explicit provider"))
 	}
 	if !oneOf(request.Backend, "claude", "cursor", "bedrock", "codex", "gemini", "opencode") {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, bedrock, codex, gemini", request.Backend))
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, bedrock, codex, gemini, opencode", request.Backend))
 	}
 	if request.CWD != "" {
 		info, statErr := os.Stat(request.CWD)
@@ -77,8 +77,8 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if request.Backend == "opencode" && request.SkipGitRepoCheck {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("--skip-git-repo-check is not supported for surfaced providers"))
 	}
-	if request.ReasoningEffort != "" && request.Backend != "codex" && !(request.Backend == "opencode" && strings.HasPrefix(request.Model, "openai/")) {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("--reasoning-effort only works with Codex models"))
+	if _, err := provider.ResolveReasoning(request.Backend, request.Model, request.ReasoningEffort); err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
 	prompt, err := readPrompt(request.PromptArgs, stdin)
 	if err != nil {
@@ -284,6 +284,7 @@ Start here:
 Common options:
   -C, --cwd DIR        Working directory for the agent
   -t, --timeout SEC    Hard timeout (default: 1800)
+  --reasoning-effort LEVEL  none|low|medium|high|xhigh|max
   --json               Emit exactly one JSON document on stdout
   --advanced-help      Show raw/backend-specific flags
 
@@ -297,7 +298,6 @@ const AdvancedHelp = Help + `
 Advanced raw/backend options:
   -b, --backend NAME
   --model MODEL
-  --reasoning-effort LEVEL
   --skip-git-repo-check
   --output-format <text|json|stream-json>
   --include-partial-messages

@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 func TestStorePreparesPrivateDurableRun(t *testing.T) {
@@ -25,6 +27,7 @@ func TestStorePreparesPrivateDurableRun(t *testing.T) {
 	artifact, err := store.Prepare(PreparedRun{
 		Surface: "gemini.raw", Provider: "google", Model: "gemini-3-pro-preview", CWD: "/repo",
 		Request: "secret prompt", RedactedArgv: []string{"gemini", "<prompt>"}, CredentialNames: []string{"GEMINI_API_KEY"},
+		ReasoningPolicy: provider.ReasoningPolicy{Source: "unsupported", Support: "unsupported"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -53,6 +56,9 @@ func TestStorePreparesPrivateDurableRun(t *testing.T) {
 	}
 	if disk.RunID != artifact.Manifest.RunID || disk.Capture.ArtifactPath != artifact.Path {
 		t.Fatalf("disk manifest mismatch: %#v", disk)
+	}
+	if disk.ReasoningPolicy.Source != "unsupported" || disk.ReasoningPolicy.Support != "unsupported" {
+		t.Fatalf("reasoning policy not durable: %#v", disk.ReasoningPolicy)
 	}
 }
 

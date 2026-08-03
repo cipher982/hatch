@@ -73,6 +73,8 @@ is not a system.
    surprising outcomes without Hatch pre-collapsing them.
 6. Credentials never enter artifacts, logs, metadata, or recovery commands.
 7. Existing callers migrate additively.
+8. Provider reasoning policy and state namespaces are explicit per run; no
+   provider may inherit another model's effort or session state by omission.
 
 ## Non-goals
 
@@ -150,6 +152,33 @@ hint merely because an ID exists, and V1 never dispatches one.
 After a run reaches a terminal outcome, later archive receipts or annotations
 may advance their own axes but cannot rewrite what the subprocess/provider did.
 Corrections are appended as observations with timestamps.
+
+### 7. Reasoning policy is visible and resolved before launch
+
+The canonical record includes:
+
+```json
+"reasoning_policy": {
+  "effort": "medium",
+  "source": "default",
+  "support": "native"
+}
+```
+
+`source` is one of `default`, `explicit`, `fixed`, or `unsupported`.
+`support` is one of `native`, `fixed`, `unsupported`, or `unknown`. Known
+Codex/OpenAI models use Hatch's explicit `medium` default; model-specific
+validation rejects an effort the provider catalog does not expose. Unknown
+OpenAI models require an explicit effort and are marked `support=unknown`.
+Providers without a tested reasoning mapping remain `unsupported` and reject
+an explicit override. This policy is resolved before credentials or provider
+execution and is copied into the public result.
+
+Provider state namespaces are also assigned before launch. OpenCode gets
+per-run XDG config/data/state/cache paths, with only the reviewed DCG config
+allowed to remain shared. Raw Codex gets a per-run `CODEX_HOME`, ignores user
+configuration, and uses ephemeral execution. Its recovery capability is
+explicitly unsupported because no native session is retained.
 
 ## Vocabulary and state model
 
@@ -257,6 +286,11 @@ Illustrative V1 shape:
   "backend": "opencode",
   "provider": "openrouter",
   "model": "openrouter/~moonshotai/kimi-latest",
+  "reasoning_policy": {
+    "effort": "",
+    "source": "unsupported",
+    "support": "unsupported"
+  },
   "cwd": "/repo",
   "execution": "subprocess",
   "invocation": {

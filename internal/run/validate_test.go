@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 func TestManifestWriterRejectsInvalidAxesAndPaths(t *testing.T) {
@@ -32,6 +34,12 @@ func TestManifestWriterRejectsInvalidAxesAndPaths(t *testing.T) {
 		"early outcome":           func(m *Manifest) { value := OutcomeFailed; m.Outcome = &value },
 		"missing backend":         func(m *Manifest) { m.Backend = "" },
 		"missing writer contract": func(m *Manifest) { m.Writer = Writer{} },
+		"invalid reasoning source": func(m *Manifest) {
+			m.ReasoningPolicy = provider.ReasoningPolicy{Effort: "medium", Source: "session", Support: "native"}
+		},
+		"unsupported reasoning with effort": func(m *Manifest) {
+			m.ReasoningPolicy = provider.ReasoningPolicy{Effort: "medium", Source: "unsupported", Support: "unsupported"}
+		},
 		"identity without id": func(m *Manifest) {
 			m.ProviderState.NativeIDState = "observed"
 		},

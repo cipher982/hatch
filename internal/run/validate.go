@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 var warningCodesV1 = map[string]bool{
@@ -77,6 +79,9 @@ func ValidateManifest(manifest Manifest) error {
 	if manifest.Capture.ArtifactPath == "" || !filepath.IsAbs(manifest.Capture.ArtifactPath) {
 		return fmt.Errorf("artifact_path must be absolute")
 	}
+	if err := validateReasoningPolicy(manifest.ReasoningPolicy); err != nil {
+		return err
+	}
 	if !oneOfString(manifest.Capture.State, "durable", "degraded", "disabled") {
 		return fmt.Errorf("invalid capture state %q", manifest.Capture.State)
 	}
@@ -125,6 +130,31 @@ func ValidateManifest(manifest Manifest) error {
 		if warning.EvidenceFile != nil && !safeRelativeFile(*warning.EvidenceFile) {
 			return fmt.Errorf("warning evidence path is unsafe: %q", *warning.EvidenceFile)
 		}
+	}
+	return nil
+}
+
+func validateReasoningPolicy(policy provider.ReasoningPolicy) error {
+	if policy == (provider.ReasoningPolicy{}) {
+		return nil // Additive field: older manifests have no policy.
+	}
+	if !oneOfString(policy.Source, "default", "explicit", "fixed", "unsupported") {
+		return fmt.Errorf("invalid reasoning policy source %q", policy.Source)
+	}
+	if !oneOfString(policy.Support, "native", "fixed", "unsupported", "unknown") {
+		return fmt.Errorf("invalid reasoning policy support %q", policy.Support)
+	}
+	if policy.Source == "unsupported" && (policy.Effort != "" || policy.Support != "unsupported") {
+		return fmt.Errorf("unsupported reasoning policy must not contain an effort")
+	}
+	if policy.Source == "fixed" && (policy.Effort == "" || policy.Support != "fixed") {
+		return fmt.Errorf("fixed reasoning policy must contain fixed support and an effort")
+	}
+	if (policy.Source == "default" || policy.Source == "explicit") && (policy.Effort == "" || (policy.Support != "native" && policy.Support != "unknown")) {
+		return fmt.Errorf("selected reasoning policy must contain a native or unknown effort")
+	}
+	if policy.Effort != "" && !provider.IsValidReasoningEffort(policy.Effort) {
+		return fmt.Errorf("invalid reasoning policy effort %q", policy.Effort)
 	}
 	return nil
 }

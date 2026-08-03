@@ -477,6 +477,98 @@ func TestOpenCodeDoesNotClaimInspectionWithoutToolVersion(t *testing.T) {
 	}
 }
 
+func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), "runs"))
+	openCode, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	openCode.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(t.TempDir(), "reviewed-opencode-config")
+	artifact, err := store.Prepare(PreparedRun{Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", Request: "prompt", ReasoningPolicy: openCode.ReasoningPolicy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanup, err := prepareProviderState(artifact, &openCode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	if openCode.SetEnv["XDG_DATA_HOME"] == "" || openCode.SetEnv["XDG_STATE_HOME"] == "" ||
+		openCode.SetEnv["XDG_CONFIG_HOME"] == "" || openCode.SetEnv["XDG_CACHE_HOME"] == "" ||
+		openCode.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] != "1" ||
+		!strings.HasPrefix(openCode.SetEnv["XDG_DATA_HOME"], artifact.Path) ||
+		!strings.HasPrefix(openCode.SetEnv["XDG_CONFIG_HOME"], artifact.Path) ||
+		!strings.HasPrefix(openCode.SetEnv["XDG_CACHE_HOME"], artifact.Path) {
+		t.Fatalf("OpenCode isolation = %#v", openCode.SetEnv)
+	}
+	if openCode.SetEnv["OPENCODE_CONFIG_DIR"] == "" || !strings.Contains(openCode.SetEnv["OPENCODE_CONFIG_DIR"], "reviewed-opencode-config") {
+		t.Fatalf("reviewed config was not preserved: %#v", openCode.SetEnv)
+	}
+
+	codex, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-5.6", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codexArtifact, err := store.Prepare(PreparedRun{Surface: "codex.raw", Backend: "codex", Provider: "openai", Model: "gpt-5.6", Request: "prompt", ReasoningPolicy: codex.ReasoningPolicy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	codexCleanup, err := prepareProviderState(codexArtifact, &codex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer codexCleanup()
+	if !strings.HasPrefix(codex.SetEnv["CODEX_HOME"], codexArtifact.Path) || codex.SetEnv["CODEX_HOME"] == openCode.SetEnv["XDG_DATA_HOME"] {
+		t.Fatalf("Codex isolation = %#v", codex.SetEnv)
+	}
+}
+
+func TestRawCodexRunRecordsEphemeralIsolation(t *testing.T) {
+	fake := buildTestProvider(t)
+	invocation, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-5.6", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	invocation.Argv[0] = fake
+	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_text"
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "codex.raw", Backend: "codex", Provider: "openai", Model: "gpt-5.6", Prompt: "prompt", Invocation: invocation,
+	})
+	if !result.OK || result.Run == nil || result.ArtifactPath == nil || result.Run.ProviderState.Capabilities["state_isolation"] != "hatch_per_run" ||
+		result.Run.ProviderState.Capabilities["session_persistence"] != "disabled_ephemeral" || result.Run.ProviderState.Capabilities["recovery"] != "unsupported_ephemeral" {
+		t.Fatalf("raw Codex result = %#v", result)
+	}
+	info, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider", "codex"))
+	if err != nil || info.Mode().Perm() != 0o700 {
+		t.Fatalf("Codex state directory mode=%v err=%v", info, err)
+	}
+}
+
+func TestOpenCodeRecoveryHintIncludesPolicyAndIsolation(t *testing.T) {
+	fake := buildTestProvider(t)
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	invocation.Argv[0] = fake
+	invocation.ProviderVersion = "opencode 1.2.3"
+	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "hang_opencode"
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", CWD: t.TempDir(), Prompt: "prompt",
+		Timeout: 2 * time.Second, Invocation: invocation,
+	})
+	if result.Run == nil || result.Run.ProviderState.RecoveryHint == nil {
+		t.Fatalf("missing recovery hint: %#v", result)
+	}
+	argv := result.Run.ProviderState.RecoveryHint.Argv
+	joined := strings.Join(argv, " ")
+	for _, fragment := range []string{"-u OPENCODE_CONFIG", "-u OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME=", "XDG_CACHE_HOME=", "OPENCODE_CONFIG_DIR=", "OPENCODE_DISABLE_PROJECT_CONFIG=1", "--variant medium"} {
+		if !strings.Contains(joined, fragment) {
+			t.Fatalf("recovery hint lacks %q: %v", fragment, argv)
+		}
+	}
+}
+
 func TestCoordinatorTimeoutKillsDescendants(t *testing.T) {
 	fake := buildTestProvider(t)
 	sentinel := filepath.Join(t.TempDir(), "child-survived")
