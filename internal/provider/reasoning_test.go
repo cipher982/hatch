@@ -1,6 +1,9 @@
 package provider
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestResolveReasoningPolicy(t *testing.T) {
 	tests := []struct {
@@ -18,8 +21,11 @@ func TestResolveReasoningPolicy(t *testing.T) {
 		{name: "unknown model explicit choice is visible", backend: "opencode", model: "openai/provider-model", requested: "high", want: ReasoningPolicy{Effort: "high", Source: "explicit", Support: "unknown"}},
 		{name: "openrouter unsupported", backend: "opencode", model: "openrouter/example", want: ReasoningPolicy{Source: "unsupported", Support: "unsupported"}},
 		{name: "openrouter rejects override", backend: "opencode", model: "openrouter/example", requested: "high", wantErr: true},
-		{name: "claude fixed", backend: "claude", model: "opus", want: ReasoningPolicy{Effort: "low", Source: "fixed", Support: "fixed"}},
-		{name: "claude rejects override", backend: "claude", model: "opus", requested: "high", wantErr: true},
+		{name: "claude default preserves low", backend: "claude", model: "opus", want: ReasoningPolicy{Effort: "low", Source: "default", Support: "native"}},
+		{name: "claude explicit effort", backend: "claude", model: "opus", requested: "high", want: ReasoningPolicy{Effort: "high", Source: "explicit", Support: "native"}},
+		{name: "claude rejects unsupported effort", backend: "claude", model: "opus", requested: "none", wantErr: true},
+		{name: "bedrock fixed", backend: "bedrock", model: "claude", want: ReasoningPolicy{Effort: "low", Source: "fixed", Support: "fixed"}},
+		{name: "bedrock rejects override", backend: "bedrock", model: "claude", requested: "high", wantErr: true},
 		{name: "raw codex default", backend: "codex", model: "gpt-5.6", want: ReasoningPolicy{Effort: "medium", Source: "default", Support: "native"}},
 		{name: "raw codex known model without max", backend: "codex", model: "gpt-5.5", requested: "max", wantErr: true},
 		{name: "raw codex unknown model requires explicit choice", backend: "codex", model: "gpt-test", wantErr: true},
@@ -48,5 +54,12 @@ func TestResolveReasoningPolicy(t *testing.T) {
 func TestResolveReasoningRejectsInvalidEffort(t *testing.T) {
 	if _, err := ResolveReasoning("codex", "gpt-5.6", "unexpected"); err == nil {
 		t.Fatal("invalid effort accepted")
+	}
+}
+
+func TestResolveClaudeReasoningRejectsUnsupportedEffortClearly(t *testing.T) {
+	_, err := ResolveReasoning("claude", "opus", "none")
+	if err == nil || !strings.Contains(err.Error(), "supported values: low, medium, high, xhigh, max") {
+		t.Fatalf("ResolveReasoning() error = %v", err)
 	}
 }

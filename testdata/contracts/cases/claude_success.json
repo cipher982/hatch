@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "claude_success",
   "provider_binaries": ["claude"],
-  "arguments": ["claude", "haiku", "--json", "-"],
+  "arguments": ["claude", "haiku", "--reasoning-effort", "high", "--json", "-"],
   "stdin": "oracle prompt",
   "scenario": "success_claude",
   "expected": {
@@ -17,12 +17,17 @@
       "stderr": "",
       "artifact_path": null,
       "session_id": null,
-      "resume_command": null
+      "resume_command": null,
+      "reasoning_policy": {
+        "effort": "high",
+        "source": "explicit",
+        "support": "native"
+      }
     },
     "provider_argv": [
       "claude", "--verbose", "--print", "-", "--output-format", "stream-json",
       "--model", "haiku", "--dangerously-skip-permissions", "--setting-sources",
-      "local", "--no-session-persistence", "--tools", "default", "--effort", "low",
+      "local", "--no-session-persistence", "--tools", "default", "--effort", "high",
       "--include-partial-messages"
     ],
     "provider_stdin_sha256": "e03beadc330bc52eedda0262f4b5af67fd46fd3a436db62a05fdb7ee46060990",

@@ -61,7 +61,23 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 			t.Fatal(err)
 		}
 		wantTail := []string{"--include-partial-messages", "--resume", "ses_1"}
-		if !reflect.DeepEqual(got.Argv[len(got.Argv)-len(wantTail):], wantTail) || got.Adapter != "claude" {
+		if !reflect.DeepEqual(got.Argv[len(got.Argv)-len(wantTail):], wantTail) || got.Adapter != "claude" ||
+			got.ReasoningPolicy != (ReasoningPolicy{Effort: "low", Source: "default", Support: "native"}) {
+			t.Fatalf("claude invocation = %#v", got)
+		}
+	})
+
+	t.Run("claude passes explicit effort", func(t *testing.T) {
+		got, err := Build(Request{Backend: "claude", Model: "opus", Prompt: "p", ReasoningEffort: "high"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []string{
+			"claude", "--verbose", "--print", "-", "--output-format", "stream-json",
+			"--model", "opus", "--dangerously-skip-permissions", "--setting-sources", "local",
+			"--no-session-persistence", "--tools", "default", "--effort", "high", "--include-partial-messages",
+		}
+		if !reflect.DeepEqual(got.Argv, want) || got.ReasoningPolicy != (ReasoningPolicy{Effort: "high", Source: "explicit", Support: "native"}) {
 			t.Fatalf("claude invocation = %#v", got)
 		}
 	})

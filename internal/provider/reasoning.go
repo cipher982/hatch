@@ -7,8 +7,20 @@ import (
 
 const DefaultReasoningEffort = "medium"
 
+// Keep existing Claude calls at their established cost profile unless callers
+// explicitly request a higher effort.
+const defaultClaudeReasoningEffort = "low"
+
 var reasoningEfforts = map[string]bool{
 	"none":   true,
+	"low":    true,
+	"medium": true,
+	"high":   true,
+	"xhigh":  true,
+	"max":    true,
+}
+
+var claudeReasoningEfforts = map[string]bool{
 	"low":    true,
 	"medium": true,
 	"high":   true,
@@ -40,9 +52,11 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 	}
 
 	switch backend {
-	case "claude", "bedrock":
+	case "claude":
+		return resolveClaudeReasoning(requested)
+	case "bedrock":
 		if requested != "" {
-			return ReasoningPolicy{}, fmt.Errorf("%s uses a fixed low reasoning policy; --reasoning-effort cannot override it", backend)
+			return ReasoningPolicy{}, fmt.Errorf("Bedrock reasoning-effort overrides are not supported")
 		}
 		return ReasoningPolicy{Effort: "low", Source: "fixed", Support: "fixed"}, nil
 	case "codex":
@@ -71,6 +85,17 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 		}
 		return ReasoningPolicy{Source: "unsupported", Support: "unsupported"}, nil
 	}
+}
+
+func resolveClaudeReasoning(requested string) (ReasoningPolicy, error) {
+	if requested != "" && !claudeReasoningEfforts[requested] {
+		return ReasoningPolicy{}, fmt.Errorf("reasoning effort %q is not supported by Claude Code; supported values: low, medium, high, xhigh, max", requested)
+	}
+	effort, source := requested, "explicit"
+	if effort == "" {
+		effort, source = defaultClaudeReasoningEffort, "default"
+	}
+	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
 }
 
 func resolveNativeReasoning(providerName, requested, model string) (ReasoningPolicy, error) {

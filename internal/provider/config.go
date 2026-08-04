@@ -68,7 +68,7 @@ func Build(req Request) (Invocation, error) {
 		argv = append(argv,
 			"--print", "-", "--output-format", outputFormat,
 			"--model", model, "--dangerously-skip-permissions", "--setting-sources", "local",
-			"--no-session-persistence", "--tools", "default", "--effort", "low",
+			"--no-session-persistence", "--tools", "default", "--effort", policy.Effort,
 		)
 		if req.IncludePartialMessages || req.OutputFormat == "" || req.OutputFormat == "text" {
 			argv = append(argv, "--include-partial-messages")

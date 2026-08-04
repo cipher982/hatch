@@ -174,3 +174,4 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
   surface uses the same durable coordinator. Python production source is
   retired; the frozen ledger, fixtures, and tagged release preserve history.
 - (2026-07-24) [models] Opus 5 shipped and is now the default `hatch claude opus` target via the local Claude Code CLI's own `--model opus` alias resolution (no hatch code change needed). It supersedes `sonnet`/`fable` as the default Claude choice for most work; keep `sonnet` for cheap/fast calls and `fable` only for Fable-specific traits.
+- (2026-08-04) [claude] Resolve Claude effort from the installed CLI's supported `--effort` values; keep its unspecified default at `low` so enabling an explicit override does not silently raise the cost of existing runs.
