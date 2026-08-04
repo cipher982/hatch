@@ -11,7 +11,11 @@ var CodexSurfaceModels = map[string]string{
 	"max":   "openai/gpt-5.5",
 }
 
+var CursorSurfaceModels = map[string]string{
+	"grok":    "cursor-grok-4.5-high",
+	"kimi-k3": "kimi-k3",
+}
+
 var OpenRouterSurfaceModels = map[string]string{
 	"deepseek-v4-flash": "openrouter/deepseek/deepseek-v4-flash-0731",
-	"kimi-k3":         "openrouter/~moonshotai/kimi-latest",
 }

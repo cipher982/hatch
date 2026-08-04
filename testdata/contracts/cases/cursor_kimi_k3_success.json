@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "name": "cursor_kimi_k3_success",
+  "provider_binaries": ["cursor-agent"],
+  "arguments": ["cursor", "kimi-k3", "--json", "-"],
+  "stdin": "oracle prompt",
+  "scenario": "success_cursor_kimi",
+  "expected": {
+    "exit_code": 0,
+    "stderr_contains": ["[hatch] Cursor started", "[hatch] Cursor completed"],
+    "result": {
+      "ok": true,
+      "status": "ok",
+      "output": "fake cursor kimi output",
+      "exit_code": 0,
+      "error": null,
+      "stderr": "",
+      "artifact_path": null,
+      "session_id": null,
+      "resume_command": null
+    },
+    "provider_argv": [
+      "cursor-agent", "--print", "--trust", "--model", "kimi-k3",
+      "--output-format", "stream-json", "--force", "$PREPARED_PROMPT"
+    ],
+    "provider_stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "provider_stdin_bytes": 0
+  }
+}

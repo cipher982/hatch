@@ -33,7 +33,7 @@ var surfaces = map[string]struct {
 	models  map[string]string
 }{
 	"claude":     {"claude", map[string]string{"haiku": "haiku", "sonnet": "sonnet", "opus": "opus", "fable": "fable"}},
-	"cursor":     {"cursor", map[string]string{"grok": "cursor-grok-4.5-high"}},
+	"cursor":     {"cursor", provider.CursorSurfaceModels},
 	"codex":      {"opencode", provider.CodexSurfaceModels},
 	"openrouter": {"opencode", provider.OpenRouterSurfaceModels},
 }
@@ -139,8 +139,8 @@ func normalizeSurface(args []string) ([]string, error) {
 		}
 		return append([]string(nil), args...), nil
 	}
-	provider := args[index]
-	surface, ok := surfaces[provider]
+	surfaceName := args[index]
+	surface, ok := surfaces[surfaceName]
 	if !ok {
 		if hasExplicitModel {
 			return append([]string{"--backend", "opencode"}, args...), nil
@@ -149,7 +149,12 @@ func normalizeSurface(args []string) ([]string, error) {
 	}
 	before, after := args[:index], args[index+1:]
 	if len(after) == 0 {
-		return nil, fmt.Errorf("%s requires an explicit model: %s", provider, modelChoices(surface.models))
+		return nil, fmt.Errorf("%s requires an explicit model: %s", surfaceName, modelChoices(surface.models))
+	}
+	if surfaceName == "openrouter" && !hasExplicitModel && after[0] == "kimi-k3" {
+		result := append([]string(nil), before...)
+		result = append(result, "--backend", "cursor", "--model", surfaces["cursor"].models["kimi-k3"])
+		return append(result, after[1:]...), nil
 	}
 	if strings.HasPrefix(after[0], "-") {
 		if after[0] == "-h" || after[0] == "--help" || after[0] == "--advanced-help" {
@@ -160,13 +165,13 @@ func normalizeSurface(args []string) ([]string, error) {
 			result = append(result, "--backend", surface.backend)
 			return append(result, after...), nil
 		}
-		return nil, fmt.Errorf("%s requires an explicit model: %s", provider, modelChoices(surface.models))
+		return nil, fmt.Errorf("%s requires an explicit model: %s", surfaceName, modelChoices(surface.models))
 	}
 	alias := after[0]
 	model, ok := surface.models[alias]
 	if !ok {
-		message := fmt.Sprintf("invalid %s model %q. Choose one of: %s", provider, alias, modelChoices(surface.models))
-		if provider == "cursor" {
+		message := fmt.Sprintf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
+		if surfaceName == "cursor" {
 			message += `. For a raw Cursor model ID, use: hatch cursor grok --model <cursor-model-id> "prompt"`
 		}
 		return nil, fmt.Errorf("%s", message)

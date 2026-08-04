@@ -272,7 +272,8 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 	}{
 		{"claude", "claude", "haiku", "success_claude", "fake claude output", "claude-session-oracle"},
 		{"cursor", "cursor", "cursor-grok-4.5-high", "success_cursor", "fake cursor output", "cursor-session-oracle"},
-		{"opencode", "opencode", "openrouter/~moonshotai/kimi-latest", "success_opencode", "fake opencode output", "ses_oracle1234"},
+		{"opencode", "opencode", "openai/gpt-5.6-sol", "success_opencode", "fake opencode output", "ses_oracle1234"},
+		{"cursor-kimi", "cursor", "kimi-k3", "success_cursor_kimi", "fake cursor kimi output", "cursor-kimi-session-oracle"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -327,9 +328,9 @@ func TestCoordinatorStructuredFailureAndRecovery(t *testing.T) {
 		warnings                                          int
 	}{
 		{"cursor error", "cursor", "cursor-grok-4.5-high", "cursor_error", "", "request rejected", false, OutcomeFailed, 0},
-		{"opencode error", "opencode", "openrouter/~moonshotai/kimi-latest", "opencode_error", "", "provider unavailable", false, OutcomeFailed, 0},
-		{"opencode recovered", "opencode", "openrouter/~moonshotai/kimi-latest", "opencode_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
-		{"opencode missing terminal", "opencode", "openrouter/~moonshotai/kimi-latest", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 1},
+		{"opencode error", "opencode", "openai/gpt-5.6-sol", "opencode_error", "", "provider unavailable", false, OutcomeFailed, 0},
+		{"opencode recovered", "opencode", "openai/gpt-5.6-sol", "opencode_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
+		{"opencode missing terminal", "opencode", "openai/gpt-5.6-sol", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 1},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -432,7 +433,7 @@ func TestCoordinatorCancelledBeforeProviderLaunch(t *testing.T) {
 
 func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/~moonshotai/kimi-latest", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,7 +441,7 @@ func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 	invocation.ProviderVersion = "opencode 1.2.3"
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "hang_opencode"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "openrouter.kimi-k3", Provider: "openrouter", Model: "openrouter/~moonshotai/kimi-latest", CWD: t.TempDir(), Prompt: "prompt",
+		Surface: "codex.sol", Provider: "openai", Model: "openai/gpt-5.6-sol", CWD: t.TempDir(), Prompt: "prompt",
 		Timeout: 2 * time.Second, Invocation: invocation,
 	})
 	if result.Status != "timeout" || result.Run == nil || result.Run.ProviderState.RecoveryHint == nil ||
@@ -460,14 +461,14 @@ func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 
 func TestOpenCodeDoesNotClaimInspectionWithoutToolVersion(t *testing.T) {
 	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/~moonshotai/kimi-latest", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	invocation.Argv[0] = fake
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_opencode"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "openrouter.kimi-k3", Backend: "opencode", Provider: "openrouter", Model: "openrouter/~moonshotai/kimi-latest", Prompt: "prompt",
+		Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", Prompt: "prompt",
 		Timeout: time.Second, Invocation: invocation,
 	})
 	if !result.OK || result.Run == nil || result.Run.ProviderState.SnapshotPath == nil ||
@@ -640,14 +641,14 @@ func TestCoordinatorRedactsPromptAndCredentialValues(t *testing.T) {
 	fake := buildTestProvider(t)
 	secret := "sk-secret-never-persist"
 	prompt := "prompt with $(shell) and 'quotes'"
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/~moonshotai/kimi-latest", Prompt: prompt, APIKey: secret})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: prompt, APIKey: secret})
 	if err != nil {
 		t.Fatal(err)
 	}
 	invocation.Argv[0] = fake
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_opencode"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "openrouter.kimi-k3", Provider: "openrouter", Model: "openrouter/~moonshotai/kimi-latest", Prompt: prompt,
+		Surface: "openrouter.deepseek-v4-flash", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: prompt,
 		Timeout: 5 * time.Second, Invocation: invocation, CredentialNames: []string{"OPENROUTER_API_KEY"},
 	})
 	if !result.OK || result.ArtifactPath == nil {
@@ -666,7 +667,7 @@ func TestCoordinatorFailsClosedOnRedactionMetadataDrift(t *testing.T) {
 	fake := buildTestProvider(t)
 	record := filepath.Join(t.TempDir(), "provider-ran")
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "openrouter.kimi-k3", Provider: "openrouter", Prompt: "sensitive prompt", Timeout: time.Second,
+		Surface: "openrouter.deepseek-v4-flash", Provider: "openrouter", Prompt: "sensitive prompt", Timeout: time.Second,
 		Invocation: provider.Invocation{
 			Argv: []string{fake, "sensitive prompt"}, RedactedArgv: []string{fake},
 			SetEnv: map[string]string{"HATCH_TEST_RECORD": record},

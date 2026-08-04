@@ -26,7 +26,7 @@ func TestParseOpenCodeModelIDs(t *testing.T) {
 func TestCheckOpenCodeModels(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash-0731' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash-0731'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
@@ -39,12 +39,12 @@ func TestCheckOpenCodeModels(t *testing.T) {
 func TestCheckOpenCodeModelsDetectsDrift(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash-0731'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'openrouter/other'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
 	check := checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", Credential{Value: "expected-secret"}, modelValues(provider.OpenRouterSurfaceModels))
-	if check.OK || !strings.Contains(check.Detail, "~moonshotai/kimi-latest") || !strings.Contains(check.Detail, "--refresh") {
+	if check.OK || !strings.Contains(check.Detail, "deepseek-v4-flash-0731") || !strings.Contains(check.Detail, "--refresh") {
 		t.Fatalf("check = %#v", check)
 	}
 }
@@ -73,19 +73,19 @@ func TestCodexDoctorCoversEverySurfaceAlias(t *testing.T) {
 func TestCheckCursorModel(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok' 'kimi-k3 - Kimi K3'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	check := checkCursorModel()
-	if !check.OK || check.Name != "cursor.grok" {
+	check := checkCursorModel(Credential{})
+	if !check.OK || check.Name != "cursor.catalog" {
 		t.Fatalf("check = %#v", check)
 	}
 }
 
 func TestCheckCursorModelMissing(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	check := checkCursorModel()
+	check := checkCursorModel(Credential{})
 	if check.OK || !strings.Contains(check.Detail, "not installed") {
 		t.Fatalf("check = %#v", check)
 	}

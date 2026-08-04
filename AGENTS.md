@@ -22,8 +22,8 @@ explicit emergency rollback.
 Public surface:
 - `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`opus` = Opus 5, current default-strength Claude; `fable` = Fable-class, higher capability)
 - `hatch codex <sol|terra|luna>` → GPT-5.6 on OpenAI (`nano|mini|max` remain compatibility aliases)
-- `hatch cursor grok` → Grok 4.5 High via local Cursor Agent CLI
-- `hatch openrouter <deepseek-v4-flash|kimi-k3>` → OpenRouter models via OpenCode
+- `hatch cursor <grok|kimi-k3>` → Grok 4.5 High and Kimi K3 via local Cursor Agent CLI
+- `hatch openrouter deepseek-v4-flash` → DeepSeek via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
@@ -34,7 +34,8 @@ Default tiers:
 - GPT-5.6 reasoning accepts `none`, `low`, `medium`, `high`, `xhigh`, and `max`
 - Use `fable` only when Fable-class traits (always-on adaptive thinking) are specifically wanted over Opus 5
 - Use `cursor grok` for Grok 4.5 High via Cursor
-- Use `openrouter deepseek-v4-flash` as the default non-OpenAI/non-Anthropic option; `kimi-k3` remains an explicit opt-in for complex coding and long-horizon agentic workflows
+- Use `openrouter deepseek-v4-flash` as the default non-OpenAI/non-Anthropic option
+- Use `cursor kimi-k3` for complex coding and long-horizon agentic workflows; `openrouter kimi-k3` remains a compatibility spelling
 
 Agent runs target a concise result within about 15 minutes and have a 30 minute
 hard timeout by default. `hatch expert` remains at 15 minutes because its
@@ -48,7 +49,7 @@ hatch cursor grok "Review this branch"
 hatch cursor grok --model cursor-grok-4.5-high "Review with a raw Cursor model ID"
 hatch doctor
 hatch openrouter deepseek-v4-flash "Review this branch"
-hatch openrouter kimi-k3 "Review this branch"
+hatch cursor kimi-k3 "Review this branch"
 hatch codex sol --reasoning-effort high "Write unit tests"
 hatch claude opus "Review this diff"
 hatch codex luna "What is 2+2?"
@@ -139,10 +140,8 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
    manifest argv
 5. **Surfaced `claude` must not use OpenRouter implicitly** - `hatch claude` uses local Claude Code OAuth/subscription and strips `OPENROUTER_API_KEY`; OpenRouter Claude models require an explicit OpenRouter surface if ever re-added
 6. **Provider aliases drift** - run `hatch doctor` after Cursor or OpenCode
-   upgrades. It verifies Cursor `grok`, Codex tiers, and OpenRouter aliases.
-   Stable `kimi-k3` intentionally routes through OpenRouter's
-   `~moonshotai/kimi-latest` alias because OpenCode 1.17.20 lists the direct K3
-   slug but rejects it at execution time.
+   upgrades. It verifies Cursor aliases, Codex tiers, and OpenRouter aliases.
+   Kimi K3 routes through Cursor's native `kimi-k3` model ID.
 7. **Artifact publication is ordered** - `result.json` precedes the terminal
    manifest. A terminal manifest is the commit point; never rewrite an existing
    run artifact or infer loss from a collapsed caller transcript.

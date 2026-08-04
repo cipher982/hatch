@@ -282,10 +282,10 @@ Illustrative V1 shape:
   "updated_at": "2026-07-22T15:06:25.000Z",
   "lifecycle": "terminal",
   "outcome": "succeeded_with_warnings",
-  "surface": "openrouter.kimi-k3",
-  "backend": "opencode",
-  "provider": "openrouter",
-  "model": "openrouter/~moonshotai/kimi-latest",
+  "surface": "cursor.kimi-k3",
+  "backend": "cursor",
+  "provider": "cursor",
+  "model": "kimi-k3",
   "reasoning_policy": {
     "effort": "",
     "source": "unsupported",
@@ -296,8 +296,8 @@ Illustrative V1 shape:
   "invocation": {
     "request_file": "request.txt",
     "request_sha256": "...",
-    "redacted_argv": ["opencode", "run", "...", "<prompt>"],
-    "credential_env_names": ["OPENROUTER_API_KEY"]
+    "redacted_argv": ["cursor-agent", "--print", "...", "<prompt>"],
+    "credential_env_names": ["CURSOR_API_KEY"]
   },
   "process": {
     "pid": 1234,
@@ -507,7 +507,7 @@ session manager. Four small adapters plus a raw-text adapter are enough.
 | Surface/runtime | Native identity | Native state retention | Proven operations | Adapter behavior |
 |---|---|---|---|---|
 | `hatch claude` and raw Claude/Bedrock | `session_id` from Claude init event | `provider_owned` in Claude's native history | identify; recovery hint only when configured/proven | Preserve full stream; capture ID; use terminal result or last assistant text; never copy all of `~/.claude` |
-| `hatch cursor grok` | `session_id` from Cursor init event | `unknown` until Cursor's durable store contract is proven | identify only | Preserve stream; require successful terminal result; record no resume/export claim |
+| `hatch cursor grok` and `hatch cursor kimi-k3` | `session_id` from Cursor init event | `unknown` until Cursor's durable store contract is proven | identify only | Preserve stream; require successful terminal result; record no resume/export claim |
 | surfaced Codex/OpenRouter through OpenCode | `sessionID` from step event | `hatch_preserved` isolated XDG database | identify, inspect snapshot; same-version timeout recovery hint | Copy a hash-stable allowlisted data/state snapshot into `provider/opencode-snapshot`, retire the live XDG tree, and preserve exact OpenCode version/model/env names |
 | `hatch expert` | OpenAI `response_id` | `remote_provider` plus local raw-response snapshots | identify, poll while active, inspect | Create Hatch run before POST; store every response snapshot and terminal projection; unify old Expert cache artifact into the run directory |
 | raw `codex exec` | unavailable unless a stable structured event is added | `provider_owned` or `unknown`; do not guess | none initially | Use raw-text adapter; durable request/stdout/stderr/result still guaranteed |

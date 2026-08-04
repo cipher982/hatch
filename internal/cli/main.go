@@ -90,6 +90,8 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 		credentialEnvironment = "OPENROUTER_API_KEY"
 	} else if strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex" {
 		credentialEnvironment = "OPENAI_API_KEY"
+	} else if request.Backend == "cursor" {
+		credentialEnvironment = "CURSOR_API_KEY"
 	}
 	if credentialEnvironment != "" {
 		apiKey, err = resolveCredential(apiKey, credentialEnvironment)
@@ -183,9 +185,11 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		}
 		return renderConfigError(jsonOutput, stdout, stderr, fmt.Errorf("unrecognized argument: %s", arg))
 	}
+	cursor, cursorErr := resolveCredential("", "CURSOR_API_KEY")
 	openAI, openAIErr := resolveCredential("", "OPENAI_API_KEY")
 	openRouter, openRouterErr := resolveCredential("", "OPENROUTER_API_KEY")
 	checks := doctor.Run(doctor.Options{
+		Cursor:     doctor.Credential{Value: cursor, ResolutionError: cursorErr},
 		OpenAI:     doctor.Credential{Value: openAI, ResolutionError: openAIErr},
 		OpenRouter: doctor.Credential{Value: openRouter, ResolutionError: openRouterErr},
 	})
@@ -241,7 +245,12 @@ func identity(backend, model string) (string, string) {
 	case "claude":
 		return "claude." + model, "anthropic"
 	case "cursor":
-		return "cursor.grok", "cursor"
+		for alias, configured := range surfaces["cursor"].models {
+			if configured == model {
+				return "cursor." + alias, "cursor"
+			}
+		}
+		return "cursor.raw", "cursor"
 	case "gemini":
 		return "gemini.raw", "google"
 	case "opencode":
@@ -267,8 +276,8 @@ func identity(backend, model string) (string, string) {
 
 const Help = `usage: hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
-       hatch cursor grok [OPTIONS] "prompt"
-       hatch openrouter <deepseek-v4-flash|kimi-k3> [OPTIONS] "prompt"
+       hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
+       hatch openrouter deepseek-v4-flash [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
 	   hatch runs <list|inspect> [OPTIONS]
 
@@ -278,8 +287,11 @@ Start here:
   hatch codex sol "Review this branch"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
-  hatch openrouter kimi-k3 "Review this branch"
+  hatch cursor kimi-k3 "Review this branch"
   hatch expert "Is this refactor direction sound?"
+
+Compatibility:
+  hatch openrouter kimi-k3 routes to the Cursor Kimi K3 model.
 
 Common options:
   -C, --cwd DIR        Working directory for the agent

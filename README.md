@@ -50,8 +50,8 @@ private; Hatch does not run a daemon or upload them anywhere.
 | --- | --- |
 | `hatch claude <haiku\|sonnet\|opus\|fable>` | Local Claude Code CLI login |
 | `hatch codex <sol\|terra\|luna>` | OpenCode with an OpenAI model alias |
-| `hatch cursor grok` | Local Cursor Agent CLI login |
-| `hatch openrouter <deepseek-v4-flash\|kimi-k3>` | OpenCode with an OpenRouter model alias |
+| `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
+| `hatch openrouter deepseek-v4-flash` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 
 The model aliases are intentionally small and opinionated. For raw or
@@ -94,7 +94,10 @@ Install and authenticate the relevant native CLI first:
 - `cursor-agent` for Cursor
 - `opencode` for Codex and OpenRouter surfaces
 - an `OPENAI_API_KEY` for Codex and Expert, or an `OPENROUTER_API_KEY` for
-  OpenRouter
+  OpenRouter; Cursor login or `CURSOR_API_KEY` for Cursor
+
+`hatch openrouter kimi-k3` remains accepted as a compatibility alias and routes
+through Cursor's native Kimi K3 model.
 
 Then make a call. When stdout is not a terminal, Hatch automatically emits one
 JSON result, making it convenient for scripts and agent callers:

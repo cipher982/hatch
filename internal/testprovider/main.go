@@ -57,6 +57,15 @@ func main() {
 			"type": "result", "subtype": "success", "is_error": false,
 			"duration_ms": 1250, "result": "fake cursor output",
 		})
+	case "success_cursor_kimi":
+		emitJSON(map[string]any{
+			"type": "system", "subtype": "init", "model": "kimi-k3",
+			"session_id": "cursor-kimi-session-oracle",
+		})
+		emitJSON(map[string]any{
+			"type": "result", "subtype": "success", "is_error": false,
+			"duration_ms": 1250, "result": "fake cursor kimi output",
+		})
 	case "success_opencode":
 		writeOpenCodeState()
 		emitJSON(map[string]any{

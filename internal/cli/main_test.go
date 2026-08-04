@@ -67,11 +67,15 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 
 func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 	for model, want := range map[string]string{
-		"openai/gpt-5.6-sol":                 "codex.sol",
-		"openai/gpt-5.4-nano":                "codex.nano",
-		"openrouter/~moonshotai/kimi-latest": "openrouter.kimi-k3",
+		"openai/gpt-5.6-sol":  "codex.sol",
+		"openai/gpt-5.4-nano": "codex.nano",
+		"kimi-k3":             "cursor.kimi-k3",
 	} {
-		if got, _ := identity("opencode", model); got != want {
+		backend := "opencode"
+		if model == "kimi-k3" {
+			backend = "cursor"
+		}
+		if got, _ := identity(backend, model); got != want {
 			t.Fatalf("identity(%q)=%q want=%q", model, got, want)
 		}
 	}
@@ -132,11 +136,11 @@ func TestMainFailsClosedBeforeProviderWhenArtifactRootUnavailable(t *testing.T) 
 func TestMainDoctorJSON(t *testing.T) {
 	directory := t.TempDir()
 	cursorBinary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok'\n"), 0o700); err != nil {
+	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok' 'kimi-k3 - Kimi K3'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4-flash-0731' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
+	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4-flash-0731'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	helper := filepath.Join(directory, "credential-helper")

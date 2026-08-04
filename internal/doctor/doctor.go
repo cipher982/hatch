@@ -12,14 +12,13 @@ import (
 	"github.com/cipher982/hatch/internal/provider"
 )
 
-const CursorGrok = "cursor-grok-4.5-high"
-
 type Credential struct {
 	Value           string
 	ResolutionError error
 }
 
 type Options struct {
+	Cursor     Credential
 	OpenAI     Credential
 	OpenRouter Credential
 }
@@ -44,7 +43,7 @@ func ParseCursorModelIDs(output string) map[string]struct{} {
 
 func Run(options Options) []Check {
 	return []Check{
-		checkCursorModel(),
+		checkCursorModel(options.Cursor),
 		checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", options.OpenAI, modelValues(provider.CodexSurfaceModels)),
 		checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", options.OpenRouter, modelValues(provider.OpenRouterSurfaceModels)),
 	}
@@ -118,17 +117,23 @@ func replaceEnvironment(environment []string, name, value string) []string {
 	return append(result, prefix+value)
 }
 
-func checkCursorModel() Check {
+func checkCursorModel(credential Credential) Check {
+	if credential.ResolutionError != nil {
+		return Check{Name: "cursor.catalog", Detail: "credential resolver failed for catalog probe: " + credential.ResolutionError.Error()}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "cursor-agent", "models")
+	if strings.TrimSpace(credential.Value) != "" {
+		cmd.Env = replaceEnvironment(os.Environ(), "CURSOR_API_KEY", credential.Value)
+	}
 	stdout, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
-		return Check{Name: "cursor.grok", Detail: "cursor-agent models timed out after 30s"}
+		return Check{Name: "cursor.catalog", Detail: "cursor-agent models timed out after 30s"}
 	}
 	if err != nil {
 		if _, ok := err.(*exec.Error); ok {
-			return Check{Name: "cursor.grok", Detail: "cursor-agent is not installed"}
+			return Check{Name: "cursor.catalog", Detail: "cursor-agent is not installed"}
 		}
 		detail := ""
 		if exit, ok := err.(*exec.ExitError); ok {
@@ -140,11 +145,17 @@ func checkCursorModel() Check {
 		if detail == "" {
 			detail = err.Error()
 		}
-		return Check{Name: "cursor.grok", Detail: "could not list Cursor models: " + detail}
+		return Check{Name: "cursor.catalog", Detail: "could not list Cursor models: " + detail}
 	}
 	available := ParseCursorModelIDs(string(stdout))
-	if _, ok := available[CursorGrok]; !ok {
-		return Check{Name: "cursor.grok", Detail: fmt.Sprintf("configured model %q is unavailable; run `cursor-agent models` and update CURSOR_GROK", CursorGrok)}
+	missing := []string{}
+	for _, model := range modelValues(provider.CursorSurfaceModels) {
+		if _, ok := available[model]; !ok {
+			missing = append(missing, model)
+		}
 	}
-	return Check{Name: "cursor.grok", OK: true, Detail: CursorGrok + " is available"}
+	if len(missing) > 0 {
+		return Check{Name: "cursor.catalog", Detail: fmt.Sprintf("configured models unavailable: %s; run `cursor-agent models` and update Hatch aliases", strings.Join(missing, ", "))}
+	}
+	return Check{Name: "cursor.catalog", OK: true, Detail: fmt.Sprintf("%d configured models are available", len(provider.CursorSurfaceModels))}
 }

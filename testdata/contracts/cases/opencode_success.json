@@ -2,13 +2,13 @@
   "schema_version": 1,
   "name": "opencode_success",
   "provider_binaries": ["opencode"],
-  "arguments": ["openrouter", "kimi-k3", "--json", "-"],
+  "arguments": ["codex", "sol", "--json", "-"],
   "stdin": "oracle prompt",
   "scenario": "success_opencode",
-  "environment": {"OPENROUTER_API_KEY": "fake-test-key"},
+  "environment": {"OPENAI_API_KEY": "fake-test-key"},
   "expected": {
     "exit_code": 0,
-    "stderr_contains": ["[hatch] OpenRouter started", "[hatch] OpenRouter completed"],
+    "stderr_contains": ["[hatch] Codex started", "[hatch] Codex completed"],
     "result": {
       "ok": true,
       "status": "ok",
@@ -23,7 +23,7 @@
     "provider_argv": [
       "opencode", "run", "--dangerously-skip-permissions", "--pure", "--print-logs",
       "--log-level", "ERROR", "--format", "json", "-m",
-      "openrouter/~moonshotai/kimi-latest", "$PREPARED_PROMPT"
+      "openai/gpt-5.6-sol", "--variant", "medium", "$PREPARED_PROMPT"
     ],
     "provider_stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "provider_stdin_bytes": 0
