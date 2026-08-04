@@ -6,7 +6,11 @@ import (
 )
 
 const boundedRunContract = `Hatch execution contract:
-This is a single bounded, non-interactive run with a time budget of about 15 minutes. Complete the requested scope and nothing more. Investigate proportionally to the question; once you have sufficient evidence, stop using tools and write your answer. Return a concise, decision-ready result. If you are blocked or running low on budget, return your best current findings and state what is uncertain rather than continuing to investigate. If the request explicitly asks for exhaustive or deep work, honor that instead.`
+This is a single bounded, non-interactive run. A human is waiting for a useful answer by the behavioral deadline; do not treat the run as an open-ended session. Complete the requested scope and nothing more, using the available context and tool signals to manage the budget. Do not promise or assume an exact wall-clock duration.
+
+Use focused checks by default. Time-box expensive tests, scratch clones or worktrees, broad repository scans, and network or fetch work; run a broad suite or exhaustive investigation only when explicitly requested or clearly required. Check the budget mid-run. Once evidence is sufficient, stop using tools and synthesize; never continue merely to eliminate every uncertainty. At the late budget threshold, stop launching tools and report incomplete evidence instead of racing the hard timeout. Preserve useful partial findings and do not redo completed work.
+
+Return a concise status with findings, confidence, unresolved questions, and the exact next action. An incomplete or timed-out run must never be presented as approved or complete. If blocked or running low on budget, return the best current findings and state what is uncertain. If the request explicitly asks for exhaustive or deep work, honor that within the deadline.`
 
 type Request struct {
 	Backend                string

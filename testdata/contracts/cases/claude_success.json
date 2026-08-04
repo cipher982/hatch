@@ -25,7 +25,7 @@
       "local", "--no-session-persistence", "--tools", "default", "--effort", "low",
       "--include-partial-messages"
     ],
-    "provider_stdin_sha256": "0eb7749ad17c17ce3323e0628fc9a6fc040d640d95edb7d6839f983ac354ee54",
-    "provider_stdin_bytes": 570
+    "provider_stdin_sha256": "e03beadc330bc52eedda0262f4b5af67fd46fd3a436db62a05fdb7ee46060990",
+    "provider_stdin_bytes": 1314
   }
 }

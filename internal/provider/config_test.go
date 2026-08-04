@@ -1,17 +1,31 @@
 package provider
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"reflect"
+	"strings"
 	"testing"
 )
 
 func TestPreparePromptOracle(t *testing.T) {
-	got := []byte(PreparePrompt("oracle prompt"))
-	digest := sha256.Sum256(got)
-	if len(got) != 570 || hex.EncodeToString(digest[:]) != "0eb7749ad17c17ce3323e0628fc9a6fc040d640d95edb7d6839f983ac354ee54" {
-		t.Fatalf("prepared prompt len=%d sha256=%s", len(got), hex.EncodeToString(digest[:]))
+	got := PreparePrompt("oracle prompt")
+	for _, want := range []string{
+		"A human is waiting for a useful answer by the behavioral deadline",
+		"Do not promise or assume an exact wall-clock duration",
+		"Use focused checks by default",
+		"Time-box expensive tests, scratch clones or worktrees, broad repository scans, and network or fetch work",
+		"Check the budget mid-run",
+		"Once evidence is sufficient, stop using tools and synthesize",
+		"At the late budget threshold, stop launching tools",
+		"Preserve useful partial findings and do not redo completed work",
+		"findings, confidence, unresolved questions, and the exact next action",
+		"must never be presented as approved or complete",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("prepared prompt missing guardrail %q", want)
+		}
+	}
+	if !strings.HasSuffix(got, "User task:\noracle prompt") {
+		t.Fatalf("prepared prompt does not preserve user task: %q", got)
 	}
 }
 
