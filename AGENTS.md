@@ -35,7 +35,7 @@ Default tiers:
 - Use `fable` only when Fable-class traits (always-on adaptive thinking) are specifically wanted over Opus 5
 - Use `cursor grok` for Grok 4.5 High via Cursor
 - Use `openrouter deepseek-v4-flash` as the default non-OpenAI/non-Anthropic option
-- Use `cursor kimi-k3` for complex coding and long-horizon agentic workflows; `openrouter kimi-k3` remains a compatibility spelling
+- Use `cursor kimi-k3` for complex coding and long-horizon agentic workflows
 
 Agent runs target a concise result within about 15 minutes and have a 30 minute
 hard timeout by default. `hatch expert` remains at 15 minutes because its

@@ -290,9 +290,6 @@ Start here:
   hatch cursor kimi-k3 "Review this branch"
   hatch expert "Is this refactor direction sound?"
 
-Compatibility:
-  hatch openrouter kimi-k3 routes to the Cursor Kimi K3 model.
-
 Common options:
   -C, --cwd DIR        Working directory for the agent
   -t, --timeout SEC    Hard timeout (default: 1800)

@@ -10,7 +10,6 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"claude", "haiku", "--json", "-"}, "claude", "haiku"},
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "cursor-grok-4.5-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
-		{[]string{"openrouter", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-5.6-sol"},
 	}
 	for _, test := range tests {
@@ -45,7 +44,6 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"explicit model wins", []string{"codex", "--model", "openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-5.4", "review"}},
 		{"explicit model equals routes", []string{"--model=openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model=openai/gpt-5.4", "review"}},
 		{"cursor raw override", []string{"cursor", "grok", "--model", "cursor-grok-4.5-low", "review"}, []string{"--backend", "cursor", "--model", "cursor-grok-4.5-low", "review"}},
-		{"legacy kimi spelling routes to cursor", []string{"openrouter", "kimi-k3", "review"}, []string{"--backend", "cursor", "--model", "kimi-k3", "review"}},
 		{"option value provider", []string{"--cwd", "claude", "review"}, []string{"--cwd", "claude", "review"}},
 		{"option equals provider", []string{"--cwd=claude", "review"}, []string{"--cwd=claude", "review"}},
 		{"model value provider", []string{"--model", "claude", "review"}, []string{"--backend", "opencode", "--model", "claude", "review"}},
@@ -68,6 +66,12 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestOpenRouterKimiK3IsRejected(t *testing.T) {
+	if _, err := Parse([]string{"openrouter", "kimi-k3", "review"}, true); err == nil {
+		t.Fatal("expected openrouter kimi-k3 to be rejected")
 	}
 }
 

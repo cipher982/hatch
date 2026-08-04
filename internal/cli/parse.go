@@ -151,11 +151,6 @@ func normalizeSurface(args []string) ([]string, error) {
 	if len(after) == 0 {
 		return nil, fmt.Errorf("%s requires an explicit model: %s", surfaceName, modelChoices(surface.models))
 	}
-	if surfaceName == "openrouter" && !hasExplicitModel && after[0] == "kimi-k3" {
-		result := append([]string(nil), before...)
-		result = append(result, "--backend", "cursor", "--model", surfaces["cursor"].models["kimi-k3"])
-		return append(result, after[1:]...), nil
-	}
 	if strings.HasPrefix(after[0], "-") {
 		if after[0] == "-h" || after[0] == "--help" || after[0] == "--advanced-help" {
 			return append([]string(nil), args...), nil

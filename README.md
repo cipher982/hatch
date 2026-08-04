@@ -96,9 +96,6 @@ Install and authenticate the relevant native CLI first:
 - an `OPENAI_API_KEY` for Codex and Expert, or an `OPENROUTER_API_KEY` for
   OpenRouter; Cursor login or `CURSOR_API_KEY` for Cursor
 
-`hatch openrouter kimi-k3` remains accepted as a compatibility alias and routes
-through Cursor's native Kimi K3 model.
-
 Then make a call. When stdout is not a terminal, Hatch automatically emits one
 JSON result, making it convenient for scripts and agent callers:
 
