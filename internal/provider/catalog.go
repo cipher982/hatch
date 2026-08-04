@@ -12,6 +12,6 @@ var CodexSurfaceModels = map[string]string{
 }
 
 var OpenRouterSurfaceModels = map[string]string{
-	"deepseek-v4-flash": "openrouter/deepseek/deepseek-v4-flash",
+	"deepseek-v4-flash": "openrouter/deepseek/deepseek-v4-flash-0731",
 	"kimi-k3":         "openrouter/~moonshotai/kimi-latest",
 }

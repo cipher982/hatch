@@ -26,7 +26,7 @@ func TestParseOpenCodeModelIDs(t *testing.T) {
 func TestCheckOpenCodeModels(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash-0731' 'openrouter/~moonshotai/kimi-latest'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
@@ -39,7 +39,7 @@ func TestCheckOpenCodeModels(t *testing.T) {
 func TestCheckOpenCodeModelsDetectsDrift(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash-0731'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
