@@ -127,6 +127,7 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
 - **Keep the surfaced CLI small** - `codex`, `claude`, and `cursor` are the human/agent-facing entrypoints; Claude routes through local Claude Code OAuth, Cursor through local Cursor Agent login, Codex/OpenRouter route through OpenCode, and raw backend flags are escape hatches
 - **Do not leak internal runtime nouns into the public contract** - `opencode` is an implementation detail, not part of the default user/agent mental model
 - **Machine callers should not remember flags** - real non-interactive CLI runs should default to JSON output + automation mode
+- **Nested Hatch is permitted, but bounded** - a surfaced run may launch a small number of narrowly scoped child `hatch` runs when the task permits parallel or independent subwork; this is not forbidden by the one-turn contract. Children need deadlines, recursion requires explicit authorization, and the parent must synthesize surviving results instead of waiting indefinitely for a child.
 
 ## Gotchas
 

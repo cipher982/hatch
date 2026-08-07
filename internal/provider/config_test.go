@@ -17,6 +17,9 @@ func TestPreparePromptOracle(t *testing.T) {
 		"Once evidence is sufficient, stop using tools and synthesize",
 		"At the late budget threshold, stop launching tools",
 		"Preserve useful partial findings and do not redo completed work",
+		"Nested Hatch runs are allowed",
+		"not a ban on child Hatch calls",
+		"Never wait indefinitely for a child",
 		"findings, confidence, unresolved questions, and the exact next action",
 		"must never be presented as approved or complete",
 	} {

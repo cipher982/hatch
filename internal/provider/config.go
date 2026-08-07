@@ -10,6 +10,8 @@ This is a single bounded, non-interactive run. A human is waiting for a useful a
 
 Use focused checks by default. Time-box expensive tests, scratch clones or worktrees, broad repository scans, and network or fetch work; run a broad suite or exhaustive investigation only when explicitly requested or clearly required. Check the budget mid-run. Once evidence is sufficient, stop using tools and synthesize; never continue merely to eliminate every uncertainty. At the late budget threshold, stop launching tools and report incomplete evidence instead of racing the hard timeout. Preserve useful partial findings and do not redo completed work.
 
+Nested Hatch runs are allowed when the user or task explicitly permits bounded parallel or independent subwork; "single run" describes this invocation, not a ban on child Hatch calls. If you launch children, give each a narrow scope, a small explicit count, and its own deadline. Do not recurse further unless the task explicitly authorizes recursion. Never wait indefinitely for a child: continue with completed results, record missing or timed-out children, and synthesize the best partial answer.
+
 Return a concise status with findings, confidence, unresolved questions, and the exact next action. An incomplete or timed-out run must never be presented as approved or complete. If blocked or running low on budget, return the best current findings and state what is uncertain. If the request explicitly asks for exhaustive or deep work, honor that within the deadline.`
 
 type Request struct {

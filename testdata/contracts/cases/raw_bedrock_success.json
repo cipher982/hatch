@@ -25,7 +25,7 @@
       "--no-session-persistence", "--tools", "", "--effort", "low",
       "--include-partial-messages"
     ],
-    "provider_stdin_sha256": "e03beadc330bc52eedda0262f4b5af67fd46fd3a436db62a05fdb7ee46060990",
-    "provider_stdin_bytes": 1314
+    "provider_stdin_sha256": "0fa79f2b11c25f01bedc005d1cb019dc7beab95c21182b9f8579d605e036aa1a",
+    "provider_stdin_bytes": 1815
   }
 }

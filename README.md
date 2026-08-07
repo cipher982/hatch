@@ -59,7 +59,11 @@ backend-specific options, use `hatch --advanced-help`.
 
 Every surfaced agent receives a bounded-run instruction: stay within the task,
 investigate proportionally, and return a concise answer rather than silently
-turning a one-shot call into an open-ended session.
+turning a one-shot call into an open-ended session. The contract does not ban
+nested Hatch calls: when a task authorizes bounded parallel or independent
+subwork, an agent may launch a small number of child Hatch runs. Each child
+needs a narrow scope and deadline; the parent must continue with partial
+results instead of waiting forever, and recursion needs explicit authorization.
 
 Reasoning effort is a Hatch run policy, not inherited provider session state.
 Known Codex/OpenAI surfaces default to `medium`; pass
