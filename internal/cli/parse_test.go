@@ -43,6 +43,16 @@ func TestParseExplicitHarness(t *testing.T) {
 	}
 }
 
+func TestParseCodexTierShorthand(t *testing.T) {
+	got, err := Parse([]string{"sol", "--harness", "omp", "--json", "prompt"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "openai/gpt-5.6-sol" || len(got.PromptArgs) != 1 || got.PromptArgs[0] != "prompt" {
+		t.Fatalf("parsed shorthand = %#v", got)
+	}
+}
+
 func TestNormalizeSurfaceCompatibility(t *testing.T) {
 	tests := []struct {
 		name string
@@ -53,6 +63,7 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"explicit backend equals wins", []string{"--backend=gemini", "claude", "review"}, []string{"--backend=gemini", "claude", "review"}},
 		{"explicit model wins", []string{"codex", "--model", "openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-5.4", "review"}},
 		{"explicit model equals routes", []string{"--model=openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model=openai/gpt-5.4", "review"}},
+		{"codex tier shorthand", []string{"sol", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-5.6-sol", "review"}},
 		{"cursor raw override", []string{"cursor", "grok", "--model", "cursor-grok-4.5-low", "review"}, []string{"--backend", "cursor", "--model", "cursor-grok-4.5-low", "review"}},
 		{"option value provider", []string{"--cwd", "claude", "review"}, []string{"--cwd", "claude", "review"}},
 		{"option equals provider", []string{"--cwd=claude", "review"}, []string{"--cwd=claude", "review"}},

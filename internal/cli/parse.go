@@ -138,6 +138,7 @@ func normalizeSurface(args []string) ([]string, error) {
 	if hasFlag(args, "-b", "--backend") {
 		return append([]string(nil), args...), nil
 	}
+	args = normalizeCodexTierShorthand(args)
 	hasExplicitModel := hasFlag(args, "--model")
 	index := aliasCandidateIndex(args)
 	if index < 0 {
@@ -185,6 +186,19 @@ func normalizeSurface(args []string) ([]string, error) {
 		result = append(result, "--model", model)
 	}
 	return append(result, after...), nil
+}
+
+func normalizeCodexTierShorthand(args []string) []string {
+	index := aliasCandidateIndex(args)
+	if index < 0 {
+		return append([]string(nil), args...)
+	}
+	if _, ok := provider.CodexSurfaceModels[args[index]]; !ok {
+		return append([]string(nil), args...)
+	}
+	result := append([]string(nil), args[:index]...)
+	result = append(result, "codex", args[index])
+	return append(result, args[index+1:]...)
 }
 
 func aliasCandidateIndex(args []string) int {

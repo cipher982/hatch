@@ -4,9 +4,9 @@ This directory holds reproducible comparisons of the coding harnesses behind
 Hatch. The public switch is:
 
 ```bash
-hatch codex sol --harness opencode --json "task"
-hatch codex sol --harness pi --json "task"
-hatch codex sol --harness omp --json "task"
+hatch sol --harness opencode --json "task"
+hatch sol --harness pi --json "task"
+hatch sol --harness omp --json "task"
 ```
 
 OpenCode remains the default for the `codex` and `openrouter` surfaces. The

@@ -282,6 +282,7 @@ func identity(backend, model string) (string, string) {
 
 const Help = `usage: hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
+       hatch <sol|terra|luna> [OPTIONS] "prompt"  (codex shorthand)
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
        hatch openrouter deepseek-v4-flash [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
@@ -296,6 +297,7 @@ Coding harness selection:
 
 Start here:
   hatch codex sol "Review this branch"
+  hatch sol --harness omp "Review this branch"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch cursor kimi-k3 "Review this branch"

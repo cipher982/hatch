@@ -49,7 +49,7 @@ private; Hatch does not run a daemon or upload them anywhere.
 | Command | What it uses |
 | --- | --- |
 | `hatch claude <haiku\|sonnet\|opus\|fable>` | Local Claude Code CLI login |
-| `hatch codex <sol\|terra\|luna>` | OpenCode with an OpenAI model alias |
+| `hatch codex <sol\|terra\|luna>` | OpenAI coding model via the selected harness |
 | `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
 | `hatch openrouter deepseek-v4-flash` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
@@ -68,6 +68,15 @@ hatch codex sol --harness pi "Review this branch"
 hatch codex sol --harness omp "Review this branch"
 hatch openrouter deepseek-v4-flash --harness omp "Fix the failing tests"
 ```
+
+The common Codex tier shorthand is also accepted:
+
+```bash
+hatch sol --harness omp "Review this branch"
+```
+
+Here, `codex` identifies the coding-agent surface, `sol` identifies the
+OpenAI model tier, and `omp` identifies the execution harness.
 
 `--harness` is recorded in the effective backend field of the run manifest, so
 JSON callers can see which implementation actually ran. The equivalent raw
