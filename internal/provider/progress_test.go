@@ -35,6 +35,15 @@ func TestProgressParserDeduplicatesToolsAndReportsLifecycle(t *testing.T) {
 			},
 			want: []string{"[hatch] OpenRouter started (session ses_1234)", "[hatch] bash: run tests", "[hatch] OpenRouter completed"},
 		},
+		{
+			name: "omp", adapter: "omp", label: "OpenRouter",
+			lines: []string{
+				`{"type":"session","id":"omp_123456789"}`,
+				`{"type":"tool_execution_start","toolCallId":"call-1","toolName":"bash","args":{"command":"go test ./..."}}`,
+				`{"type":"agent_end","isTerminal":true}`,
+			},
+			want: []string{"[hatch] OpenRouter started (session omp_1234)", "[hatch] bash: go test ./...", "[hatch] OpenRouter completed"},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

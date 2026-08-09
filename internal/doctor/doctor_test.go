@@ -90,3 +90,16 @@ func TestCheckCursorModelMissing(t *testing.T) {
 		t.Fatalf("check = %#v", check)
 	}
 }
+
+func TestCheckHarness(t *testing.T) {
+	directory := t.TempDir()
+	binary := filepath.Join(directory, "omp")
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'omp v17.2.10'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory)
+	check := checkHarness("harness.omp", "omp")
+	if !check.OK || check.Name != "harness.omp" || check.Detail != "omp v17.2.10" {
+		t.Fatalf("check = %#v", check)
+	}
+}

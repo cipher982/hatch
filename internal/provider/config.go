@@ -184,6 +184,8 @@ func Build(req Request) (Invocation, error) {
 			invocation.SetEnv["AWS_REGION"] = "us-east-1"
 		}
 		return redactInvocation(invocation, len(invocation.Argv)-1), nil
+	case "pi", "omp":
+		return buildPiLikeInvocation(req, policy)
 	case "codex":
 		if req.APIKey == "" {
 			return Invocation{}, fmt.Errorf("OPENAI_API_KEY not set and no api_key provided")

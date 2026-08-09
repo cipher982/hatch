@@ -81,6 +81,13 @@ func main() {
 		emitJSON(map[string]any{
 			"type": "step_finish", "part": map[string]any{"reason": "stop"},
 		})
+	case "success_pi", "success_omp":
+		emitJSON(map[string]any{"type": "session", "id": os.Getenv("HATCH_TEST_SESSION")})
+		emitJSON(map[string]any{
+			"type":    "message_end",
+			"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": "fake " + os.Getenv("HATCH_TEST_SCENARIO") + " output"}}},
+		})
+		emitJSON(map[string]any{"type": "agent_end", "isTerminal": true})
 	case "cursor_error":
 		emitJSON(map[string]any{"type": "system", "subtype": "init", "session_id": "cursor-error-session"})
 		emitJSON(map[string]any{"type": "result", "subtype": "error", "is_error": true, "result": "request rejected"})
@@ -211,6 +218,9 @@ func selectedEnvironment() map[string]string {
 		"LONGHOUSE_PARENT_THREAD_ID",
 		"LONGHOUSE_PARENT_PROVIDER_SESSION_ID",
 		"LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT",
+		"PI_CODING_AGENT_DIR",
+		"PI_CODING_AGENT_SESSION_DIR",
+		"PI_TELEMETRY",
 	} {
 		if value, ok := os.LookupEnv(name); ok {
 			result[name] = value

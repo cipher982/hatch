@@ -43,6 +43,8 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 		result.Capabilities["identify"] = "supported"
 	case "opencode":
 		result.Capabilities["identify"] = "supported"
+	case "pi", "omp":
+		result.Capabilities["identify"] = "supported"
 	}
 	var textChunks, finalChunks []string
 	validStructuredEvent := false
@@ -134,6 +136,36 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 					result.Error = message
 				}
 			}
+		case "pi", "omp":
+			if typeName == "session" {
+				observeSession(&result, event, "id")
+			}
+			if typeName == "message_update" {
+				if delta := piLikeTextDelta(event); delta != "" {
+					textChunks = append(textChunks, delta)
+				}
+			}
+			if typeName == "message_end" {
+				if text := piLikeAssistantText(event["message"]); text != "" {
+					finalChunks = append(finalChunks, text)
+				}
+			}
+			if typeName == "agent_end" {
+				terminal, hasTerminal := event["isTerminal"].(bool)
+				if !hasTerminal || terminal {
+					result.TerminalMarker = "observed"
+					if len(finalChunks) == 0 {
+						if text := piLikeAssistantText(event["messages"]); text != "" {
+							finalChunks = append(finalChunks, text)
+						}
+					}
+				}
+			}
+			if typeName == "error" {
+				if message := piLikeErrorMessage(event); message != "" {
+					result.Error = message
+				}
+			}
 		}
 	}
 	chunks := finalChunks
@@ -158,6 +190,60 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 		result.Warnings = append(result.Warnings, Warning{Code: "adapter_recognition_empty", Message: "structured events contained no terminal result recognized by the adapter"})
 	}
 	return result
+}
+
+func piLikeTextDelta(event map[string]any) string {
+	if delta, ok := event["delta"].(string); ok {
+		return delta
+	}
+	if nested, ok := event["assistantMessageEvent"].(map[string]any); ok {
+		if delta, ok := nested["delta"].(string); ok {
+			return delta
+		}
+		if text, ok := nested["text"].(string); ok {
+			return text
+		}
+	}
+	return ""
+}
+
+func piLikeAssistantText(value any) string {
+	switch current := value.(type) {
+	case map[string]any:
+		if role, ok := current["role"].(string); ok && role != "" && role != "assistant" {
+			return ""
+		}
+		if text, ok := current["text"].(string); ok {
+			return text
+		}
+		if content, ok := current["content"]; ok {
+			return piLikeAssistantText(content)
+		}
+	case []any:
+		var texts []string
+		for _, item := range current {
+			if text := piLikeAssistantText(item); text != "" {
+				texts = append(texts, text)
+			}
+		}
+		return strings.Join(texts, "")
+	}
+	return ""
+}
+
+func piLikeErrorMessage(event map[string]any) string {
+	if message, ok := event["message"].(string); ok && message != "" {
+		return message
+	}
+	if errorValue, ok := event["error"].(string); ok && errorValue != "" {
+		return errorValue
+	}
+	if nested, ok := event["error"].(map[string]any); ok {
+		if message, ok := nested["message"].(string); ok && message != "" {
+			return message
+		}
+	}
+	return nestedErrorMessage(event)
 }
 
 func observeSession(result *Interpretation, event map[string]any, name string) {

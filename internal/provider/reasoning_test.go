@@ -21,6 +21,8 @@ func TestResolveReasoningPolicy(t *testing.T) {
 		{name: "unknown model explicit choice is visible", backend: "opencode", model: "openai/provider-model", requested: "high", want: ReasoningPolicy{Effort: "high", Source: "explicit", Support: "unknown"}},
 		{name: "openrouter unsupported", backend: "opencode", model: "openrouter/example", want: ReasoningPolicy{Source: "unsupported", Support: "unsupported"}},
 		{name: "openrouter rejects override", backend: "opencode", model: "openrouter/example", requested: "high", wantErr: true},
+		{name: "pi OpenAI default", backend: "pi", model: "openai/gpt-5.6-sol", want: ReasoningPolicy{Effort: "medium", Source: "default", Support: "native"}},
+		{name: "omp OpenRouter explicit effort", backend: "omp", model: "openrouter/example", requested: "high", want: ReasoningPolicy{Effort: "high", Source: "explicit", Support: "unknown"}},
 		{name: "claude default preserves low", backend: "claude", model: "opus", want: ReasoningPolicy{Effort: "low", Source: "default", Support: "native"}},
 		{name: "claude explicit effort", backend: "claude", model: "opus", requested: "high", want: ReasoningPolicy{Effort: "high", Source: "explicit", Support: "native"}},
 		{name: "claude rejects unsupported effort", backend: "claude", model: "opus", requested: "none", wantErr: true},

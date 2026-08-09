@@ -74,6 +74,8 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 			return ReasoningPolicy{}, fmt.Errorf("--reasoning-effort is unsupported for OpenCode model %q", model)
 		}
 		return ReasoningPolicy{Source: "unsupported", Support: "unsupported"}, nil
+	case "pi", "omp":
+		return resolvePiLikeReasoning(backend, model, requested)
 	case "cursor", "gemini":
 		if requested != "" {
 			return ReasoningPolicy{}, fmt.Errorf("--reasoning-effort is unsupported for %s", backend)
@@ -85,6 +87,19 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 		}
 		return ReasoningPolicy{Source: "unsupported", Support: "unsupported"}, nil
 	}
+}
+
+func resolvePiLikeReasoning(backend, model, requested string) (ReasoningPolicy, error) {
+	if model == "" {
+		return ReasoningPolicy{}, fmt.Errorf("%s backend requires an explicit model", backend)
+	}
+	if strings.HasPrefix(model, "openai/") {
+		return resolveOpenCodeOpenAIReasoning(model, requested)
+	}
+	if requested == "" {
+		return ReasoningPolicy{Source: "unsupported", Support: "unsupported"}, nil
+	}
+	return ReasoningPolicy{Effort: requested, Source: "explicit", Support: "unknown"}, nil
 }
 
 func resolveClaudeReasoning(requested string) (ReasoningPolicy, error) {

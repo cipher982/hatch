@@ -43,10 +43,37 @@ func ParseCursorModelIDs(output string) map[string]struct{} {
 
 func Run(options Options) []Check {
 	return []Check{
+		checkHarness("harness.opencode", "opencode"),
+		checkHarness("harness.pi", "pi"),
+		checkHarness("harness.omp", "omp"),
 		checkCursorModel(options.Cursor),
 		checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", options.OpenAI, modelValues(provider.CodexSurfaceModels)),
 		checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", options.OpenRouter, modelValues(provider.OpenRouterSurfaceModels)),
 	}
+}
+
+func checkHarness(name, binary string) Check {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, binary, "--version").CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return Check{Name: name, Detail: binary + " --version timed out after 5s"}
+	}
+	if err != nil {
+		if _, ok := err.(*exec.Error); ok {
+			return Check{Name: name, Detail: binary + " is not installed"}
+		}
+		detail := strings.TrimSpace(string(output))
+		if detail == "" {
+			detail = err.Error()
+		}
+		return Check{Name: name, Detail: binary + " --version failed: " + detail}
+	}
+	version := strings.TrimSpace(strings.SplitN(string(output), "\n", 2)[0])
+	if version == "" {
+		version = "installed"
+	}
+	return Check{Name: name, OK: true, Detail: version}
 }
 
 func modelValues(catalog map[string]string) []string {

@@ -57,6 +57,23 @@ private; Hatch does not run a daemon or upload them anywhere.
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.
 
+### Select the coding harness
+
+Codex and OpenRouter surfaces default to OpenCode, but callers can choose the
+harness explicitly:
+
+```bash
+hatch codex sol --harness opencode "Review this branch"
+hatch codex sol --harness pi "Review this branch"
+hatch codex sol --harness omp "Review this branch"
+hatch openrouter deepseek-v4-flash --harness omp "Fix the failing tests"
+```
+
+`--harness` is recorded in the effective backend field of the run manifest, so
+JSON callers can see which implementation actually ran. The equivalent raw
+forms are `--backend opencode`, `--backend pi`, and `--backend omp` with an
+explicit `--model`.
+
 Every surfaced agent receives a bounded-run instruction: stay within the task,
 investigate proportionally, and return a concise answer rather than silently
 turning a one-shot call into an open-ended session. The contract does not ban
@@ -79,6 +96,9 @@ data, state, and cache paths while reviewed DCG configuration remains the only
 shared configuration. Raw Codex receives a private `CODEX_HOME`, ignores user
 configuration, and runs ephemerally, so a previous local Codex session cannot
 silently affect a Hatch run or be mistaken for a recoverable Hatch session.
+Pi and Oh My Pi receive private `PI_CODING_AGENT_DIR` and
+`PI_CODING_AGENT_SESSION_DIR` paths, disable native session persistence for
+one-shot runs, and record their JSON event streams in the Hatch artifact.
 
 ## Quick start
 

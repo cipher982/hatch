@@ -273,6 +273,8 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 		{"claude", "claude", "haiku", "success_claude", "fake claude output", "claude-session-oracle"},
 		{"cursor", "cursor", "cursor-grok-4.5-high", "success_cursor", "fake cursor output", "cursor-session-oracle"},
 		{"opencode", "opencode", "openai/gpt-5.6-sol", "success_opencode", "fake opencode output", "ses_oracle1234"},
+		{"pi", "pi", "openai/gpt-5.6-sol", "success_pi", "fake success_pi output", ""},
+		{"omp", "omp", "openai/gpt-5.6-sol", "success_omp", "fake success_omp output", ""},
 		{"cursor-kimi", "cursor", "kimi-k3", "success_cursor_kimi", "fake cursor kimi output", "cursor-kimi-session-oracle"},
 	}
 	for _, test := range tests {
@@ -287,19 +289,29 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 				invocation.SetEnv = map[string]string{}
 			}
 			invocation.SetEnv["HATCH_TEST_SCENARIO"] = test.scenario
+			if test.backend == "pi" {
+				invocation.SetEnv["HATCH_TEST_SESSION"] = "pi-session-oracle"
+			}
+			if test.backend == "omp" {
+				invocation.SetEnv["HATCH_TEST_SESSION"] = "omp-session-oracle"
+			}
 			coordinator := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs")))
 			result := coordinator.Execute(Request{
 				Surface: test.name, Provider: test.name, Model: test.model, Prompt: "oracle prompt",
 				Timeout: 5 * time.Second, Invocation: invocation,
 				ProgressLabel: test.name, Progress: func(message string) { progress = append(progress, message) },
 			})
-			if !result.OK || result.Output != test.output || result.SessionID == nil || *result.SessionID != test.session {
+			if !result.OK || result.Output != test.output || (test.session != "" && (result.SessionID == nil || *result.SessionID != test.session)) {
 				t.Fatalf("unexpected result: ok=%v output=%q session=%v error=%s stderr=%s", result.OK, result.Output, result.SessionID, stringValue(result.Error), stringValue(result.Stderr))
 			}
 			if result.Run.Result.TerminalMarker != "observed" || result.Run.Capture.StdoutFile != "stdout.jsonl" {
 				t.Fatalf("structured evidence mismatch: %#v", result.Run)
 			}
-			if test.backend == "opencode" {
+			if test.backend == "pi" || test.backend == "omp" {
+				if result.Run.ProviderState.Capabilities["state_isolation"] != "hatch_per_run" || result.Run.ProviderState.Capabilities["session_persistence"] != "disabled_ephemeral" {
+					t.Fatalf("%s state policy = %#v", test.backend, result.Run.ProviderState)
+				}
+			} else if test.backend == "opencode" {
 				if result.Run.ProviderState.SnapshotPath == nil {
 					t.Fatal("OpenCode snapshot path is missing")
 				}

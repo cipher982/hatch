@@ -342,6 +342,15 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			state.Capabilities["snapshot"] = "unsupported"
 		}
 	}
+	if req.Invocation.Adapter == "pi" || req.Invocation.Adapter == "omp" {
+		state.Retention = "hatch_preserved"
+		state.Capabilities["state_isolation"] = "hatch_per_run"
+		state.Capabilities["session_persistence"] = "disabled_ephemeral"
+		state.Capabilities["recovery"] = "unsupported_ephemeral"
+		if req.Invocation.ProviderVersion != "" {
+			state.ProviderVersion = &req.Invocation.ProviderVersion
+		}
+	}
 	c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
 	stderrCopy := stderrText
 	var publicStderr *string = &stderrCopy
@@ -634,6 +643,16 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 			invocation.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(configHome, "opencode")
 		}
 		invocation.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] = "1"
+		return func() {}, nil
+	}
+	if invocation.Adapter == "pi" || invocation.Adapter == "omp" {
+		root := filepath.Join(artifact.Path, "provider", invocation.Adapter)
+		if err := secureMkdirAll(root); err != nil {
+			return nil, err
+		}
+		invocation.SetEnv["PI_CODING_AGENT_DIR"] = root
+		invocation.SetEnv["PI_CODING_AGENT_SESSION_DIR"] = filepath.Join(root, "sessions")
+		invocation.SetEnv["PI_TELEMETRY"] = "0"
 		return func() {}, nil
 	}
 	if isRawCodexInvocation(*invocation) {

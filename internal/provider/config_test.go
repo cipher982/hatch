@@ -123,6 +123,25 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 		}
 	})
 
+	for _, backend := range []string{"pi", "omp"} {
+		t.Run(backend+" uses explicit headless JSON mode", func(t *testing.T) {
+			got, err := Build(Request{Backend: backend, Model: "openai/gpt-5.6-sol", Prompt: "p", APIKey: "secret"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Argv[0] != backend || got.StreamFormat != "jsonl" || got.Adapter != backend || got.Argv[len(got.Argv)-1] != PreparePrompt("p") ||
+				got.SetEnv["OPENAI_API_KEY"] != "secret" || got.ReasoningPolicy.Effort != "medium" {
+				t.Fatalf("%s invocation = %#v", backend, got)
+			}
+			joined := strings.Join(got.Argv, " ")
+			for _, want := range []string{"--mode json", "--no-session", "--model openai/gpt-5.6-sol", "--thinking medium"} {
+				if !strings.Contains(joined, want) {
+					t.Fatalf("%s argv lacks %q: %#v", backend, want, got.Argv)
+				}
+			}
+		})
+	}
+
 	t.Run("bedrock defaults", func(t *testing.T) {
 		got, err := Build(Request{Backend: "bedrock", Prompt: "p", OutputFormat: "text"})
 		if err != nil {

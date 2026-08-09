@@ -10,7 +10,7 @@ import (
 )
 
 func populateProviderVersion(invocation *provider.Invocation) {
-	if invocation.Adapter != "opencode" || len(invocation.Argv) == 0 || invocation.ProviderVersion != "" {
+	if !oneOf(invocation.Adapter, "opencode", "pi", "omp") || len(invocation.Argv) == 0 || invocation.ProviderVersion != "" {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

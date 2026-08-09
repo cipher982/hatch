@@ -59,11 +59,17 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 		fmt.Fprintf(stdout, "hatch %s (commit=%s dirty=%s go=%s target=%s)\n", Version, Commit, Dirty, goVersion, target)
 		return 0
 	}
+	if request.Harness != "" {
+		if !oneOf(request.Backend, "opencode", "pi", "omp") {
+			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for codex or openrouter surfaces"))
+		}
+		request.Backend = request.Harness
+	}
 	if request.Backend == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("No default model is configured; choose an explicit provider"))
 	}
-	if !oneOf(request.Backend, "claude", "cursor", "bedrock", "codex", "gemini", "opencode") {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, bedrock, codex, gemini, opencode", request.Backend))
+	if !oneOf(request.Backend, "claude", "cursor", "bedrock", "codex", "gemini", "opencode", "pi", "omp") {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, bedrock, codex, gemini, opencode, pi, omp", request.Backend))
 	}
 	if request.CWD != "" {
 		info, statErr := os.Stat(request.CWD)
@@ -74,7 +80,7 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 			return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("cwd is not a directory: %s", request.CWD))
 		}
 	}
-	if request.Backend == "opencode" && request.SkipGitRepoCheck {
+	if oneOf(request.Backend, "opencode", "pi", "omp") && request.SkipGitRepoCheck {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("--skip-git-repo-check is not supported for surfaced providers"))
 	}
 	if _, err := provider.ResolveReasoning(request.Backend, request.Model, request.ReasoningEffort); err != nil {
@@ -253,7 +259,7 @@ func identity(backend, model string) (string, string) {
 		return "cursor.raw", "cursor"
 	case "gemini":
 		return "gemini.raw", "google"
-	case "opencode":
+	case "opencode", "pi", "omp":
 		for alias, configured := range surfaces["openrouter"].models {
 			if configured == model {
 				return "openrouter." + alias, "openrouter"
@@ -283,6 +289,11 @@ const Help = `usage: hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
 
 One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls
 
+Coding harness selection:
+  --harness opencode     Use OpenCode (default for codex and openrouter)
+  --harness pi           Use Pi
+  --harness omp          Use Oh My Pi
+
 Start here:
   hatch codex sol "Review this branch"
   hatch claude sonnet "Review this diff"
@@ -293,6 +304,7 @@ Start here:
 Common options:
   -C, --cwd DIR        Working directory for the agent
   -t, --timeout SEC    Hard timeout (default: 1800)
+  --harness NAME       Select opencode, pi, or omp for codex/openrouter
   --reasoning-effort LEVEL  none|low|medium|high|xhigh|max
   --json               Emit exactly one JSON document on stdout
   --advanced-help      Show raw/backend-specific flags

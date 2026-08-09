@@ -33,6 +33,16 @@ func TestParseMachineDefaults(t *testing.T) {
 	}
 }
 
+func TestParseExplicitHarness(t *testing.T) {
+	got, err := Parse([]string{"codex", "sol", "--harness", "omp", "--json", "prompt"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "openai/gpt-5.6-sol" {
+		t.Fatalf("parsed harness = %#v", got)
+	}
+}
+
 func TestNormalizeSurfaceCompatibility(t *testing.T) {
 	tests := []struct {
 		name string

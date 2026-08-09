@@ -10,6 +10,7 @@ import (
 
 type Request struct {
 	Backend                string
+	Harness                string
 	Model                  string
 	PromptArgs             []string
 	CWD                    string
@@ -42,6 +43,7 @@ var flagsWithValue = map[string]bool{
 	"-b": true, "--backend": true, "-t": true, "--timeout": true,
 	"-C": true, "--cwd": true, "--model": true, "--reasoning-effort": true,
 	"--output-format": true, "--api-key": true, "-r": true, "--resume": true,
+	"--harness": true,
 }
 
 func Parse(args []string, stdoutTTY bool) (Request, error) {
@@ -80,7 +82,7 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 			req.SkipGitRepoCheck = true
 		case "--include-partial-messages":
 			req.IncludePartialMessages = true
-		case "-b", "--backend", "--model", "-C", "--cwd", "-t", "--timeout", "--reasoning-effort", "--output-format", "--api-key", "-r", "--resume":
+		case "-b", "--backend", "--model", "-C", "--cwd", "-t", "--timeout", "--reasoning-effort", "--output-format", "--api-key", "-r", "--resume", "--harness":
 			value := inlineValue
 			if !hasInlineValue {
 				if i+1 >= len(normalized) {
@@ -92,6 +94,11 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 			switch name {
 			case "-b", "--backend":
 				req.Backend = value
+			case "--harness":
+				if !oneOf(value, "opencode", "pi", "omp") {
+					return req, fmt.Errorf("invalid harness %q. Choose one of: opencode, pi, omp", value)
+				}
+				req.Harness = value
 			case "--model":
 				req.Model = value
 			case "-C", "--cwd":

@@ -72,6 +72,31 @@ func (p *ProgressParser) Observe(line []byte) []string {
 				return []string{"[hatch] " + label + " completed"}
 			}
 		}
+	case "pi", "omp":
+		label := p.Label
+		if label == "" {
+			label = defaultName(p.Adapter, "Agent")
+		}
+		if typeName == "session" {
+			return []string{startedMessage(label, event, "id")}
+		}
+		if typeName == "tool_execution_start" {
+			id, _ := event["toolCallId"].(string)
+			if id == "" {
+				id, _ = event["toolCallID"].(string)
+			}
+			if id != "" && p.seen[id] {
+				return nil
+			}
+			p.seen[id] = true
+			return []string{summarizePiLikeTool(event)}
+		}
+		if typeName == "agent_end" {
+			terminal, hasTerminal := event["isTerminal"].(bool)
+			if !hasTerminal || terminal {
+				return []string{"[hatch] " + label + " completed"}
+			}
+		}
 	}
 	return nil
 }
@@ -154,6 +179,19 @@ func summarizeOpenCodeTool(part map[string]any) string {
 	state, _ := part["state"].(map[string]any)
 	input, _ := state["input"].(map[string]any)
 	if value := firstString(input, "description", "command", "filePath", "path", "pattern", "query"); value != "" {
+		return fmt.Sprintf("[hatch] %s: %s", name, compact(value))
+	}
+	return "[hatch] " + name
+}
+
+func summarizePiLikeTool(event map[string]any) string {
+	name, _ := event["toolName"].(string)
+	if name == "" {
+		name, _ = event["tool"].(string)
+	}
+	name = defaultName(name, "tool")
+	args, _ := event["args"].(map[string]any)
+	if value := firstString(args, "description", "command", "file_path", "filePath", "path", "pattern", "query"); value != "" {
 		return fmt.Sprintf("[hatch] %s: %s", name, compact(value))
 	}
 	return "[hatch] " + name

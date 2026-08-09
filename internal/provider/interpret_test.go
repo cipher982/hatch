@@ -92,14 +92,39 @@ func TestInterpretOpenCodeLogError(t *testing.T) {
 	}
 }
 
+func TestInterpretPiLikeJSONEvents(t *testing.T) {
+	stdout := []byte(
+		`{"type":"session","id":"pi-session"}` + "\n" +
+			`{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"ignored "}}` + "\n" +
+			`{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"final answer"}]}}` + "\n" +
+			`{"type":"agent_end","isTerminal":true}` + "\n",
+	)
+	for _, adapter := range []string{"pi", "omp"} {
+		got := Interpret(adapter, stdout, nil)
+		if string(got.Output) != "final answer" || got.NativeID != "pi-session" || got.TerminalMarker != "observed" || got.Error != "" {
+			t.Fatalf("%s interpretation = %#v", adapter, got)
+		}
+	}
+}
+
+func TestInterpretPiLikeNonterminalAgentEndDoesNotComplete(t *testing.T) {
+	stdout := []byte(`{"type":"session","id":"omp-session"}` + "\n" + `{"type":"message_update","delta":"partial"}` + "\n" + `{"type":"agent_end","isTerminal":false}` + "\n")
+	got := Interpret("omp", stdout, nil)
+	if string(got.Output) != "partial" || got.TerminalMarker != "not_observed" {
+		t.Fatalf("nonterminal interpretation = %#v", got)
+	}
+}
+
 func FuzzInterpret(f *testing.F) {
 	f.Add("raw", []byte("plain output\n"), []byte{})
 	f.Add("claude", []byte(`{"type":"result","result":"done"}`+"\n"), []byte{})
 	f.Add("cursor", []byte(`{"type":"result","subtype":"success","result":"done"}`+"\n"), []byte{})
 	f.Add("opencode", []byte(`{"type":"step_start","sessionID":"ses_1"}`+"\n"), []byte{})
+	f.Add("pi", []byte(`{"type":"session","id":"pi_1"}`+"\n"), []byte{})
+	f.Add("omp", []byte(`{"type":"session","id":"omp_1"}`+"\n"), []byte{})
 	f.Fuzz(func(t *testing.T, adapter string, stdout, stderr []byte) {
 		switch adapter {
-		case "raw", "claude", "cursor", "opencode":
+		case "raw", "claude", "cursor", "opencode", "pi", "omp":
 			_ = Interpret(adapter, stdout, stderr)
 		default:
 			t.Skip()

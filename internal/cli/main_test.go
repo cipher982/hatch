@@ -65,6 +65,51 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 	}
 }
 
+func TestMainSelectsOMPForSurfacedCodexRun(t *testing.T) {
+	root := t.TempDir()
+	fake := buildTestProviderForCLI(t, root)
+	if err := os.Symlink(fake, filepath.Join(root, "omp")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv("HATCH_TEST_SCENARIO", "success_omp")
+	t.Setenv("HATCH_TEST_SESSION", "omp-session-cli")
+	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", filepath.Join(root, "runs"))
+
+	var stdout, stderr bytes.Buffer
+	exitCode := Main([]string{"codex", "sol", "--harness", "omp", "--json", "prompt"}, bytes.NewReader(nil), &stdout, &stderr, true)
+	if exitCode != 0 {
+		t.Fatalf("exit=%d stderr=%s stdout=%s", exitCode, stderr.String(), stdout.String())
+	}
+	var result struct {
+		OK     bool   `json:"ok"`
+		Output string `json:"output"`
+		Run    struct {
+			Surface string `json:"surface"`
+			Backend string `json:"backend"`
+			Model   string `json:"model"`
+		} `json:"run"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Output != "fake success_omp output" || result.Run.Surface != "codex.sol" || result.Run.Backend != "omp" || result.Run.Model != "openai/gpt-5.6-sol" {
+		t.Fatalf("unexpected OMP result: %#v", result)
+	}
+}
+
+func buildTestProviderForCLI(t *testing.T, root string) string {
+	t.Helper()
+	fake := filepath.Join(root, "testprovider")
+	command := exec.Command("go", "build", "-o", fake, "./internal/testprovider")
+	command.Dir = filepath.Join("..", "..")
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("build test provider: %v\n%s", err, output)
+	}
+	return fake
+}
+
 func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 	for model, want := range map[string]string{
 		"openai/gpt-5.6-sol":  "codex.sol",
@@ -140,8 +185,13 @@ func TestMainDoctorJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4-flash-0731'\n"), 0o700); err != nil {
+	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4-flash-0731'\n"), 0o700); err != nil {
 		t.Fatal(err)
+	}
+	for _, binary := range []string{"pi", "omp"} {
+		if err := os.WriteFile(filepath.Join(directory, binary), []byte("#!/bin/sh\nprintf '%s\\n' '"+binary+" test'\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
 	}
 	helper := filepath.Join(directory, "credential-helper")
 	if err := os.WriteFile(helper, []byte("#!/bin/sh\nprintf 'test-secret\\n'\n"), 0o700); err != nil {
@@ -165,7 +215,7 @@ func TestMainDoctorJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || len(result.Checks) != 3 {
+	if !result.OK || len(result.Checks) != 6 {
 		t.Fatalf("doctor = %#v", result)
 	}
 	for _, check := range result.Checks {
