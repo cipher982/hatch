@@ -46,6 +46,23 @@ private; Hatch does not run a daemon or upload them anywhere.
 
 ## The small public surface
 
+The preferred form is model-first. Hatch infers the provider from the alias:
+
+```bash
+hatch opus "Review this diff"
+hatch sol --harness omp "Review this branch"
+hatch grok "Review this branch"
+hatch deepseek-v4-flash "Fix the failing tests"
+```
+
+The explicit provider forms remain valid when they make a call easier to read:
+
+```bash
+hatch claude opus "Review this diff"
+hatch codex sol --harness omp "Review this branch"
+hatch openrouter deepseek-v4-flash "Fix the failing tests"
+```
+
 | Command | What it uses |
 | --- | --- |
 | `hatch claude <haiku\|sonnet\|opus\|fable>` | Local Claude Code CLI login |
@@ -75,8 +92,9 @@ The common Codex tier shorthand is also accepted:
 hatch sol --harness omp "Review this branch"
 ```
 
-Here, `codex` identifies the coding-agent surface, `sol` identifies the
-OpenAI model tier, and `omp` identifies the execution harness.
+Here, `sol` identifies the OpenAI model tier and `omp` identifies the execution
+harness. The run manifest still records the inferred provider and effective
+harness separately.
 
 `--harness` is recorded in the effective backend field of the run manifest, so
 JSON callers can see which implementation actually ran. The equivalent raw

@@ -138,7 +138,7 @@ func normalizeSurface(args []string) ([]string, error) {
 	if hasFlag(args, "-b", "--backend") {
 		return append([]string(nil), args...), nil
 	}
-	args = normalizeCodexTierShorthand(args)
+	args = normalizeModelShorthand(args)
 	hasExplicitModel := hasFlag(args, "--model")
 	index := aliasCandidateIndex(args)
 	if index < 0 {
@@ -188,17 +188,32 @@ func normalizeSurface(args []string) ([]string, error) {
 	return append(result, after...), nil
 }
 
-func normalizeCodexTierShorthand(args []string) []string {
+func normalizeModelShorthand(args []string) []string {
 	index := aliasCandidateIndex(args)
 	if index < 0 {
 		return append([]string(nil), args...)
 	}
-	if _, ok := provider.CodexSurfaceModels[args[index]]; !ok {
+	surfaceName := shorthandSurface(args[index])
+	if surfaceName == "" {
 		return append([]string(nil), args...)
 	}
 	result := append([]string(nil), args[:index]...)
-	result = append(result, "codex", args[index])
+	result = append(result, surfaceName, args[index])
 	return append(result, args[index+1:]...)
+}
+
+func shorthandSurface(alias string) string {
+	switch alias {
+	case "haiku", "sonnet", "opus", "fable":
+		return "claude"
+	case "sol", "terra", "luna", "nano", "mini", "max":
+		return "codex"
+	case "grok", "kimi-k3":
+		return "cursor"
+	case "deepseek-v4-flash":
+		return "openrouter"
+	}
+	return ""
 }
 
 func aliasCandidateIndex(args []string) int {

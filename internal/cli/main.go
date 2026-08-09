@@ -280,9 +280,9 @@ func identity(backend, model string) (string, string) {
 	return backend + ".raw", "unknown"
 }
 
-const Help = `usage: hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
+const Help = `usage: hatch <model> [OPTIONS] "prompt"
+       hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
-       hatch <sol|terra|luna> [OPTIONS] "prompt"  (codex shorthand)
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
        hatch openrouter deepseek-v4-flash [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
@@ -295,9 +295,18 @@ Coding harness selection:
   --harness pi           Use Pi
   --harness omp          Use Oh My Pi
 
+Model-first aliases:
+  Claude: haiku, sonnet, opus, fable
+  OpenAI coding models: sol, terra, luna, nano, mini, max
+  Cursor: grok, kimi-k3
+  OpenRouter: deepseek-v4-flash
+
 Start here:
-  hatch codex sol "Review this branch"
+  hatch opus "Review this diff"
   hatch sol --harness omp "Review this branch"
+  hatch grok "Review this branch"
+  hatch deepseek-v4-flash "Fix the failing tests"
+  hatch codex sol "Review this branch"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch cursor kimi-k3 "Review this branch"
