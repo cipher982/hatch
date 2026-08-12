@@ -210,7 +210,7 @@ func shorthandSurface(alias string) string {
 		return "codex"
 	case "grok", "kimi-k3":
 		return "cursor"
-	case "deepseek-v4-flash":
+	case "deepseek-v4-flash", "deepseek-v4-pro":
 		return "openrouter"
 	}
 	return ""
@@ -260,7 +260,7 @@ func splitLongFlag(arg string) (string, string, bool) {
 
 func modelChoices(models map[string]string) string {
 	// Stable public order, matching each surface's documented preference.
-	order := []string{"sol", "terra", "luna", "nano", "mini", "max", "haiku", "sonnet", "opus", "fable", "grok", "deepseek-v4-flash", "kimi-k3"}
+	order := []string{"sol", "terra", "luna", "nano", "mini", "max", "haiku", "sonnet", "opus", "fable", "grok", "deepseek-v4-flash", "deepseek-v4-pro", "kimi-k3"}
 	choices := make([]string, 0, len(models))
 	for _, name := range order {
 		if _, ok := models[name]; ok {

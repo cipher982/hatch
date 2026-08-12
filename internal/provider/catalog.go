@@ -29,6 +29,7 @@ var CursorSurfaceModels = map[string]string{
 
 var OpenRouterSurfaceModels = map[string]string{
 	"deepseek-v4-flash": "openrouter/deepseek/deepseek-v4-flash-0731",
+	"deepseek-v4-pro":   "openrouter/deepseek/deepseek-v4-pro-0813",
 }
 
 // SurfaceCatalog returns every surfaced model in a stable order for help,

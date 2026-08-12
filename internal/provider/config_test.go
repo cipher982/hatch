@@ -8,9 +8,10 @@ import (
 	"testing"
 )
 
-func TestSurfaceCatalogIncludesCurrentDeepSeekSurface(t *testing.T) {
+func TestSurfaceCatalogIncludesCurrentDeepSeekSurfaces(t *testing.T) {
 	entries := SurfaceCatalog()
-	if !slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-flash", Model: "openrouter/deepseek/deepseek-v4-flash-0731"}) {
+	if !slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-flash", Model: "openrouter/deepseek/deepseek-v4-flash-0731"}) ||
+		!slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-pro", Model: "openrouter/deepseek/deepseek-v4-pro-0813"}) {
 		t.Fatalf("catalog = %#v", entries)
 	}
 }
