@@ -20,7 +20,7 @@
       "resume_command": null
     },
     "provider_argv": [
-      "cursor-agent", "--print", "--trust", "--model", "cursor-grok-4.5-high",
+      "cursor-agent", "--print", "--trust", "--model", "cursor-grok-4.6-high",
       "--output-format", "stream-json", "--force", "$PREPARED_PROMPT"
     ],
     "provider_stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

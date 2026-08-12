@@ -8,7 +8,7 @@ func TestParseSurfacedCommands(t *testing.T) {
 		backend, model string
 	}{
 		{[]string{"claude", "haiku", "--json", "-"}, "claude", "haiku"},
-		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "cursor-grok-4.5-high"},
+		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "cursor-grok-4.6-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-5.6-sol"},
 	}
@@ -59,7 +59,7 @@ func TestParseModelFirstShorthands(t *testing.T) {
 	}{
 		{"opus", "claude", "opus"},
 		{"sol", "opencode", "openai/gpt-5.6-sol"},
-		{"grok", "cursor", "cursor-grok-4.5-high"},
+		{"grok", "cursor", "cursor-grok-4.6-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
 		{"deepseek-v4-flash", "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
 	}

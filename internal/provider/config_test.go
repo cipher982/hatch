@@ -84,7 +84,7 @@ func TestBuildOracleInvocations(t *testing.T) {
 		argv []string
 	}{
 		{"gemini", Request{Backend: "gemini", Prompt: "oracle prompt"}, []string{"gemini", "--model", "gemini-3-pro-preview", "--yolo", "--skip-trust", "-p", "-"}},
-		{"cursor", Request{Backend: "cursor", Model: "cursor-grok-4.5-high", Prompt: "oracle prompt"}, []string{"cursor-agent", "--print", "--trust", "--model", "cursor-grok-4.5-high", "--output-format", "stream-json", "--force", PreparePrompt("oracle prompt")}},
+		{"cursor", Request{Backend: "cursor", Model: "cursor-grok-4.6-high", Prompt: "oracle prompt"}, []string{"cursor-agent", "--print", "--trust", "--model", "cursor-grok-4.6-high", "--output-format", "stream-json", "--force", PreparePrompt("oracle prompt")}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

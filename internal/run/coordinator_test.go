@@ -271,7 +271,7 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 		name, backend, model, scenario, output, session string
 	}{
 		{"claude", "claude", "haiku", "success_claude", "fake claude output", "claude-session-oracle"},
-		{"cursor", "cursor", "cursor-grok-4.5-high", "success_cursor", "fake cursor output", "cursor-session-oracle"},
+		{"cursor", "cursor", "cursor-grok-4.6-high", "success_cursor", "fake cursor output", "cursor-session-oracle"},
 		{"opencode", "opencode", "openai/gpt-5.6-sol", "success_opencode", "fake opencode output", "ses_oracle1234"},
 		{"pi", "pi", "openai/gpt-5.6-sol", "success_pi", "fake success_pi output", ""},
 		{"omp", "omp", "openai/gpt-5.6-sol", "success_omp", "fake success_omp output", ""},
@@ -339,7 +339,7 @@ func TestCoordinatorStructuredFailureAndRecovery(t *testing.T) {
 		outcome                                           Outcome
 		warnings                                          int
 	}{
-		{"cursor error", "cursor", "cursor-grok-4.5-high", "cursor_error", "", "request rejected", false, OutcomeFailed, 0},
+		{"cursor error", "cursor", "cursor-grok-4.6-high", "cursor_error", "", "request rejected", false, OutcomeFailed, 0},
 		{"opencode error", "opencode", "openai/gpt-5.6-sol", "opencode_error", "", "provider unavailable", false, OutcomeFailed, 0},
 		{"opencode recovered", "opencode", "openai/gpt-5.6-sol", "opencode_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
 		{"opencode missing terminal", "opencode", "openai/gpt-5.6-sol", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 1},

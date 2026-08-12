@@ -10,8 +10,8 @@ import (
 )
 
 func TestParseCursorModelIDs(t *testing.T) {
-	got := ParseCursorModelIDs("cursor-auto - Auto\ncursor-grok-4.5-high - Grok 4.5 High\nnoise\n")
-	if _, ok := got["cursor-grok-4.5-high"]; !ok || len(got) != 2 {
+	got := ParseCursorModelIDs("cursor-auto - Auto\ncursor-grok-4.6-high - Grok 4.6 High\nnoise\n")
+	if _, ok := got["cursor-grok-4.6-high"]; !ok || len(got) != 2 {
 		t.Fatalf("models = %#v", got)
 	}
 }
@@ -73,7 +73,7 @@ func TestCodexDoctorCoversEverySurfaceAlias(t *testing.T) {
 func TestCheckCursorModel(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok' 'kimi-k3 - Kimi K3'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.6-high - Grok' 'kimi-k3 - Kimi K3'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)

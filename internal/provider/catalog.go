@@ -12,7 +12,7 @@ var CodexSurfaceModels = map[string]string{
 }
 
 var CursorSurfaceModels = map[string]string{
-	"grok":    "cursor-grok-4.5-high",
+	"grok":    "cursor-grok-4.6-high",
 	"kimi-k3": "kimi-k3",
 }
 

@@ -181,7 +181,7 @@ func TestMainFailsClosedBeforeProviderWhenArtifactRootUnavailable(t *testing.T) 
 func TestMainDoctorJSON(t *testing.T) {
 	directory := t.TempDir()
 	cursorBinary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.5-high - Grok' 'kimi-k3 - Kimi K3'\n"), 0o700); err != nil {
+	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'cursor-grok-4.6-high - Grok' 'kimi-k3 - Kimi K3'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
