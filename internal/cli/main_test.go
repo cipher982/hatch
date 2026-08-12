@@ -8,7 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"testing"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 func TestMainRawGeminiVerticalSlice(t *testing.T) {
@@ -222,6 +225,20 @@ func TestMainDoctorJSON(t *testing.T) {
 		if !check.OK {
 			t.Fatalf("doctor = %#v", result)
 		}
+	}
+}
+
+func TestMainCatalogJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if exit := Main([]string{"catalog", "--json"}, bytes.NewReader(nil), &stdout, &stderr, true); exit != 0 {
+		t.Fatalf("exit=%d stdout=%s stderr=%s", exit, stdout.String(), stderr.String())
+	}
+	var catalog []provider.CatalogEntry
+	if err := json.Unmarshal(stdout.Bytes(), &catalog); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-flash", Model: "openrouter/deepseek/deepseek-v4-flash-0731"}) {
+		t.Fatalf("catalog = %#v", catalog)
 	}
 }
 

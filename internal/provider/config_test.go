@@ -3,9 +3,17 @@ package provider
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
+
+func TestSurfaceCatalogIncludesCurrentDeepSeekSurface(t *testing.T) {
+	entries := SurfaceCatalog()
+	if !slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-flash", Model: "openrouter/deepseek/deepseek-v4-flash-0731"}) {
+		t.Fatalf("catalog = %#v", entries)
+	}
+}
 
 func TestBuildOpenCodeDeepSeekRoutingConfig(t *testing.T) {
 	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: "prompt", APIKey: "fake"})

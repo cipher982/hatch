@@ -1,5 +1,16 @@
 package provider
 
+import "sort"
+
+// CatalogEntry is one stable Hatch surface alias. It is intentionally local
+// configuration, not a live provider listing: agents must only be taught
+// aliases that Hatch can invoke.
+type CatalogEntry struct {
+	Surface string `json:"surface"`
+	Alias   string `json:"alias"`
+	Model   string `json:"model"`
+}
+
 // Surface model catalogs are the single source used by CLI alias resolution and
 // doctor drift checks. Treat these maps as immutable.
 var CodexSurfaceModels = map[string]string{
@@ -18,4 +29,30 @@ var CursorSurfaceModels = map[string]string{
 
 var OpenRouterSurfaceModels = map[string]string{
 	"deepseek-v4-flash": "openrouter/deepseek/deepseek-v4-flash-0731",
+}
+
+// SurfaceCatalog returns every surfaced model in a stable order for help,
+// automation, and generated agent context.
+func SurfaceCatalog() []CatalogEntry {
+	catalogs := []struct {
+		surface string
+		models  map[string]string
+	}{
+		{"claude", map[string]string{"haiku": "haiku", "sonnet": "sonnet", "opus": "opus", "fable": "fable"}},
+		{"codex", CodexSurfaceModels},
+		{"cursor", CursorSurfaceModels},
+		{"openrouter", OpenRouterSurfaceModels},
+	}
+	entries := make([]CatalogEntry, 0, 16)
+	for _, catalog := range catalogs {
+		aliases := make([]string, 0, len(catalog.models))
+		for alias := range catalog.models {
+			aliases = append(aliases, alias)
+		}
+		sort.Strings(aliases)
+		for _, alias := range aliases {
+			entries = append(entries, CatalogEntry{Surface: catalog.surface, Alias: alias, Model: catalog.models[alias]})
+		}
+	}
+	return entries
 }

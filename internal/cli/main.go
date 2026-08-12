@@ -35,6 +35,9 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if len(args) > 0 && args[0] == "doctor" {
 		return runDoctor(args[1:], stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "catalog" {
+		return runCatalog(args[1:], stdout, stderr)
+	}
 	request, err := Parse(args, stdoutTTY)
 	if err != nil {
 		return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, err)
@@ -220,6 +223,17 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 	return 4
 }
 
+func runCatalog(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 || args[0] != "--json" {
+		return renderConfigError(false, stdout, stderr, fmt.Errorf("usage: hatch catalog --json"))
+	}
+	if err := json.NewEncoder(stdout).Encode(provider.SurfaceCatalog()); err != nil {
+		fmt.Fprintf(stderr, "Error: encode catalog: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
 func readPrompt(args []string, input io.Reader) (string, error) {
 	if len(args) == 0 || (len(args) == 1 && args[0] == "-") {
 		data, err := io.ReadAll(input)
@@ -321,6 +335,7 @@ Common options:
   --advanced-help      Show raw/backend-specific flags
 
 Other commands:
+  hatch catalog --json
   hatch doctor [--json]
   hatch runs list [--status STATUS] [--json]
   hatch runs inspect <run-id> [--json]
