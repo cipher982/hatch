@@ -284,7 +284,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
-	   hatch openrouter <deepseek-v4-flash|deepseek-v4-pro> [OPTIONS] "prompt"
+	   hatch openrouter deepseek-v4-flash [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
 	   hatch runs <list|inspect> [OPTIONS]
 
@@ -299,14 +299,13 @@ Model-first aliases:
   Claude: haiku, sonnet, opus, fable
   OpenAI coding models: sol, terra, luna, nano, mini, max
   Cursor: grok, kimi-k3
-  OpenRouter: deepseek-v4-flash, deepseek-v4-pro
+  OpenRouter: deepseek-v4-flash
 
 Start here:
   hatch opus "Review this diff"
   hatch sol --harness omp "Review this branch"
   hatch grok "Review this branch"
   hatch deepseek-v4-flash "Fix the failing tests"
-	 hatch deepseek-v4-pro "Review this architecture"
   hatch codex sol "Review this branch"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"

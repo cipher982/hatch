@@ -11,7 +11,7 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "cursor-grok-4.6-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-5.6-sol"},
-		{[]string{"openrouter", "deepseek-v4-pro", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
+		{[]string{"openrouter", "deepseek-v4-flash", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
 	}
 	for _, test := range tests {
 		got, err := Parse(test.args, true)
@@ -63,7 +63,6 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"grok", "cursor", "cursor-grok-4.6-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
 		{"deepseek-v4-flash", "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
-		{"deepseek-v4-pro", "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
 	}
 	for _, test := range tests {
 		t.Run(test.alias, func(t *testing.T) {

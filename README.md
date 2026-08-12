@@ -53,7 +53,6 @@ hatch opus "Review this diff"
 hatch sol --harness omp "Review this branch"
 hatch grok "Review this branch"
 hatch deepseek-v4-flash "Fix the failing tests"
-hatch deepseek-v4-pro "Review this architecture"
 ```
 
 The explicit provider forms remain valid when they make a call easier to read:
@@ -62,7 +61,6 @@ The explicit provider forms remain valid when they make a call easier to read:
 hatch claude opus "Review this diff"
 hatch codex sol --harness omp "Review this branch"
 hatch openrouter deepseek-v4-flash "Fix the failing tests"
-hatch openrouter deepseek-v4-pro "Review this architecture"
 ```
 
 | Command | What it uses |
@@ -70,7 +68,7 @@ hatch openrouter deepseek-v4-pro "Review this architecture"
 | `hatch claude <haiku\|sonnet\|opus\|fable>` | Local Claude Code CLI login |
 | `hatch codex <sol\|terra\|luna>` | OpenAI coding model via the selected harness |
 | `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
-| `hatch openrouter <deepseek-v4-flash\|deepseek-v4-pro>` | OpenCode with an OpenRouter model alias |
+| `hatch openrouter deepseek-v4-flash` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 
 The model aliases are intentionally small and opinionated. For raw or
@@ -86,7 +84,6 @@ hatch codex sol --harness opencode "Review this branch"
 hatch codex sol --harness pi "Review this branch"
 hatch codex sol --harness omp "Review this branch"
 hatch openrouter deepseek-v4-flash --harness omp "Fix the failing tests"
-hatch openrouter deepseek-v4-pro --harness omp "Review this architecture"
 ```
 
 The common Codex tier shorthand is also accepted:
