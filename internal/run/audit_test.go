@@ -13,7 +13,7 @@ import (
 func TestAuditFieldEvidenceClassifiesAndPassesCompleteFixture(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "runs")
 	store := NewStore(root)
-	for _, surface := range []string{"claude.haiku", "codex.terra", "cursor.grok", "openrouter.deepseek-v4-flash", "expert"} {
+	for _, surface := range []string{"claude.haiku", "codex.terra", "cursor.grok", "openrouter.deepseek-v4-flash", "openrouter.deepseek-v4-pro", "expert"} {
 		for range 5 {
 			createAuditRun(t, store, surface, OutcomeSucceeded)
 		}
@@ -30,7 +30,7 @@ func TestAuditFieldEvidenceClassifiesAndPassesCompleteFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !audit.Passed() || audit.Eligible != 25 || audit.Observed != 30 || audit.ExcludedPreContract != 2 || audit.Incomplete != 1 || audit.NonSuccess != 1 || audit.NonSurfaced != 1 || audit.Unsafe != 0 || audit.ExplainedUnsafe != 0 || audit.UnexplainedUnsafe != 0 {
+	if !audit.Passed() || audit.Eligible != 30 || audit.Observed != 35 || audit.ExcludedPreContract != 2 || audit.Incomplete != 1 || audit.NonSuccess != 1 || audit.NonSurfaced != 1 || audit.Unsafe != 0 || audit.ExplainedUnsafe != 0 || audit.UnexplainedUnsafe != 0 {
 		t.Fatalf("audit = %#v", audit)
 	}
 }

@@ -26,7 +26,7 @@ func TestParseOpenCodeModelIDs(t *testing.T) {
 func TestCheckOpenCodeModels(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash-0731'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4-flash-0731' 'openrouter/deepseek/deepseek-v4-pro-0813'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
@@ -44,7 +44,7 @@ func TestCheckOpenCodeModelsDetectsDrift(t *testing.T) {
 	}
 	t.Setenv("PATH", directory)
 	check := checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", Credential{Value: "expected-secret"}, modelValues(provider.OpenRouterSurfaceModels))
-	if check.OK || !strings.Contains(check.Detail, "deepseek-v4-flash-0731") || !strings.Contains(check.Detail, "--refresh") {
+	if check.OK || !strings.Contains(check.Detail, "deepseek-v4-flash-0731") || !strings.Contains(check.Detail, "deepseek-v4-pro-0813") || !strings.Contains(check.Detail, "--refresh") {
 		t.Fatalf("check = %#v", check)
 	}
 }
