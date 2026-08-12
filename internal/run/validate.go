@@ -14,6 +14,7 @@ var warningCodesV1 = map[string]bool{
 	"transient_provider_error":   true,
 	"stderr_error_recovered":     true,
 	"adapter_recognition_empty":  true,
+	"stall_detected":             true,
 }
 
 // ValidateManifest enforces records emitted by the V1 writer. Compatibility

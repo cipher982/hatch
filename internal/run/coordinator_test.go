@@ -536,6 +536,38 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 	}
 }
 
+func TestOpenCodeProviderStateWritesRoutingConfig(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), "runs"))
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(invocation.OpenCodeConfigJSON) == 0 {
+		t.Fatal("openrouter deepseek run missing routing config")
+	}
+	artifact, err := store.Prepare(PreparedRun{Surface: "openrouter.deepseek-v4-flash", Backend: "opencode", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Request: "prompt", ReasoningPolicy: invocation.ReasoningPolicy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanup, err := prepareProviderState(artifact, &invocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	configPath := filepath.Join(invocation.SetEnv["OPENCODE_CONFIG_DIR"], "opencode.json")
+	info, err := os.Stat(configPath)
+	if err != nil {
+		t.Fatalf("routing config not written: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("routing config mode = %v, want 0600", info.Mode().Perm())
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil || !bytes.Contains(data, []byte(`"DeepSeek"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":true`)) {
+		t.Fatalf("routing config content = %s err=%v", data, err)
+	}
+}
+
 func TestRawCodexRunRecordsEphemeralIsolation(t *testing.T) {
 	fake := buildTestProvider(t)
 	invocation, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-5.6", Prompt: "prompt", APIKey: "fake"})

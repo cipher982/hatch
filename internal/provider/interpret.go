@@ -3,6 +3,7 @@ package provider
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -47,6 +48,8 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 		result.Capabilities["identify"] = "supported"
 	}
 	var textChunks, finalChunks []string
+	var openCodeSteps, openCodeTools, openCodeTextBytes int
+	openCodeToolInputs := map[string]int{}
 	validStructuredEvent := false
 	for _, line := range bytes.Split(stdout, []byte{'\n'}) {
 		if len(bytes.TrimSpace(line)) == 0 {
@@ -109,6 +112,7 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 		case "opencode":
 			if typeName == "step_start" {
 				observeSession(&result, event, "sessionID")
+				openCodeSteps++
 				if result.NativeID != "" {
 					result.Retention = "hatch_preserved"
 					result.Capabilities["snapshot"] = "supported"
@@ -119,9 +123,18 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 					text, _ := part["text"].(string)
 					if text != "" {
 						textChunks = append(textChunks, text)
+						openCodeTextBytes += len(text)
 						if isFinalOpenCodeText(part) {
 							finalChunks = append(finalChunks, text)
 						}
+					}
+				}
+			}
+			if typeName == "tool_use" {
+				openCodeTools++
+				if part, ok := event["part"].(map[string]any); ok {
+					if input := openCodeToolInputID(part); input != "" {
+						openCodeToolInputs[input]++
 					}
 				}
 			}
@@ -186,10 +199,90 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 		result.Warnings = append(result.Warnings, Warning{Code: "transient_provider_error", Message: result.Error})
 		result.Error = ""
 	}
+	if adapter == "opencode" && validStructuredEvent {
+		if warning := stalledRunWarning(openCodeSteps, openCodeTools, openCodeTextBytes, openCodeToolInputs); warning != "" {
+			result.Warnings = append(result.Warnings, Warning{Code: "stall_detected", Message: warning})
+		}
+	}
 	if validStructuredEvent && result.TerminalMarker == "not_observed" && result.Error == "" {
-		result.Warnings = append(result.Warnings, Warning{Code: "adapter_recognition_empty", Message: "structured events contained no terminal result recognized by the adapter"})
+		message := "structured events contained no terminal result recognized by the adapter"
+		if adapter == "opencode" {
+			message += fmt.Sprintf(" (%d steps, %d tool calls, %d text bytes)", openCodeSteps, openCodeTools, openCodeTextBytes)
+		}
+		result.Warnings = append(result.Warnings, Warning{Code: "adapter_recognition_empty", Message: message})
 	}
 	return result
+}
+
+const (
+	stallMinSteps     = 8
+	stallMinRepeats   = 3
+	stallMaxTextBytes = 500
+)
+
+// stalledRunWarning classifies an OpenCode run that produced no meaningful
+// assistant text across many tool-only steps while repeating identical tool
+// calls (for example re-reading the same file or re-running the same glob).
+// Returns "" for healthy runs.
+func stalledRunWarning(steps, toolCalls, textBytes int, inputs map[string]int) string {
+	if steps < stallMinSteps || textBytes > stallMaxTextBytes {
+		return ""
+	}
+	var repeated []string
+	totalRepeats := 0
+	for input, count := range inputs {
+		if count >= stallMinRepeats {
+			totalRepeats += count
+			if len(repeated) < 3 {
+				repeated = append(repeated, fmt.Sprintf("%s x%d", input, count))
+			}
+		}
+	}
+	if totalRepeats == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d steps, %d tool calls, %d text bytes; repeated identical tool calls: %s", steps, toolCalls, textBytes, strings.Join(repeated, ", "))
+}
+
+// openCodeToolInputID derives a stable identity for a tool call so repeated
+// identical invocations can be counted. Empty for calls without a useful input.
+func openCodeToolInputID(part map[string]any) string {
+	tool, _ := part["tool"].(string)
+	state, _ := part["state"].(map[string]any)
+	input, _ := state["input"].(map[string]any)
+	switch tool {
+	case "read":
+		if path := firstString(input, "filePath"); path != "" {
+			return "read:" + path
+		}
+	case "bash":
+		if command := firstString(input, "command"); command != "" {
+			return "bash:" + truncateCommand(command)
+		}
+	case "glob":
+		if pattern := firstString(input, "pattern"); pattern != "" {
+			return "glob:" + pattern
+		}
+	case "grep":
+		if pattern := firstString(input, "pattern"); pattern != "" {
+			return "grep:" + pattern
+		}
+	default:
+		if tool != "" {
+			if raw, err := json.Marshal(input); err == nil && len(raw) > 0 {
+				return tool + ":" + string(raw)
+			}
+		}
+	}
+	return ""
+}
+
+func truncateCommand(command string) string {
+	const maxCommandLength = 80
+	if len(command) > maxCommandLength {
+		return command[:maxCommandLength] + "..."
+	}
+	return command
 }
 
 func piLikeTextDelta(event map[string]any) string {

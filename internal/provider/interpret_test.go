@@ -6,6 +6,50 @@ import (
 	"testing"
 )
 
+func TestInterpretDetectsStalledOpenCodeRun(t *testing.T) {
+	var stdout strings.Builder
+	for i := 0; i < 10; i++ {
+		stdout.WriteString(`{"type":"step_start","sessionID":"ses_stall","part":{"type":"step-start"}}` + "\n")
+	}
+	for i := 0; i < 12; i++ {
+		stdout.WriteString(`{"type":"tool_use","part":{"tool":"glob","state":{"status":"completed","input":{"pattern":"docs/specs/*qualification*.md"},"output":"same"}}}` + "\n")
+	}
+	stdout.WriteString(`{"type":"text","part":{"type":"text","text":"Let me read the core docs first."}}` + "\n")
+	got := Interpret("opencode", []byte(stdout.String()), nil)
+	var stall *Warning
+	for i := range got.Warnings {
+		if got.Warnings[i].Code == "stall_detected" {
+			stall = &got.Warnings[i]
+		}
+	}
+	if stall == nil {
+		t.Fatalf("expected stall_detected warning, got %#v", got.Warnings)
+	}
+	if !strings.Contains(stall.Message, "10 steps") || !strings.Contains(stall.Message, "12 tool calls") ||
+		!strings.Contains(stall.Message, "repeated identical tool calls") ||
+		!strings.Contains(stall.Message, "glob:docs/specs/*qualification*.md x12") {
+		t.Fatalf("stall message = %q", stall.Message)
+	}
+}
+
+func TestInterpretHealthyOpenCodeRunHasNoStallWarning(t *testing.T) {
+	var stdout strings.Builder
+	stdout.WriteString(`{"type":"step_start","sessionID":"ses_ok","part":{"type":"step-start"}}` + "\n")
+	stdout.WriteString(`{"type":"tool_use","part":{"tool":"bash","state":{"status":"completed","input":{"command":"ls -la"},"output":"x"}}}` + "\n")
+	stdout.WriteString(`{"type":"tool_use","part":{"tool":"read","state":{"status":"completed","input":{"filePath":"a.md"},"output":"y"}}}` + "\n")
+	stdout.WriteString(`{"type":"text","part":{"type":"text","text":"Here is the synthesis with enough substance to satisfy a review."}}` + "\n")
+	stdout.WriteString(`{"type":"step_finish","part":{"type":"step-finish","reason":"stop"}}` + "\n")
+	got := Interpret("opencode", []byte(stdout.String()), nil)
+	for _, warning := range got.Warnings {
+		if warning.Code == "stall_detected" {
+			t.Fatalf("healthy run flagged as stalled: %#v", got.Warnings)
+		}
+	}
+	if got.TerminalMarker != "observed" {
+		t.Fatalf("terminal marker = %q", got.TerminalMarker)
+	}
+}
+
 func TestInterpretMissingTerminalPreservesOutputButDoesNotClaimSuccess(t *testing.T) {
 	stdout := []byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"useful evidence"}]}}` + "\n")
 	got := Interpret("claude", stdout, nil)

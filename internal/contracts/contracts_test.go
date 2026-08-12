@@ -82,6 +82,7 @@ func TestContractWarningCodesRemainV1(t *testing.T) {
 		"transient_provider_error":   true,
 		"stderr_error_recovered":     true,
 		"adapter_recognition_empty":  true,
+		"stall_detected":             true,
 	}
 	seen := map[string]bool{}
 	pattern := regexp.MustCompile(`Code:\s*"([^"]+)"`)

@@ -643,6 +643,15 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 			invocation.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(configHome, "opencode")
 		}
 		invocation.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] = "1"
+		if len(invocation.OpenCodeConfigJSON) > 0 {
+			configDir := strings.TrimSpace(invocation.SetEnv["OPENCODE_CONFIG_DIR"])
+			if configDir == "" {
+				return nil, fmt.Errorf("OpenCode config dir missing for routing config")
+			}
+			if err := os.WriteFile(filepath.Join(configDir, "opencode.json"), invocation.OpenCodeConfigJSON, 0o600); err != nil {
+				return nil, fmt.Errorf("write OpenCode routing config: %w", err)
+			}
+		}
 		return func() {}, nil
 	}
 	if invocation.Adapter == "pi" || invocation.Adapter == "omp" {

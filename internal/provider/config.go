@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -8,7 +9,7 @@ import (
 const boundedRunContract = `Hatch execution contract:
 This is a single bounded, non-interactive run. A human is waiting for a useful answer by the behavioral deadline; do not treat the run as an open-ended session. Complete the requested scope and nothing more, using the available context and tool signals to manage the budget. Do not promise or assume an exact wall-clock duration.
 
-Use focused checks by default. Time-box expensive tests, scratch clones or worktrees, broad repository scans, and network or fetch work; run a broad suite or exhaustive investigation only when explicitly requested or clearly required. Check the budget mid-run. Once evidence is sufficient, stop using tools and synthesize; never continue merely to eliminate every uncertainty. At the late budget threshold, stop launching tools and report incomplete evidence instead of racing the hard timeout. Preserve useful partial findings and do not redo completed work.
+Use focused checks by default. Time-box expensive tests, scratch clones or worktrees, broad repository scans, and network or fetch work; run a broad suite or exhaustive investigation only when explicitly requested or clearly required. Check the budget mid-run. Once evidence is sufficient, stop using tools and synthesize; never continue merely to eliminate every uncertainty. At the late budget threshold, stop launching tools and report incomplete evidence instead of racing the hard timeout. Preserve useful partial findings and do not redo completed work. Read each file at most once per run; when a read returns a continuation notice (for example "Use offset=N to continue"), issue exactly that continuation instead of re-reading from the start, and never re-run a search that already returned identical results. Start writing your answer once the core files are read: do not hold output until every file is read, and if the budget runs low, answer with the evidence you have and list what you did not read.
 
 Nested Hatch runs are allowed when the user or task explicitly permits bounded parallel or independent subwork; "single run" describes this invocation, not a ban on child Hatch calls. If you launch children, give each a narrow scope, a small explicit count, and its own deadline. Do not recurse further unless the task explicitly authorizes recursion. Never wait indefinitely for a child: continue with completed results, record missing or timed-out children, and synthesize the best partial answer.
 
@@ -38,6 +39,11 @@ type Invocation struct {
 	Adapter         string
 	ProviderVersion string
 	ReasoningPolicy ReasoningPolicy
+	// OpenCodeConfigJSON, when set, is written into the per-run OpenCode
+	// config dir as opencode.json before launch. Carries routing pins (for
+	// example an OpenRouter provider order that keeps prefix caching warm);
+	// never contains credentials.
+	OpenCodeConfigJSON []byte
 }
 
 func PreparePrompt(prompt string) string {
@@ -179,6 +185,9 @@ func Build(req Request) (Invocation, error) {
 		if strings.HasPrefix(req.Model, "openrouter/") && req.APIKey != "" {
 			invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
 		}
+		if strings.HasPrefix(req.Model, "openrouter/deepseek/deepseek-v4-flash") {
+			invocation.OpenCodeConfigJSON = openCodeDeepSeekRoutingConfig(strings.TrimPrefix(req.Model, "openrouter/"))
+		}
 		if strings.HasPrefix(req.Model, "amazon-bedrock/") {
 			invocation.SetEnv["AWS_PROFILE"] = "zh-ml-mlengineer"
 			invocation.SetEnv["AWS_REGION"] = "us-east-1"
@@ -228,4 +237,36 @@ func redactInvocation(invocation Invocation, promptIndices ...int) Invocation {
 		}
 	}
 	return invocation
+}
+
+// openCodeDeepSeekRoutingConfig pins an OpenRouter deepseek-v4-flash model to a
+// provider order with working prefix caching. Measured on the hatch account
+// (2026-08): DeepSeek 98% cache hit, CoreWeave 91%, Novita 91%, DeepInfra 90%;
+// the default price-based load balancer frequently picks non-caching endpoints
+// (DigitalOcean, OpenInference) that re-encode the full growing context on
+// every agent step, adding tens of seconds of latency per step. Setting
+// provider.order disables load balancing and is tried in order; allow_fallbacks
+// engages only on provider failure.
+func openCodeDeepSeekRoutingConfig(model string) []byte {
+	config := map[string]any{
+		"provider": map[string]any{
+			"openrouter": map[string]any{
+				"models": map[string]any{
+					model: map[string]any{
+						"options": map[string]any{
+							"provider": map[string]any{
+								"order":           []string{"DeepSeek", "CoreWeave", "Novita", "DeepInfra"},
+								"allow_fallbacks": true,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		panic("static opencode routing config cannot fail to marshal")
+	}
+	return encoded
 }

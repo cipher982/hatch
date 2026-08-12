@@ -1,10 +1,50 @@
 package provider
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestBuildOpenCodeDeepSeekRoutingConfig(t *testing.T) {
+	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(invocation.OpenCodeConfigJSON) == 0 {
+		t.Fatal("openrouter deepseek run missing routing config")
+	}
+	var config struct {
+		Provider struct {
+			OpenRouter struct {
+				Models map[string]struct {
+					Options struct {
+						Provider struct {
+							Order          []string `json:"order"`
+							AllowFallbacks bool     `json:"allow_fallbacks"`
+						} `json:"provider"`
+					} `json:"options"`
+				} `json:"models"`
+			} `json:"openrouter"`
+		} `json:"provider"`
+	}
+	if err := json.Unmarshal(invocation.OpenCodeConfigJSON, &config); err != nil {
+		t.Fatalf("routing config is not valid JSON: %v", err)
+	}
+	model := config.Provider.OpenRouter.Models["deepseek/deepseek-v4-flash-0731"]
+	if !model.Options.Provider.AllowFallbacks || len(model.Options.Provider.Order) == 0 || model.Options.Provider.Order[0] != "DeepSeek" {
+		t.Fatalf("routing config = %s", invocation.OpenCodeConfigJSON)
+	}
+
+	plain, err := Build(Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plain.OpenCodeConfigJSON) != 0 {
+		t.Fatalf("non-deepseek opencode run must not carry routing config: %s", plain.OpenCodeConfigJSON)
+	}
+}
 
 func TestPreparePromptOracle(t *testing.T) {
 	got := PreparePrompt("oracle prompt")
@@ -17,6 +57,11 @@ func TestPreparePromptOracle(t *testing.T) {
 		"Once evidence is sufficient, stop using tools and synthesize",
 		"At the late budget threshold, stop launching tools",
 		"Preserve useful partial findings and do not redo completed work",
+		"Read each file at most once per run",
+		"Use offset=N to continue",
+		"never re-run a search that already returned identical results",
+		"Start writing your answer once the core files are read",
+		"list what you did not read",
 		"Nested Hatch runs are allowed",
 		"not a ban on child Hatch calls",
 		"Never wait indefinitely for a child",

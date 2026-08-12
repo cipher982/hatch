@@ -11,8 +11,8 @@
     "legacy_result": {"ok": false, "status": "timeout", "output": "partial output\n", "exit_code": -1, "error": "Agent timed out after 1s", "stderr": null, "artifact_path": null, "session_id": null, "resume_command": null},
     "target_result": {"ok": false, "status": "timeout", "output": "partial output\n", "exit_code": -1, "error": "Agent timed out after 1s", "stderr": null},
     "provider_argv": ["gemini", "--model", "gemini-3-pro-preview", "--yolo", "--skip-trust", "-p", "-"],
-    "provider_stdin_sha256": "0fa79f2b11c25f01bedc005d1cb019dc7beab95c21182b9f8579d605e036aa1a",
-    "provider_stdin_bytes": 1815,
+    "provider_stdin_sha256": "987672f6b029408c0180c161b46526f70b9de4c8ad147bb41790f329e0ea4723",
+    "provider_stdin_bytes": 2268,
     "stderr_contains": []
   }
 }
