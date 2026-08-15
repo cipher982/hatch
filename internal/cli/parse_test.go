@@ -35,6 +35,16 @@ func TestParseMachineDefaults(t *testing.T) {
 	}
 }
 
+func TestParseExplicitJSONIsAutomationEvenWithTTY(t *testing.T) {
+	got, err := Parse([]string{"cursor", "grok", "--json", "prompt"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.JSON || !got.Automation {
+		t.Fatalf("explicit JSON did not enable automation: %#v", got)
+	}
+}
+
 func TestParseExplicitHarness(t *testing.T) {
 	got, err := Parse([]string{"codex", "sol", "--harness", "omp", "--json", "prompt"}, true)
 	if err != nil {

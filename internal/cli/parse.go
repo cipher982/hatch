@@ -75,7 +75,7 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 		case "-v", "--version":
 			req.Version = true
 		case "--json":
-			req.JSON = true
+			req.JSON, req.Automation = true, true
 		case "--automation":
 			req.Automation = true
 		case "--skip-git-repo-check":
