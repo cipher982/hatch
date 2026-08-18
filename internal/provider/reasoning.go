@@ -96,6 +96,13 @@ func resolvePiLikeReasoning(backend, model, requested string) (ReasoningPolicy, 
 	if strings.HasPrefix(model, "openai/") {
 		return resolveOpenCodeOpenAIReasoning(model, requested)
 	}
+	if strings.HasPrefix(model, "google-antigravity/") || strings.HasPrefix(model, "google/") {
+		effort, source := requested, "explicit"
+		if effort == "" {
+			effort, source = DefaultReasoningEffort, "default"
+		}
+		return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
+	}
 	if requested == "" {
 		return ReasoningPolicy{Source: "unsupported", Support: "unsupported"}, nil
 	}

@@ -36,6 +36,7 @@ var surfaces = map[string]struct {
 	"claude":     {"claude", map[string]string{"haiku": "haiku", "sonnet": "sonnet", "opus": "opus", "fable": "fable"}},
 	"cursor":     {"cursor", provider.CursorSurfaceModels},
 	"codex":      {"opencode", provider.CodexSurfaceModels},
+	"gemini":     {"omp", provider.GeminiSurfaceModels},
 	"openrouter": {"opencode", provider.OpenRouterSurfaceModels},
 }
 
@@ -157,15 +158,26 @@ func normalizeSurface(args []string) ([]string, error) {
 	}
 	before, after := args[:index], args[index+1:]
 	if len(after) == 0 {
+		if surfaceName == "gemini" {
+			result := append([]string(nil), before...)
+			result = append(result, "--backend", surface.backend)
+			if !hasExplicitModel {
+				result = append(result, "--model", surface.models["flash"])
+			}
+			return append(result, after...), nil
+		}
 		return nil, fmt.Errorf("%s requires an explicit model: %s", surfaceName, modelChoices(surface.models))
 	}
 	if strings.HasPrefix(after[0], "-") {
 		if after[0] == "-h" || after[0] == "--help" || after[0] == "--advanced-help" {
 			return append([]string(nil), args...), nil
 		}
-		if hasExplicitModel {
+		if hasExplicitModel || surfaceName == "gemini" {
 			result := append([]string(nil), before...)
 			result = append(result, "--backend", surface.backend)
+			if !hasExplicitModel && surfaceName == "gemini" {
+				result = append(result, "--model", surface.models["flash"])
+			}
 			return append(result, after...), nil
 		}
 		return nil, fmt.Errorf("%s requires an explicit model: %s", surfaceName, modelChoices(surface.models))
@@ -173,6 +185,14 @@ func normalizeSurface(args []string) ([]string, error) {
 	alias := after[0]
 	model, ok := surface.models[alias]
 	if !ok {
+		if surfaceName == "gemini" {
+			result := append([]string(nil), before...)
+			result = append(result, "--backend", surface.backend)
+			if !hasExplicitModel {
+				result = append(result, "--model", surface.models["flash"])
+			}
+			return append(result, after...), nil
+		}
 		message := fmt.Sprintf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
 		if surfaceName == "cursor" {
 			message += `. For a raw Cursor model ID, use: hatch cursor grok --model <cursor-model-id> "prompt"`
@@ -210,6 +230,8 @@ func shorthandSurface(alias string) string {
 		return "codex"
 	case "grok", "kimi-k3":
 		return "cursor"
+	case "flash", "3.7", "gemini-3.7-flash-tiered":
+		return "gemini"
 	case "deepseek-v4-flash", "deepseek-v4-pro":
 		return "openrouter"
 	}

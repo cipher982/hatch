@@ -32,6 +32,13 @@ var OpenRouterSurfaceModels = map[string]string{
 	"deepseek-v4-pro":   "openrouter/deepseek/deepseek-v4-pro-0813",
 }
 
+var GeminiSurfaceModels = map[string]string{
+	"flash":                   "google-antigravity/gemini-3.7-flash-tiered",
+	"3.7":                     "google-antigravity/gemini-3.7-flash-tiered",
+	"gemini-3.7-flash-tiered": "google-antigravity/gemini-3.7-flash-tiered",
+	"pro":                     "google-antigravity/gemini-3.1-pro",
+}
+
 // SurfaceCatalog returns every surfaced model in a stable order for help,
 // automation, and generated agent context.
 func SurfaceCatalog() []CatalogEntry {
@@ -42,6 +49,7 @@ func SurfaceCatalog() []CatalogEntry {
 		{"claude", map[string]string{"haiku": "haiku", "sonnet": "sonnet", "opus": "opus", "fable": "fable"}},
 		{"codex", CodexSurfaceModels},
 		{"cursor", CursorSurfaceModels},
+		{"gemini", GeminiSurfaceModels},
 		{"openrouter", OpenRouterSurfaceModels},
 	}
 	entries := make([]CatalogEntry, 0, 16)

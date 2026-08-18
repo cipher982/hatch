@@ -64,7 +64,7 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	}
 	if request.Harness != "" {
 		if !oneOf(request.Backend, "opencode", "pi", "omp") {
-			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for codex or openrouter surfaces"))
+			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for codex, gemini, or openrouter surfaces"))
 		}
 		request.Backend = request.Harness
 	}
@@ -284,11 +284,19 @@ func identity(backend, model string) (string, string) {
 				return "codex." + alias, "openai"
 			}
 		}
+		for alias, configured := range surfaces["gemini"].models {
+			if configured == model {
+				return "gemini." + alias, "google"
+			}
+		}
 		if strings.HasPrefix(model, "openrouter/") {
 			return "openrouter.raw", "openrouter"
 		}
 		if strings.HasPrefix(model, "openai/") {
 			return "codex.raw", "openai"
+		}
+		if strings.HasPrefix(model, "google-antigravity/") || strings.HasPrefix(model, "google/") {
+			return "gemini.raw", "google"
 		}
 	}
 	return backend + ".raw", "unknown"
@@ -298,29 +306,32 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
-	   hatch openrouter <deepseek-v4-flash|deepseek-v4-pro> [OPTIONS] "prompt"
+       hatch gemini [flash|pro] [OPTIONS] "prompt"
+       hatch openrouter <deepseek-v4-flash|deepseek-v4-pro> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
-	   hatch runs <list|inspect> [OPTIONS]
+       hatch runs <list|inspect> [OPTIONS]
 
 One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls
 
 Coding harness selection:
   --harness opencode     Use OpenCode (default for codex and openrouter)
   --harness pi           Use Pi
-  --harness omp          Use Oh My Pi
+  --harness omp          Use Oh My Pi (default for gemini)
 
 Model-first aliases:
   Claude: haiku, sonnet, opus, fable
   OpenAI coding models: sol, terra, luna, nano, mini, max
   Cursor: grok, kimi-k3
+  Gemini: flash, pro, 3.7, gemini-3.7-flash-tiered
   OpenRouter: deepseek-v4-flash, deepseek-v4-pro
 
 Start here:
   hatch opus "Review this diff"
+  hatch gemini "Review this branch"
   hatch sol --harness omp "Review this branch"
   hatch grok "Review this branch"
   hatch deepseek-v4-flash "Fix the failing tests"
-	 hatch deepseek-v4-pro "Review this architecture"
+  hatch deepseek-v4-pro "Review this architecture"
   hatch codex sol "Review this branch"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"

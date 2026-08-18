@@ -437,6 +437,8 @@ func fieldSurface(surface string) (string, bool) {
 		return "codex", true
 	case "cursor.grok", "cursor.kimi-k3":
 		return "cursor", true
+	case "gemini.flash", "gemini.3.7", "gemini.gemini-3.7-flash-tiered", "gemini.pro":
+		return "gemini", true
 	case "openrouter.deepseek-v4-flash", "openrouter.deepseek-v4-pro":
 		return "openrouter", true
 	case "expert":

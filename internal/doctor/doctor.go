@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -48,6 +49,7 @@ func Run(options Options) []Check {
 		checkHarness("harness.omp", "omp"),
 		checkCursorModel(options.Cursor),
 		checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", options.OpenAI, modelValues(provider.CodexSurfaceModels)),
+		checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels)),
 		checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", options.OpenRouter, modelValues(provider.OpenRouterSurfaceModels)),
 	}
 }
@@ -185,4 +187,56 @@ func checkCursorModel(credential Credential) Check {
 		return Check{Name: "cursor.catalog", Detail: fmt.Sprintf("configured models unavailable: %s; run `cursor-agent models` and update Hatch aliases", strings.Join(missing, ", "))}
 	}
 	return Check{Name: "cursor.catalog", OK: true, Detail: fmt.Sprintf("%d configured models are available", len(provider.CursorSurfaceModels))}
+}
+
+type ompModelEntry struct {
+	ID       string `json:"id"`
+	Selector string `json:"selector"`
+}
+
+type ompModelsResponse struct {
+	Models []ompModelEntry `json:"models"`
+}
+
+func checkOMPModels(name string, required []string) Check {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "omp", "models", "--json")
+	stdout, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return Check{Name: name, Detail: "omp models --json timed out after 10s"}
+	}
+	if err != nil {
+		if _, ok := err.(*exec.Error); ok {
+			return Check{Name: name, Detail: "omp is not installed"}
+		}
+		detail := err.Error()
+		if exit, ok := err.(*exec.ExitError); ok && strings.TrimSpace(string(exit.Stderr)) != "" {
+			detail = strings.TrimSpace(string(exit.Stderr))
+		}
+		return Check{Name: name, Detail: "could not list omp models: " + detail}
+	}
+	var resp ompModelsResponse
+	if err := json.Unmarshal(stdout, &resp); err != nil {
+		return Check{Name: name, Detail: "failed to parse omp models --json: " + err.Error()}
+	}
+	available := map[string]struct{}{}
+	for _, m := range resp.Models {
+		if m.Selector != "" {
+			available[m.Selector] = struct{}{}
+		}
+		if m.ID != "" {
+			available[m.ID] = struct{}{}
+		}
+	}
+	missing := []string{}
+	for _, model := range required {
+		if _, ok := available[model]; !ok {
+			missing = append(missing, model)
+		}
+	}
+	if len(missing) > 0 {
+		return Check{Name: name, Detail: fmt.Sprintf("configured models unavailable: %s; run `omp models` and update Hatch aliases", strings.Join(missing, ", "))}
+	}
+	return Check{Name: name, OK: true, Detail: fmt.Sprintf("%d configured models are available", len(required))}
 }

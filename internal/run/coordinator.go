@@ -659,8 +659,13 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 		if err := secureMkdirAll(root); err != nil {
 			return nil, err
 		}
+		linkUserPiLikeConfig(invocation.Adapter, root)
+		sessionDir := filepath.Join(root, "sessions")
+		if err := secureMkdirAll(sessionDir); err != nil {
+			return nil, err
+		}
 		invocation.SetEnv["PI_CODING_AGENT_DIR"] = root
-		invocation.SetEnv["PI_CODING_AGENT_SESSION_DIR"] = filepath.Join(root, "sessions")
+		invocation.SetEnv["PI_CODING_AGENT_SESSION_DIR"] = sessionDir
 		invocation.SetEnv["PI_TELEMETRY"] = "0"
 		return func() {}, nil
 	}
@@ -689,6 +694,37 @@ func hasInvocationArg(argv []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func linkUserPiLikeConfig(adapter, targetRoot string) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return
+	}
+	candidates := []string{}
+	if adapter == "omp" {
+		candidates = append(candidates, filepath.Join(home, ".omp", "agent"))
+	} else if adapter == "pi" {
+		candidates = append(candidates, filepath.Join(home, ".pi", "agent"))
+	}
+	for _, sourceDir := range candidates {
+		entries, err := os.ReadDir(sourceDir)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			name := entry.Name()
+			if entry.IsDir() && (name == "sessions" || name == "terminal-sessions" || name == "logs") {
+				continue
+			}
+			destPath := filepath.Join(targetRoot, name)
+			if _, err := os.Lstat(destPath); err == nil {
+				continue
+			}
+			sourcePath := filepath.Join(sourceDir, name)
+			_ = os.Symlink(sourcePath, destPath)
+		}
+	}
 }
 
 func displayReasoningEffort(policy provider.ReasoningPolicy) string {

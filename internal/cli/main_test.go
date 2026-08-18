@@ -191,10 +191,17 @@ func TestMainDoctorJSON(t *testing.T) {
 	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4-flash-0731' 'openrouter/deepseek/deepseek-v4-pro-0813'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, binary := range []string{"pi", "omp"} {
-		if err := os.WriteFile(filepath.Join(directory, binary), []byte("#!/bin/sh\nprintf '%s\\n' '"+binary+" test'\n"), 0o700); err != nil {
-			t.Fatal(err)
-		}
+	piBinary := filepath.Join(directory, "pi")
+	if err := os.WriteFile(piBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'pi test'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ompBinary := filepath.Join(directory, "omp")
+	ompScript := `#!/bin/sh
+if [ "$1" = "--version" ]; then printf '%s\n' 'omp test'; exit 0; fi
+printf '%s\n' '{"models":[{"id":"gemini-3.7-flash-tiered","selector":"google-antigravity/gemini-3.7-flash-tiered"},{"id":"gemini-3.1-pro","selector":"google-antigravity/gemini-3.1-pro"}]}'
+`
+	if err := os.WriteFile(ompBinary, []byte(ompScript), 0o700); err != nil {
+		t.Fatal(err)
 	}
 	helper := filepath.Join(directory, "credential-helper")
 	if err := os.WriteFile(helper, []byte("#!/bin/sh\nprintf 'test-secret\\n'\n"), 0o700); err != nil {
@@ -218,7 +225,7 @@ func TestMainDoctorJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || len(result.Checks) != 6 {
+	if !result.OK || len(result.Checks) != 7 {
 		t.Fatalf("doctor = %#v", result)
 	}
 	for _, check := range result.Checks {

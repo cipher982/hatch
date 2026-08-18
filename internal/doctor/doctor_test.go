@@ -103,3 +103,19 @@ func TestCheckHarness(t *testing.T) {
 		t.Fatalf("check = %#v", check)
 	}
 }
+
+func TestCheckOMPModels(t *testing.T) {
+	directory := t.TempDir()
+	binary := filepath.Join(directory, "omp")
+	script := `#!/bin/sh
+printf '%s\n' '{"models":[{"id":"gemini-3.7-flash-tiered","selector":"google-antigravity/gemini-3.7-flash-tiered"},{"id":"gemini-3.1-pro","selector":"google-antigravity/gemini-3.1-pro"}]}'
+`
+	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory)
+	check := checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels))
+	if !check.OK || check.Name != "gemini.catalog" {
+		t.Fatalf("check = %#v", check)
+	}
+}
