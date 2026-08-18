@@ -306,7 +306,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
-       hatch gemini [flash|pro] [OPTIONS] "prompt"
+       hatch gemini [flash|3.7|gemini-3.7-flash-tiered] [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4-flash|deepseek-v4-pro> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect> [OPTIONS]
@@ -322,7 +322,7 @@ Model-first aliases:
   Claude: haiku, sonnet, opus, fable
   OpenAI coding models: sol, terra, luna, nano, mini, max
   Cursor: grok, kimi-k3
-  Gemini: flash, pro, 3.7, gemini-3.7-flash-tiered
+  Gemini: flash, 3.7, gemini-3.7-flash-tiered
   OpenRouter: deepseek-v4-flash, deepseek-v4-pro
 
 Start here:

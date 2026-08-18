@@ -13,7 +13,6 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-5.6-sol"},
 		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-3.7-flash-tiered"},
 		{[]string{"gemini", "flash", "--json", "-"}, "omp", "google-antigravity/gemini-3.7-flash-tiered"},
-		{[]string{"gemini", "pro", "--json", "-"}, "omp", "google-antigravity/gemini-3.1-pro"},
 		{[]string{"openrouter", "deepseek-v4-flash", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
 		{[]string{"openrouter", "deepseek-v4-pro", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
 	}
@@ -112,7 +111,6 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"surface help", []string{"codex", "--help"}, []string{"codex", "--help"}},
 		{"surface advanced help", []string{"claude", "--advanced-help"}, []string{"claude", "--advanced-help"}},
 		{"gemini default prompt", []string{"gemini", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.7-flash-tiered", "review"}},
-		{"gemini explicit alias", []string{"gemini", "pro", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.1-pro", "review"}},
 		{"gemini shorthand", []string{"flash", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.7-flash-tiered", "review"}},
 	}
 	for _, test := range tests {
@@ -130,6 +128,13 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestParseRejectsDeprecatedGeminiAlias(t *testing.T) {
+	_, err := Parse([]string{"gemini", "pro", "review"}, true)
+	if err == nil || err.Error() != `invalid gemini model "pro". Choose one of: flash, 3.7, gemini-3.7-flash-tiered` {
+		t.Fatalf("Parse deprecated Gemini alias error = %v", err)
 	}
 }
 

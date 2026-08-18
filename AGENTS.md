@@ -25,7 +25,7 @@ here is authoritative when they differ):
 - `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`opus` = Opus 5, current default; `fable` = Fable-class)
 - `hatch codex <sol|terra|luna>` → GPT-5.6 on OpenAI (`nano|mini|max` remain compatibility aliases)
 - `hatch cursor <grok|kimi-k3>` → Grok 4.5 High and Kimi K3 via local Cursor Agent CLI
-- `hatch gemini [flash|pro]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.7-flash-tiered`, current default)
+- `hatch gemini [flash|3.7|gemini-3.7-flash-tiered]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.7-flash-tiered`, current default)
 - `hatch openrouter deepseek-v4-flash` → DeepSeek via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
@@ -154,4 +154,4 @@ explicit surfaced provider.
 - (2026-08-04) [claude] Resolve Claude effort from the installed CLI's supported `--effort` values; keep its unspecified default at `low` so an explicit override doesn't silently raise cost.
 - (2026-08-12) [routing] OpenRouter deepseek-v4-flash runs pin a provider order (DeepSeek, CoreWeave, Novita, DeepInfra; allow_fallbacks) via a per-run `opencode.json` in the isolated config dir. Default price-based load balancing routinely lands on non-caching endpoints (DigitalOcean, OpenInference) that re-encode the whole growing context per agent step; measured on this account DeepSeek caches 98% while OpenInference caches 0% and runs at ~3 tps.
 - (2026-08-12) [contract] The bounded-run contract forbids re-reading the same file or re-running identical searches and requires starting the answer once core files are read. Cancelled/timed-out OpenCode runs with no meaningful text across many tool-only steps and repeated identical tool calls emit a `stall_detected` warning with step/tool/text statistics.
-- (2026-08-18) [gemini] `hatch gemini` routes to Oh My Pi with `google-antigravity/gemini-3.7-flash-tiered` by default (aliases: `flash`, `3.7`, `gemini-3.7-flash-tiered`, `pro`). OMP coordinator isolation preserves user database/auth (`models.db*`, `config.yml`, `models.yml`) via symlinks while keeping session state isolated under the run artifact root.
+- (2026-08-18) [gemini] `hatch gemini` routes to Oh My Pi with `google-antigravity/gemini-3.7-flash-tiered` by default (aliases: `flash`, `3.7`, `gemini-3.7-flash-tiered`). OMP coordinator isolation preserves user database/auth (`models.db*`, `config.yml`, `models.yml`) via symlinks while keeping session state isolated under the run artifact root.

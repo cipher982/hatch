@@ -198,7 +198,7 @@ func TestMainDoctorJSON(t *testing.T) {
 	ompBinary := filepath.Join(directory, "omp")
 	ompScript := `#!/bin/sh
 if [ "$1" = "--version" ]; then printf '%s\n' 'omp test'; exit 0; fi
-printf '%s\n' '{"models":[{"id":"gemini-3.7-flash-tiered","selector":"google-antigravity/gemini-3.7-flash-tiered"},{"id":"gemini-3.1-pro","selector":"google-antigravity/gemini-3.1-pro"}]}'
+printf '%s\n' '{"models":[{"id":"gemini-3.7-flash-tiered","selector":"google-antigravity/gemini-3.7-flash-tiered"}]}'
 `
 	if err := os.WriteFile(ompBinary, []byte(ompScript), 0o700); err != nil {
 		t.Fatal(err)
