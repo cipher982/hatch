@@ -175,8 +175,8 @@ an explicit override. This policy is resolved before credentials or provider
 execution and is copied into the public result.
 
 Provider state namespaces are also assigned before launch. OpenCode gets
-per-run XDG config/data/state/cache paths, with only the reviewed DCG config
-allowed to remain shared. Raw Codex gets a per-run `CODEX_HOME`, ignores user
+per-run XDG data/state paths; config dependencies and cache use a shared,
+version-keyed runtime namespace outside the artifact. Raw Codex gets a per-run `CODEX_HOME`, ignores user
 configuration, and uses ephemeral execution. Its recovery capability is
 explicitly unsupported because no native session is retained.
 
@@ -448,10 +448,12 @@ it. This is sensitive local data, like provider-native transcripts; permissions
 and archive policy protect it. A future request-redaction mode must be explicit
 and must record that evidence is incomplete.
 
-Provider snapshots require an adapter-owned allowlist. In particular, OpenCode
-snapshotting must prove which XDG database/WAL/state files are needed and exclude
-auth files, tokens, credential caches, and unrelated provider caches before the
-snapshot may be exported or included in an archive digest. Terminalization
+Provider snapshots require an adapter-owned allowlist. In particular, abnormal
+OpenCode terminal outcomes may retain only proven XDG database/WAL/state files;
+auth files, tokens, credential caches, configuration, package installations,
+and unrelated provider caches are excluded before a snapshot may be exported
+or included in an archive digest. Successful OpenCode runs discard native state
+after their event stream and result are durable. Terminalization
 copies a hash-stable allowlisted view onto new inodes, then retires the live XDG
 tree. A provider holding an old SQLite descriptor therefore cannot mutate the
 content-addressed terminal evidence after Hatch returns.
@@ -508,7 +510,7 @@ session manager. Four small adapters plus a raw-text adapter are enough.
 |---|---|---|---|---|
 | `hatch claude` and raw Claude/Bedrock | `session_id` from Claude init event | `provider_owned` in Claude's native history | identify; recovery hint only when configured/proven | Preserve full stream; capture ID; use terminal result or last assistant text; never copy all of `~/.claude` |
 | `hatch cursor grok` and `hatch cursor kimi-k3` | `session_id` from Cursor init event | `unknown` until Cursor's durable store contract is proven | identify only | Preserve stream; require successful terminal result; record no resume/export claim |
-| surfaced Codex/OpenRouter through OpenCode | `sessionID` from step event | `hatch_preserved` isolated XDG database | identify, inspect snapshot; same-version timeout recovery hint | Copy a hash-stable allowlisted data/state snapshot into `provider/opencode-snapshot`, retire the live XDG tree, and preserve exact OpenCode version/model/env names |
+| surfaced Codex/OpenRouter through OpenCode | `sessionID` from step event | successful: discarded; abnormal: `hatch_preserved` allowlisted XDG database | identify; inspect abnormal snapshot; same-version timeout recovery hint | Keep config dependencies/cache in a shared version-keyed namespace; discard successful native state; for abnormal outcomes copy a hash-stable allowlisted snapshot into `provider/opencode-snapshot` and retire the live XDG tree |
 | `hatch expert` | OpenAI `response_id` | `remote_provider` plus local raw-response snapshots | identify, poll while active, inspect | Create Hatch run before POST; store every response snapshot and terminal projection; unify old Expert cache artifact into the run directory |
 | raw `codex exec` | unavailable unless a stable structured event is added | `provider_owned` or `unknown`; do not guess | none initially | Use raw-text adapter; durable request/stdout/stderr/result still guaranteed |
 | raw Gemini | unavailable unless CLI exposes one | `unknown` | none initially | Use raw-text adapter; durable request/stdout/stderr/result still guaranteed |
@@ -575,9 +577,13 @@ in-repo usage reaches zero and a time-boxed external compatibility window ends.
 hatch runs list [--status ...] [--json]
 hatch runs inspect <run-id> [--json]
 hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
+hatch runs gc [--apply] [--json]
 ```
 
 - `list` and `inspect` are local and never require provider credentials.
+- `gc` removes only classified provider runtime/config/cache material that was
+  never canonical evidence. It is a dry run unless `--apply` is explicit and
+  skips nonterminal and `.hatch-pin` runs.
 - `inspect` shows exact files, capture state, native identity/capabilities,
   warnings, and any structured operator recovery hint.
 - `audit` is the authoritative Go artifact-integrity checker. It reuses the V1

@@ -309,7 +309,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch gemini [flash|3.7|gemini-3.7-flash-tiered] [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4-flash|deepseek-v4-pro> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
-       hatch runs <list|inspect> [OPTIONS]
+       hatch runs <list|inspect|audit|gc> [OPTIONS]
 
 One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls
 
@@ -351,6 +351,8 @@ Other commands:
   hatch doctor [--json]
   hatch runs list [--status STATUS] [--json]
   hatch runs inspect <run-id> [--json]
+  hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
+  hatch runs gc [--apply] [--json]
 `
 
 const AdvancedHelp = Help + `

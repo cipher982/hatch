@@ -3,6 +3,8 @@ package run
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -293,62 +295,84 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		state.Capabilities["state_isolation"] = "hatch_per_run"
 		state.Capabilities["session_persistence"] = "disabled_ephemeral"
 		state.Capabilities["recovery"] = "unsupported_ephemeral"
+		if pruneErr := discardProviderRuntime(artifact, "codex"); pruneErr != nil {
+			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
+			if outcome == OutcomeSucceeded {
+				outcome = OutcomeSucceededWarnings
+			}
+		}
 	}
 	if interpretation.NativeID != "" {
 		state.NativeID = &interpretation.NativeID
 	}
 	if req.Invocation.Adapter == "opencode" {
 		state.Capabilities["state_isolation"] = "hatch_per_run"
-		snapshot, approved, pruneErr := freezeOpenCodeState(artifact)
-		if pruneErr != nil {
-			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
-			artifact.Manifest.Capture.State = "degraded"
-		}
-		if approved > 0 {
-			state.SnapshotPath = &snapshot
-			state.Retention = "hatch_preserved"
-			state.Capabilities["snapshot"] = "supported"
-			if req.Invocation.ProviderVersion != "" {
-				state.ProviderVersion = &req.Invocation.ProviderVersion
+		if outcome == OutcomeSucceeded || outcome == OutcomeSucceededWarnings {
+			if pruneErr := discardProviderRuntime(artifact, "opencode"); pruneErr != nil {
+				warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
+				outcome = OutcomeSucceededWarnings
 			}
-			if state.NativeID != nil && req.Invocation.ProviderVersion != "" {
-				envArgs := openCodeRecoveryEnvironment(artifact, snapshot, req.Invocation)
-				state.InspectHint = &OperatorHint{
-					Argv:         append(append([]string(nil), envArgs...), "opencode", "export", *state.NativeID),
-					VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion,
-				}
-				state.Capabilities["inspect"] = "supported_same_version"
-				if timedOut {
-					argv := append(append([]string(nil), envArgs...), "opencode", "run", "--dangerously-skip-permissions")
-					if req.CWD != "" {
-						argv = append(argv, "--dir", req.CWD)
-					}
-					if hasInvocationArg(req.Invocation.Argv, "--pure") {
-						argv = append(argv, "--pure")
-					}
-					argv = append(argv, "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model)
-					if req.Invocation.ReasoningPolicy.Effort != "" && req.Invocation.ReasoningPolicy.Support != "unsupported" {
-						argv = append(argv, "--variant", req.Invocation.ReasoningPolicy.Effort)
-					}
-					argv = append(argv, "--session", *state.NativeID, "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.")
-					state.RecoveryHint = &OperatorHint{Argv: argv, VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion, RequiresApprovalBypass: true}
-					state.Capabilities["recovery_hint"] = "best_effort_same_version"
-				}
-			} else if state.NativeID != nil {
-				state.Capabilities["inspect"] = "unsupported"
-			}
-		} else {
 			state.Retention = "unavailable"
-			state.Capabilities["snapshot"] = "unsupported"
+			state.Capabilities["snapshot"] = "not_retained_terminal_success"
+			state.Capabilities["inspect"] = "run_artifact_only"
+		} else {
+			snapshot, approved, pruneErr := freezeOpenCodeState(artifact)
+			if pruneErr != nil {
+				warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
+				artifact.Manifest.Capture.State = "degraded"
+			}
+			if approved > 0 {
+				state.SnapshotPath = &snapshot
+				state.Retention = "hatch_preserved"
+				state.Capabilities["snapshot"] = "supported"
+				if req.Invocation.ProviderVersion != "" {
+					state.ProviderVersion = &req.Invocation.ProviderVersion
+				}
+				if state.NativeID != nil && req.Invocation.ProviderVersion != "" {
+					envArgs := openCodeRecoveryEnvironment(artifact, snapshot, req.Invocation)
+					state.InspectHint = &OperatorHint{
+						Argv:         append(append([]string(nil), envArgs...), "opencode", "export", *state.NativeID),
+						VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion,
+					}
+					state.Capabilities["inspect"] = "supported_same_version"
+					if timedOut {
+						argv := append(append([]string(nil), envArgs...), "opencode", "run", "--dangerously-skip-permissions")
+						if req.CWD != "" {
+							argv = append(argv, "--dir", req.CWD)
+						}
+						if hasInvocationArg(req.Invocation.Argv, "--pure") {
+							argv = append(argv, "--pure")
+						}
+						argv = append(argv, "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model)
+						if req.Invocation.ReasoningPolicy.Effort != "" && req.Invocation.ReasoningPolicy.Support != "unsupported" {
+							argv = append(argv, "--variant", req.Invocation.ReasoningPolicy.Effort)
+						}
+						argv = append(argv, "--session", *state.NativeID, "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.")
+						state.RecoveryHint = &OperatorHint{Argv: argv, VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion, RequiresApprovalBypass: true}
+						state.Capabilities["recovery_hint"] = "best_effort_same_version"
+					}
+				} else if state.NativeID != nil {
+					state.Capabilities["inspect"] = "unsupported"
+				}
+			} else {
+				state.Retention = "unavailable"
+				state.Capabilities["snapshot"] = "unsupported"
+			}
 		}
 	}
 	if req.Invocation.Adapter == "pi" || req.Invocation.Adapter == "omp" {
-		state.Retention = "hatch_preserved"
+		state.Retention = "unavailable"
 		state.Capabilities["state_isolation"] = "hatch_per_run"
 		state.Capabilities["session_persistence"] = "disabled_ephemeral"
 		state.Capabilities["recovery"] = "unsupported_ephemeral"
 		if req.Invocation.ProviderVersion != "" {
 			state.ProviderVersion = &req.Invocation.ProviderVersion
+		}
+		if pruneErr := discardProviderRuntime(artifact, req.Invocation.Adapter); pruneErr != nil {
+			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
+			if outcome == OutcomeSucceeded {
+				outcome = OutcomeSucceededWarnings
+			}
 		}
 	}
 	c.Store.StageTerminal(artifact, outcome, exitCode, resultState, state, warnings)
@@ -629,11 +653,12 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 			}
 			invocation.SetEnv[envName] = path
 		}
-		configHome := filepath.Join(artifact.Path, "provider", "opencode-config")
-		if err := secureMkdirAll(filepath.Join(configHome, "opencode")); err != nil {
-			return nil, err
+		configHome, cacheHome, managedConfig := sharedOpenCodeRuntimeHomes(artifact, *invocation)
+		if managedConfig {
+			if err := secureMkdirAll(filepath.Join(configHome, "opencode")); err != nil {
+				return nil, err
+			}
 		}
-		cacheHome := filepath.Join(artifact.Path, "provider", "opencode-cache")
 		if err := secureMkdirAll(cacheHome); err != nil {
 			return nil, err
 		}
@@ -644,15 +669,9 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 		}
 		invocation.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] = "1"
 		if len(invocation.OpenCodeConfigJSON) > 0 {
-			configDir := strings.TrimSpace(invocation.SetEnv["OPENCODE_CONFIG_DIR"])
-			if configDir == "" {
-				return nil, fmt.Errorf("OpenCode config dir missing for routing config")
-			}
-			if err := os.WriteFile(filepath.Join(configDir, "opencode.json"), invocation.OpenCodeConfigJSON, 0o600); err != nil {
-				return nil, fmt.Errorf("write OpenCode routing config: %w", err)
-			}
+			invocation.SetEnv["OPENCODE_CONFIG_CONTENT"] = string(invocation.OpenCodeConfigJSON)
 		}
-		return func() {}, nil
+		return func() { _ = discardProviderRuntime(artifact, "opencode") }, nil
 	}
 	if invocation.Adapter == "pi" || invocation.Adapter == "omp" {
 		root := filepath.Join(artifact.Path, "provider", invocation.Adapter)
@@ -667,7 +686,7 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 		invocation.SetEnv["PI_CODING_AGENT_DIR"] = root
 		invocation.SetEnv["PI_CODING_AGENT_SESSION_DIR"] = sessionDir
 		invocation.SetEnv["PI_TELEMETRY"] = "0"
-		return func() {}, nil
+		return func() { _ = discardProviderRuntime(artifact, invocation.Adapter) }, nil
 	}
 	if isRawCodexInvocation(*invocation) {
 		root := filepath.Join(artifact.Path, "provider", "codex")
@@ -675,9 +694,26 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 			return nil, err
 		}
 		invocation.SetEnv["CODEX_HOME"] = root
-		return func() {}, nil
+		return func() { _ = discardProviderRuntime(artifact, "codex") }, nil
 	}
 	return func() {}, nil
+}
+
+func sharedOpenCodeRuntimeHomes(artifact *Artifact, invocation provider.Invocation) (string, string, bool) {
+	version := strings.TrimSpace(invocation.ProviderVersion)
+	if version == "" && len(invocation.Argv) > 0 {
+		version = filepath.Base(invocation.Argv[0]) + "-unknown-version"
+	}
+	digest := sha256.Sum256([]byte(version))
+	key := "v-" + hex.EncodeToString(digest[:8])
+	root := filepath.Join(filepath.Dir(filepath.Dir(artifact.Path)), "provider-runtime", "opencode", key)
+	configHome := filepath.Join(root, "config")
+	managedConfig := true
+	if configDir := strings.TrimSpace(invocation.SetEnv["OPENCODE_CONFIG_DIR"]); filepath.Base(configDir) == "opencode" {
+		configHome = filepath.Dir(configDir)
+		managedConfig = false
+	}
+	return configHome, filepath.Join(root, "cache"), managedConfig
 }
 
 func isRawCodexInvocation(invocation provider.Invocation) bool {
@@ -743,6 +779,7 @@ func openCodeRecoveryEnvironment(artifact *Artifact, snapshot string, invocation
 		{"XDG_CONFIG_HOME", invocation.SetEnv["XDG_CONFIG_HOME"]},
 		{"XDG_CACHE_HOME", invocation.SetEnv["XDG_CACHE_HOME"]},
 		{"OPENCODE_CONFIG_DIR", invocation.SetEnv["OPENCODE_CONFIG_DIR"]},
+		{"OPENCODE_CONFIG_CONTENT", invocation.SetEnv["OPENCODE_CONFIG_CONTENT"]},
 		{"OPENCODE_DISABLE_PROJECT_CONFIG", "1"},
 	}
 	args := []string{"env", "-u", "OPENCODE_CONFIG", "-u", "OPENCODE_CONFIG_CONTENT"}
@@ -752,6 +789,15 @@ func openCodeRecoveryEnvironment(artifact *Artifact, snapshot string, invocation
 		}
 	}
 	return args
+}
+
+func discardProviderRuntime(artifact *Artifact, name string) error {
+	root := filepath.Join(artifact.Path, "provider", name)
+	if err := os.RemoveAll(root); err != nil {
+		return fmt.Errorf("discard %s provider runtime: %w", name, err)
+	}
+	_ = os.Remove(filepath.Join(artifact.Path, "provider"))
+	return nil
 }
 
 var openCodeStateAllowlist = map[string]bool{

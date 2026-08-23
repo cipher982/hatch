@@ -113,9 +113,57 @@ func runRuns(args []string, stdout, stderr io.Writer) int {
 			return 0
 		}
 		return 1
+	case "gc":
+		apply, jsonOutput, err := parseRunsGC(args[1:])
+		if err != nil {
+			return renderConfigError(jsonOutput, stdout, stderr, err)
+		}
+		report, err := runner.CollectGarbage(root, apply)
+		if err != nil {
+			return renderConfigError(jsonOutput, stdout, stderr, err)
+		}
+		if jsonOutput {
+			_ = json.NewEncoder(stdout).Encode(report)
+		} else {
+			mode := "dry-run"
+			if apply {
+				mode = "applied"
+			}
+			fmt.Fprintf(stdout, "Hatch run garbage collection (%s): scanned=%d nonterminal-skipped=%d pinned-skipped=%d\n", mode, report.RunsScanned, report.RunsSkippedNonterminal, report.RunsSkippedPinned)
+			for _, className := range []string{runner.GarbageOpenCodeConfig, runner.GarbageOpenCodeCache, runner.GarbageProviderState} {
+				class := report.Classes[className]
+				fmt.Fprintf(stdout, "  %s: paths=%d files=%d logical-bytes=%d\n", className, class.Paths, class.Files, class.LogicalBytes)
+			}
+			fmt.Fprintf(stdout, "  total: paths=%d files=%d logical-bytes=%d removed-logical-bytes=%d\n", report.TotalPaths, report.TotalFiles, report.TotalLogicalBytes, report.RemovedLogicalBytes)
+			if !apply && report.TotalPaths > 0 {
+				fmt.Fprintln(stdout, "Dry run only. Re-run with --apply to remove these derived provider directories.")
+			}
+			for _, message := range report.Errors {
+				fmt.Fprintf(stderr, "  error: %s\n", message)
+			}
+		}
+		if len(report.Errors) > 0 {
+			return 1
+		}
+		return 0
 	default:
 		return renderConfigError(false, stdout, stderr, fmt.Errorf("unknown runs command %q", args[0]))
 	}
+}
+
+func parseRunsGC(args []string) (bool, bool, error) {
+	apply, jsonOutput := false, false
+	for _, arg := range args {
+		switch arg {
+		case "--apply":
+			apply = true
+		case "--json":
+			jsonOutput = true
+		default:
+			return apply, jsonOutput, fmt.Errorf("unrecognized argument: %s", arg)
+		}
+	}
+	return apply, jsonOutput, nil
 }
 
 func parseRunsAudit(args []string) (int, int, bool, error) {
@@ -210,6 +258,8 @@ func outcomeString(value *runner.Outcome) string {
 const RunsHelp = `usage: hatch runs list [--status STATUS] [--json]
        hatch runs inspect <run-id> [--json]
        hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
+       hatch runs gc [--apply] [--json]
 
 Inspect local Hatch run artifacts without provider credentials.
+Garbage collection is a dry run unless --apply is supplied.
 `

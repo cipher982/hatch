@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -52,6 +53,53 @@ func TestRunsCLIListsAndInspectsCurrentArtifacts(t *testing.T) {
 		record.Manifest.RunID != artifact.Manifest.RunID || !containsString(record.Files, "evidence.sha256") ||
 		!containsString(record.Files, "result.txt") {
 		t.Fatalf("inspect=%s err=%v", inspectOut.String(), err)
+	}
+}
+
+func TestRunsCLIGarbageCollectionRequiresApply(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "runs")
+	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", root)
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	store := runner.NewStore(root)
+	artifact, err := store.Prepare(runner.PreparedRun{Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", Request: "prompt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdoutSink, stderrSink, err := store.OpenStreams(artifact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = stdoutSink.Close()
+	_ = stderrSink.Close()
+	resultFile, err := store.WriteResult(artifact, []byte("answer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CommitTerminal(artifact, runner.OutcomeSucceeded, 0, runner.Result{Output: "present", OutputFile: &resultFile, TerminalMarker: "observed"}, runner.State{Retention: "unavailable", NativeIDState: "not_exposed", Capabilities: map[string]string{}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	garbage := filepath.Join(artifact.Path, "provider", "opencode-cache", "opencode", "models.json")
+	if err := os.MkdirAll(filepath.Dir(garbage), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(garbage, []byte("cache"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if exit := Main([]string{"runs", "gc", "--json"}, bytes.NewReader(nil), &stdout, &stderr, true); exit != 0 {
+		t.Fatalf("dry run exit=%d stderr=%s", exit, stderr.String())
+	}
+	if _, err := os.Stat(garbage); err != nil {
+		t.Fatalf("dry run removed garbage: %v", err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if exit := Main([]string{"runs", "gc", "--apply", "--json"}, bytes.NewReader(nil), &stdout, &stderr, true); exit != 0 {
+		t.Fatalf("apply exit=%d stderr=%s", exit, stderr.String())
+	}
+	if _, err := os.Stat(garbage); !os.IsNotExist(err) {
+		t.Fatalf("garbage remains: %v", err)
 	}
 }
 

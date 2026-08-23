@@ -308,23 +308,22 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 				t.Fatalf("structured evidence mismatch: %#v", result.Run)
 			}
 			if test.backend == "pi" || test.backend == "omp" {
-				if result.Run.ProviderState.Capabilities["state_isolation"] != "hatch_per_run" || result.Run.ProviderState.Capabilities["session_persistence"] != "disabled_ephemeral" {
+				if result.Run.ProviderState.Retention != "unavailable" || result.Run.ProviderState.Capabilities["state_isolation"] != "hatch_per_run" || result.Run.ProviderState.Capabilities["session_persistence"] != "disabled_ephemeral" {
 					t.Fatalf("%s state policy = %#v", test.backend, result.Run.ProviderState)
 				}
-			} else if test.backend == "opencode" {
-				if result.Run.ProviderState.SnapshotPath == nil {
-					t.Fatal("OpenCode snapshot path is missing")
+				if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider")); !os.IsNotExist(err) {
+					t.Fatalf("%s provider runtime retained: %v", test.backend, err)
 				}
-				snapshotRoot := filepath.Join(*result.ArtifactPath, filepath.FromSlash(*result.Run.ProviderState.SnapshotPath))
-				stateFile := filepath.Join(snapshotRoot, "data", "opencode", "session.db")
-				if data, err := os.ReadFile(stateFile); err != nil || string(data) != "fake opencode state" {
-					t.Fatalf("provider state not preserved: %q, %v", data, err)
+			} else if test.backend == "opencode" {
+				if result.Run.ProviderState.SnapshotPath != nil || result.Run.ProviderState.Retention != "unavailable" ||
+					result.Run.ProviderState.Capabilities["snapshot"] != "not_retained_terminal_success" {
+					t.Fatalf("successful OpenCode state was retained: %#v", result.Run.ProviderState)
 				}
 				if len(progress) < 3 || progress[0][:12] != "[hatch] run " {
 					t.Fatalf("progress = %#v", progress)
 				}
-				if _, err := os.Stat(filepath.Join(snapshotRoot, "data", "opencode", "auth.json")); !os.IsNotExist(err) {
-					t.Fatalf("untrusted provider auth state retained: %v", err)
+				if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider")); !os.IsNotExist(err) {
+					t.Fatalf("successful provider runtime retained: %v", err)
 				}
 			}
 		})
@@ -483,9 +482,9 @@ func TestOpenCodeDoesNotClaimInspectionWithoutToolVersion(t *testing.T) {
 		Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", Prompt: "prompt",
 		Timeout: time.Second, Invocation: invocation,
 	})
-	if !result.OK || result.Run == nil || result.Run.ProviderState.SnapshotPath == nil ||
+	if !result.OK || result.Run == nil || result.Run.ProviderState.SnapshotPath != nil ||
 		result.Run.ProviderState.InspectHint != nil || result.Run.ProviderState.RecoveryHint != nil ||
-		result.Run.ProviderState.Capabilities["inspect"] != "unsupported" {
+		result.Run.ProviderState.Capabilities["inspect"] != "run_artifact_only" {
 		t.Fatalf("unverified provider capability = %#v", result.Run)
 	}
 }
@@ -510,9 +509,17 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 		openCode.SetEnv["XDG_CONFIG_HOME"] == "" || openCode.SetEnv["XDG_CACHE_HOME"] == "" ||
 		openCode.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] != "1" ||
 		!strings.HasPrefix(openCode.SetEnv["XDG_DATA_HOME"], artifact.Path) ||
-		!strings.HasPrefix(openCode.SetEnv["XDG_CONFIG_HOME"], artifact.Path) ||
-		!strings.HasPrefix(openCode.SetEnv["XDG_CACHE_HOME"], artifact.Path) {
+		!strings.HasPrefix(openCode.SetEnv["XDG_STATE_HOME"], artifact.Path) ||
+		strings.HasPrefix(openCode.SetEnv["XDG_CONFIG_HOME"], artifact.Path) ||
+		strings.HasPrefix(openCode.SetEnv["XDG_CACHE_HOME"], artifact.Path) ||
+		!strings.Contains(openCode.SetEnv["XDG_CONFIG_HOME"], "provider-runtime") ||
+		!strings.Contains(openCode.SetEnv["XDG_CACHE_HOME"], "provider-runtime") {
 		t.Fatalf("OpenCode isolation = %#v", openCode.SetEnv)
+	}
+	for _, path := range []string{filepath.Join(artifact.Path, "provider", "opencode-config"), filepath.Join(artifact.Path, "provider", "opencode-cache")} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("per-run runtime path exists: %s (%v)", path, err)
+		}
 	}
 	if openCode.SetEnv["OPENCODE_CONFIG_DIR"] == "" || !strings.Contains(openCode.SetEnv["OPENCODE_CONFIG_DIR"], "reviewed-opencode-config") {
 		t.Fatalf("reviewed config was not preserved: %#v", openCode.SetEnv)
@@ -554,17 +561,12 @@ func TestOpenCodeProviderStateWritesRoutingConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cleanup()
-	configPath := filepath.Join(invocation.SetEnv["OPENCODE_CONFIG_DIR"], "opencode.json")
-	info, err := os.Stat(configPath)
-	if err != nil {
-		t.Fatalf("routing config not written: %v", err)
+	data := []byte(invocation.SetEnv["OPENCODE_CONFIG_CONTENT"])
+	if !bytes.Contains(data, []byte(`"DeepSeek"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":true`)) {
+		t.Fatalf("inline routing config content = %s", data)
 	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("routing config mode = %v, want 0600", info.Mode().Perm())
-	}
-	data, err := os.ReadFile(configPath)
-	if err != nil || !bytes.Contains(data, []byte(`"DeepSeek"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":true`)) {
-		t.Fatalf("routing config content = %s err=%v", data, err)
+	if _, err := os.Stat(filepath.Join(invocation.SetEnv["OPENCODE_CONFIG_DIR"], "opencode.json")); !os.IsNotExist(err) {
+		t.Fatalf("per-run routing file was written: %v", err)
 	}
 }
 
@@ -583,9 +585,8 @@ func TestRawCodexRunRecordsEphemeralIsolation(t *testing.T) {
 		result.Run.ProviderState.Capabilities["session_persistence"] != "disabled_ephemeral" || result.Run.ProviderState.Capabilities["recovery"] != "unsupported_ephemeral" {
 		t.Fatalf("raw Codex result = %#v", result)
 	}
-	info, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider", "codex"))
-	if err != nil || info.Mode().Perm() != 0o700 {
-		t.Fatalf("Codex state directory mode=%v err=%v", info, err)
+	if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider")); !os.IsNotExist(err) {
+		t.Fatalf("Codex provider runtime retained: %v", err)
 	}
 }
 

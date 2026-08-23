@@ -39,6 +39,8 @@ details. A terminal manifest is written only after the result is captured.
 hatch runs list
 hatch runs inspect hatch_01K...
 hatch runs audit --json
+hatch runs gc                 # report derived provider-runtime bloat
+hatch runs gc --apply         # remove it from terminal, unpinned runs
 ```
 
 Artifacts live under `~/.local/state/hatch/runs/` by default. They are local and
@@ -121,14 +123,22 @@ Claude and Bedrock use a fixed `low` policy. OpenRouter, Cursor, and Gemini
 report reasoning as unsupported instead of accepting a misleading override.
 Unknown OpenAI models require an explicit effort before Hatch launches them.
 
-Provider state is isolated per run. OpenCode receives private XDG config,
-data, state, and cache paths while reviewed DCG configuration remains the only
-shared configuration. Raw Codex receives a private `CODEX_HOME`, ignores user
-configuration, and runs ephemerally, so a previous local Codex session cannot
-silently affect a Hatch run or be mistaken for a recoverable Hatch session.
+Provider session state is isolated per run. OpenCode receives private XDG data
+and state paths, while version-keyed config dependencies and cache are shared
+outside run artifacts. Successful runs discard native OpenCode state after the
+event stream and result are durable; abnormal runs retain only the allowlisted
+database snapshot used by the current recovery contract. Raw Codex receives a
+private `CODEX_HOME`, ignores user configuration, and runs ephemerally, so a
+previous local Codex session cannot silently affect a Hatch run or be mistaken
+for a recoverable Hatch session.
 Pi and Oh My Pi receive private `PI_CODING_AGENT_DIR` and
 `PI_CODING_AGENT_SESSION_DIR` paths, disable native session persistence for
 one-shot runs, and record their JSON event streams in the Hatch artifact.
+
+`hatch runs gc` is deliberately narrower than evidence retention. It removes
+old per-run OpenCode config installations and caches that were never declared
+as evidence. It skips nonterminal runs and runs containing a `.hatch-pin` file;
+without `--apply` it only measures and reports.
 
 ## Quick start
 
