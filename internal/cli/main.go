@@ -86,10 +86,6 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if oneOf(request.Backend, "opencode", "pi", "omp") && request.SkipGitRepoCheck {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("--skip-git-repo-check is not supported for surfaced providers"))
 	}
-	storageAdmitted, err := applyStorageAdmission(DetectContext())
-	if err != nil {
-		return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, err)
-	}
 	if _, err := provider.ResolveReasoning(request.Backend, request.Model, request.ReasoningEffort); err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
@@ -127,12 +123,6 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	})
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
-	}
-	if storageAdmitted {
-		if invocation.SetEnv == nil {
-			invocation.SetEnv = map[string]string{}
-		}
-		invocation.SetEnv["AGENT_STORAGE_PARENT_PID"] = fmt.Sprint(os.Getpid())
 	}
 	if err := applyHostContext(&invocation, request.Backend, DetectContext()); err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
