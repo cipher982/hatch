@@ -8,10 +8,11 @@ import (
 	"testing"
 )
 
-func TestSurfaceCatalogIncludesCurrentDeepSeekSurfaces(t *testing.T) {
+func TestSurfaceCatalogIncludesCurrentOpenRouterSurfaces(t *testing.T) {
 	entries := SurfaceCatalog()
 	if !slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-flash", Model: "openrouter/deepseek/deepseek-v4-flash-0731"}) ||
-		!slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-pro", Model: "openrouter/deepseek/deepseek-v4-pro-0813"}) {
+		!slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-pro", Model: "openrouter/deepseek/deepseek-v4-pro-0813"}) ||
+		!slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) {
 		t.Fatalf("catalog = %#v", entries)
 	}
 }
@@ -52,6 +53,37 @@ func TestBuildOpenCodeDeepSeekRoutingConfig(t *testing.T) {
 	}
 	if len(plain.OpenCodeConfigJSON) != 0 {
 		t.Fatalf("non-deepseek opencode run must not carry routing config: %s", plain.OpenCodeConfigJSON)
+	}
+}
+
+func TestBuildOpenCodeGLMRoutingConfig(t *testing.T) {
+	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/z-ai/glm-5.3-flash", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(invocation.OpenCodeConfigJSON) == 0 {
+		t.Fatal("openrouter glm run missing routing config")
+	}
+	var config struct {
+		Provider struct {
+			OpenRouter struct {
+				Models map[string]struct {
+					Options struct {
+						Provider struct {
+							Order          []string `json:"order"`
+							AllowFallbacks bool     `json:"allow_fallbacks"`
+						} `json:"provider"`
+					} `json:"options"`
+				} `json:"models"`
+			} `json:"openrouter"`
+		} `json:"provider"`
+	}
+	if err := json.Unmarshal(invocation.OpenCodeConfigJSON, &config); err != nil {
+		t.Fatalf("routing config is not valid JSON: %v", err)
+	}
+	model := config.Provider.OpenRouter.Models["z-ai/glm-5.3-flash"]
+	if model.Options.Provider.AllowFallbacks || len(model.Options.Provider.Order) != 1 || model.Options.Provider.Order[0] != "Modal" {
+		t.Fatalf("routing config = %s", invocation.OpenCodeConfigJSON)
 	}
 }
 

@@ -570,6 +570,33 @@ func TestOpenCodeProviderStateWritesRoutingConfig(t *testing.T) {
 	}
 }
 
+func TestOpenCodeGLMProviderStateWritesRoutingConfig(t *testing.T) {
+	store := NewStore(filepath.Join(t.TempDir(), "runs"))
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/z-ai/glm-5.3-flash", Prompt: "prompt", APIKey: "fake"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(invocation.OpenCodeConfigJSON) == 0 {
+		t.Fatal("openrouter glm run missing routing config")
+	}
+	artifact, err := store.Prepare(PreparedRun{Surface: "openrouter.glm-5.3-flash", Backend: "opencode", Provider: "openrouter", Model: "openrouter/z-ai/glm-5.3-flash", Request: "prompt", ReasoningPolicy: invocation.ReasoningPolicy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanup, err := prepareProviderState(artifact, &invocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	data := []byte(invocation.SetEnv["OPENCODE_CONFIG_CONTENT"])
+	if !bytes.Contains(data, []byte(`"Modal"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":false`)) {
+		t.Fatalf("inline routing config content = %s", data)
+	}
+	if _, err := os.Stat(filepath.Join(invocation.SetEnv["OPENCODE_CONFIG_DIR"], "opencode.json")); !os.IsNotExist(err) {
+		t.Fatalf("per-run routing file was written: %v", err)
+	}
+}
+
 func TestRawCodexRunRecordsEphemeralIsolation(t *testing.T) {
 	fake := buildTestProvider(t)
 	invocation, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-5.6", Prompt: "prompt", APIKey: "fake"})

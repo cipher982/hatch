@@ -15,6 +15,7 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"gemini", "flash", "--json", "-"}, "omp", "google-antigravity/gemini-3.7-flash-tiered"},
 		{[]string{"openrouter", "deepseek-v4-flash", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
 		{[]string{"openrouter", "deepseek-v4-pro", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
+		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
 		got, err := Parse(test.args, true)
@@ -79,6 +80,7 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"gemini-3.7-flash-tiered", "omp", "google-antigravity/gemini-3.7-flash-tiered"},
 		{"deepseek-v4-flash", "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
 		{"deepseek-v4-pro", "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
+		{"glm-5.3-flash", "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
 		t.Run(test.alias, func(t *testing.T) {

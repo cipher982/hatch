@@ -26,7 +26,7 @@ here is authoritative when they differ):
 - `hatch codex <sol|terra|luna>` → GPT-5.6 on OpenAI (`nano|mini|max` remain compatibility aliases)
 - `hatch cursor <grok|kimi-k3>` → Grok 4.5 High and Kimi K3 via local Cursor Agent CLI
 - `hatch gemini [flash|3.7|gemini-3.7-flash-tiered]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.7-flash-tiered`, current default)
-- `hatch openrouter deepseek-v4-flash` → DeepSeek via OpenCode
+- `hatch openrouter <deepseek-v4-flash|deepseek-v4-pro|glm-5.3-flash>` → OpenRouter models via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
@@ -34,7 +34,7 @@ Default tiers: `opus` for Claude (supersedes `sonnet`/`fable` for most work as
 of 2026-07-24), `sol` for Codex; `sonnet` cheaper/faster Claude, `terra` lower-cost
 Codex balance, `luna` high-volume. GPT-5.6 reasoning accepts
 `none|low|medium|high|xhigh|max`. `fable` only when always-on adaptive thinking
-is wanted. `openrouter deepseek-v4-flash` is the default non-OpenAI/non-Anthropic.
+is wanted. `openrouter deepseek-v4-flash` and `openrouter glm-5.3-flash` are the default non-OpenAI/non-Anthropic choices.
 
 Agent runs target a concise result within ~15 minutes and have a default 30
 minute hard timeout. `hatch expert` stays at 15 minutes because its background
@@ -119,7 +119,7 @@ explicit surfaced provider.
 
 ## Gotchas
 
-1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, `hatch cursor grok`, or `hatch openrouter ...`; z.ai/GLM is disabled for now
+1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, `hatch cursor grok`, or `hatch openrouter ...`; direct z.ai API is disabled for now (use `hatch openrouter glm-5.3-flash`)
 2. **All production execution uses the coordinator** - adapters interpret evidence; they do not launch processes, own persistence, or invent retries
 3. **Python is retired** - preserve the migration ledger, language-neutral fixtures, and `python-v0.1.0-final` tag; do not restore Python production code
 4. **Credential authority stays external** - do not embed Infisical or another secret manager in the Go binary, and never put prompt or credential values in manifest argv
@@ -155,3 +155,4 @@ explicit surfaced provider.
 - (2026-08-12) [routing] OpenRouter deepseek-v4-flash runs pin a provider order (DeepSeek, CoreWeave, Novita, DeepInfra; allow_fallbacks) via a per-run `opencode.json` in the isolated config dir. Default price-based load balancing routinely lands on non-caching endpoints (DigitalOcean, OpenInference) that re-encode the whole growing context per agent step; measured on this account DeepSeek caches 98% while OpenInference caches 0% and runs at ~3 tps.
 - (2026-08-12) [contract] The bounded-run contract forbids re-reading the same file or re-running identical searches and requires starting the answer once core files are read. Cancelled/timed-out OpenCode runs with no meaningful text across many tool-only steps and repeated identical tool calls emit a `stall_detected` warning with step/tool/text statistics.
 - (2026-08-18) [gemini] `hatch gemini` routes to Oh My Pi with `google-antigravity/gemini-3.7-flash-tiered` by default (aliases: `flash`, `3.7`, `gemini-3.7-flash-tiered`). OMP coordinator isolation preserves user database/auth (`models.db*`, `config.yml`, `models.yml`) via symlinks while keeping session state isolated under the run artifact root.
+- (2026-08-28) [routing] OpenRouter `glm-5.3-flash` (`openrouter/z-ai/glm-5.3-flash`) runs via OpenCode latched specifically to the Modal provider (`order: ["Modal"]`, `allow_fallbacks: false`) via isolated per-run `opencode.json` config.

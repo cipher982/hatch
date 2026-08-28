@@ -187,6 +187,8 @@ func Build(req Request) (Invocation, error) {
 		}
 		if strings.HasPrefix(req.Model, "openrouter/deepseek/deepseek-v4-flash") {
 			invocation.OpenCodeConfigJSON = openCodeDeepSeekRoutingConfig(strings.TrimPrefix(req.Model, "openrouter/"))
+		} else if strings.HasPrefix(req.Model, "openrouter/z-ai/glm-5.3-flash") {
+			invocation.OpenCodeConfigJSON = openCodeGLMRoutingConfig(strings.TrimPrefix(req.Model, "openrouter/"))
 		}
 		if strings.HasPrefix(req.Model, "amazon-bedrock/") {
 			invocation.SetEnv["AWS_PROFILE"] = "zh-ml-mlengineer"
@@ -257,6 +259,32 @@ func openCodeDeepSeekRoutingConfig(model string) []byte {
 							"provider": map[string]any{
 								"order":           []string{"DeepSeek", "CoreWeave", "Novita", "DeepInfra"},
 								"allow_fallbacks": true,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		panic("static opencode routing config cannot fail to marshal")
+	}
+	return encoded
+}
+
+// openCodeGLMRoutingConfig latches an OpenRouter GLM-5.3 Flash model
+// specifically to the Modal provider without fallbacks.
+func openCodeGLMRoutingConfig(model string) []byte {
+	config := map[string]any{
+		"provider": map[string]any{
+			"openrouter": map[string]any{
+				"models": map[string]any{
+					model: map[string]any{
+						"options": map[string]any{
+							"provider": map[string]any{
+								"order":           []string{"Modal"},
+								"allow_fallbacks": false,
 							},
 						},
 					},

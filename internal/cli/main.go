@@ -307,7 +307,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
        hatch gemini [flash|3.7|gemini-3.7-flash-tiered] [OPTIONS] "prompt"
-       hatch openrouter <deepseek-v4-flash|deepseek-v4-pro> [OPTIONS] "prompt"
+       hatch openrouter <deepseek-v4-flash|deepseek-v4-pro|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|audit|gc> [OPTIONS]
 
@@ -323,8 +323,7 @@ Model-first aliases:
   OpenAI coding models: sol, terra, luna, nano, mini, max
   Cursor: grok, kimi-k3
   Gemini: flash, 3.7, gemini-3.7-flash-tiered
-  OpenRouter: deepseek-v4-flash, deepseek-v4-pro
-
+  OpenRouter: deepseek-v4-flash, deepseek-v4-pro, glm-5.3-flash
 Start here:
   hatch opus "Review this diff"
   hatch gemini "Review this branch"
@@ -332,7 +331,7 @@ Start here:
   hatch grok "Review this branch"
   hatch deepseek-v4-flash "Fix the failing tests"
   hatch deepseek-v4-pro "Review this architecture"
-  hatch codex sol "Review this branch"
+  hatch glm-5.3-flash "Fix the failing tests"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch cursor kimi-k3 "Review this branch"
