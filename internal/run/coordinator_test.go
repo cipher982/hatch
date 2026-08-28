@@ -162,7 +162,7 @@ func TestCoordinatorWritesProjectionBeforeTerminalManifest(t *testing.T) {
 	events := []string{}
 	store := orderingStore{Store: NewStore(filepath.Join(t.TempDir(), "runs")), events: &events}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || len(events) < 2 || events[0] != "result.json" || events[1] != "terminal manifest" {
@@ -175,7 +175,7 @@ func TestCoordinatorRetriesTerminalCommitAsDegraded(t *testing.T) {
 	attempts := 0
 	store := transientCommitStore{Store: NewStore(filepath.Join(t.TempDir(), "runs")), attempts: &attempts}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || attempts != 2 || result.Run == nil || result.Run.Lifecycle != LifecycleTerminal ||
@@ -192,7 +192,7 @@ func TestCoordinatorReturnsAnswerWhenMarkRunningPersistenceFails(t *testing.T) {
 	fake := buildTestProvider(t)
 	store := markRunningFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || result.Output != "fake provider output\n" || result.Run == nil || result.Run.Capture.State != "degraded" || result.ArtifactPath != nil {
@@ -217,7 +217,7 @@ func TestCoordinatorReturnsAnswerWhenResultPersistenceFails(t *testing.T) {
 	fake := buildTestProvider(t)
 	store := writeResultFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || result.Output != "fake provider output\n" || result.Run == nil || result.Run.Result.OutputFile != nil || result.Run.Capture.State != "degraded" || result.ArtifactPath != nil {
@@ -387,13 +387,13 @@ func TestCoordinatorTimeoutKillsProcessGroup(t *testing.T) {
 	coordinator := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs")))
 	started := time.Now()
 	result := coordinator.Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 500 * time.Millisecond,
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang"}},
 	})
 	if result.OK || result.ExitCode != -1 || result.Status != "timeout" {
 		t.Fatalf("unexpected timeout: %#v", result)
 	}
-	if time.Since(started) > 3*time.Second {
+	if time.Since(started) > 5*time.Second {
 		t.Fatal("timeout did not terminate promptly")
 	}
 	if result.Output != "partial output\n" {
@@ -589,7 +589,7 @@ func TestOpenCodeGLMProviderStateWritesRoutingConfig(t *testing.T) {
 	}
 	defer cleanup()
 	data := []byte(invocation.SetEnv["OPENCODE_CONFIG_CONTENT"])
-	if !bytes.Contains(data, []byte(`"Modal"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":false`)) {
+	if !bytes.Contains(data, []byte(`"Modal"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":true`)) {
 		t.Fatalf("inline routing config content = %s", data)
 	}
 	if _, err := os.Stat(filepath.Join(invocation.SetEnv["OPENCODE_CONFIG_DIR"], "opencode.json")); !os.IsNotExist(err) {

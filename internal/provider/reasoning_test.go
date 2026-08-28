@@ -19,6 +19,8 @@ func TestResolveReasoningPolicy(t *testing.T) {
 		{name: "codex model without max", backend: "opencode", model: "openai/gpt-5.5", requested: "max", wantErr: true},
 		{name: "unknown model requires explicit choice", backend: "opencode", model: "openai/provider-model", wantErr: true},
 		{name: "unknown model explicit choice is visible", backend: "opencode", model: "openai/provider-model", requested: "high", want: ReasoningPolicy{Effort: "high", Source: "explicit", Support: "unknown"}},
+		{name: "openrouter glm default", backend: "opencode", model: "openrouter/z-ai/glm-5.3-flash", want: ReasoningPolicy{Effort: "medium", Source: "default", Support: "native"}},
+		{name: "openrouter glm explicit high", backend: "opencode", model: "openrouter/z-ai/glm-5.3-flash", requested: "high", want: ReasoningPolicy{Effort: "high", Source: "explicit", Support: "native"}},
 		{name: "openrouter unsupported", backend: "opencode", model: "openrouter/example", want: ReasoningPolicy{Source: "unsupported", Support: "unsupported"}},
 		{name: "openrouter rejects override", backend: "opencode", model: "openrouter/example", requested: "high", wantErr: true},
 		{name: "pi OpenAI default", backend: "pi", model: "openai/gpt-5.6-sol", want: ReasoningPolicy{Effort: "medium", Source: "default", Support: "native"}},

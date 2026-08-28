@@ -165,7 +165,7 @@ func Build(req Request) (Invocation, error) {
 			argv = append(argv, "--dir", req.CWD)
 		}
 		argv = append(argv, "--pure", "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model)
-		if policy.Effort != "" && policy.Support != "unsupported" && strings.HasPrefix(req.Model, "openai/") {
+		if policy.Effort != "" && policy.Support != "unsupported" {
 			argv = append(argv, "--variant", policy.Effort)
 		}
 		argv = append(argv, prompt)
@@ -273,8 +273,9 @@ func openCodeDeepSeekRoutingConfig(model string) []byte {
 	return encoded
 }
 
-// openCodeGLMRoutingConfig latches an OpenRouter GLM-5.3 Flash model
-// specifically to the Modal provider without fallbacks.
+// openCodeGLMRoutingConfig configures OpenRouter GLM-5.3 Flash with Modal as the
+// preferred provider and fallbacks to healthy providers (Z.AI, Novita, Together,
+// Parasail, DeepInfra) when Modal lacks specific parameter support (such as tool_choice: auto).
 func openCodeGLMRoutingConfig(model string) []byte {
 	config := map[string]any{
 		"provider": map[string]any{
@@ -283,8 +284,8 @@ func openCodeGLMRoutingConfig(model string) []byte {
 					model: map[string]any{
 						"options": map[string]any{
 							"provider": map[string]any{
-								"order":           []string{"Modal"},
-								"allow_fallbacks": false,
+								"order":           []string{"Modal", "Z.AI", "Novita", "Together", "Parasail", "DeepInfra"},
+								"allow_fallbacks": true,
 							},
 						},
 					},

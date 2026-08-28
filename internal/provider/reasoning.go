@@ -70,6 +70,9 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 		if strings.HasPrefix(model, "openai/") {
 			return resolveOpenCodeOpenAIReasoning(model, requested)
 		}
+		if strings.HasPrefix(model, "openrouter/z-ai/glm-5.3-flash") {
+			return resolveOpenCodeGLMReasoning(model, requested)
+		}
 		if requested != "" {
 			return ReasoningPolicy{}, fmt.Errorf("--reasoning-effort is unsupported for OpenCode model %q", model)
 		}
@@ -152,6 +155,14 @@ func resolveOpenCodeOpenAIReasoning(model, requested string) (ReasoningPolicy, e
 	}
 	if effort == "max" && !supportsMax {
 		return ReasoningPolicy{}, fmt.Errorf("reasoning effort %q is not supported by OpenCode model %q", effort, model)
+	}
+	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
+}
+
+func resolveOpenCodeGLMReasoning(model, requested string) (ReasoningPolicy, error) {
+	effort, source := requested, "explicit"
+	if effort == "" {
+		effort, source = DefaultReasoningEffort, "default"
 	}
 	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
 }

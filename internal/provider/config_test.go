@@ -82,7 +82,7 @@ func TestBuildOpenCodeGLMRoutingConfig(t *testing.T) {
 		t.Fatalf("routing config is not valid JSON: %v", err)
 	}
 	model := config.Provider.OpenRouter.Models["z-ai/glm-5.3-flash"]
-	if model.Options.Provider.AllowFallbacks || len(model.Options.Provider.Order) != 1 || model.Options.Provider.Order[0] != "Modal" {
+	if !model.Options.Provider.AllowFallbacks || len(model.Options.Provider.Order) == 0 || model.Options.Provider.Order[0] != "Modal" {
 		t.Fatalf("routing config = %s", invocation.OpenCodeConfigJSON)
 	}
 }
