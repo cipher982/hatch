@@ -13,6 +13,14 @@ type CatalogEntry struct {
 
 // Surface model catalogs are the single source used by CLI alias resolution and
 // doctor drift checks. Treat these maps as immutable.
+var ClaudeSurfaceModels = map[string]string{
+	"haiku":     "haiku",
+	"sonnet":    "sonnet",
+	"opus":      "opus",
+	"fable":     "claude-fable-5-1",
+	"fable-5.1": "claude-fable-5-1",
+}
+
 var CodexSurfaceModels = map[string]string{
 	"sol":   "openai/gpt-5.6-sol",
 	"terra": "openai/gpt-5.6-terra",
@@ -46,7 +54,7 @@ func SurfaceCatalog() []CatalogEntry {
 		surface string
 		models  map[string]string
 	}{
-		{"claude", map[string]string{"haiku": "haiku", "sonnet": "sonnet", "opus": "opus", "fable": "fable"}},
+		{"claude", ClaudeSurfaceModels},
 		{"codex", CodexSurfaceModels},
 		{"cursor", CursorSurfaceModels},
 		{"gemini", GeminiSurfaceModels},

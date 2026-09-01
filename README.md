@@ -71,7 +71,7 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 
 | Command | What it uses |
 | --- | --- |
-| `hatch claude <haiku\|sonnet\|opus\|fable>` | Local Claude Code CLI login |
+| `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login |
 | `hatch codex <sol\|terra\|luna>` | OpenAI coding model via the selected harness |
 | `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
 | `hatch openrouter <deepseek-v4-flash\|deepseek-v4-pro\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |

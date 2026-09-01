@@ -263,6 +263,11 @@ func renderConfigError(jsonOutput bool, stdout, stderr io.Writer, err error) int
 func identity(backend, model string) (string, string) {
 	switch backend {
 	case "claude":
+		for _, alias := range []string{"fable", "fable-5.1", "opus", "sonnet", "haiku"} {
+			if surfaces["claude"].models[alias] == model {
+				return "claude." + alias, "anthropic"
+			}
+		}
 		return "claude." + model, "anthropic"
 	case "cursor":
 		for alias, configured := range surfaces["cursor"].models {
@@ -303,7 +308,7 @@ func identity(backend, model string) (string, string) {
 }
 
 const Help = `usage: hatch <model> [OPTIONS] "prompt"
-       hatch claude <haiku|sonnet|opus|fable> [OPTIONS] "prompt"
+       hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
        hatch gemini [flash|3.7|gemini-3.7-flash-tiered] [OPTIONS] "prompt"
@@ -319,7 +324,7 @@ Coding harness selection:
   --harness omp          Use Oh My Pi (default for gemini)
 
 Model-first aliases:
-  Claude: haiku, sonnet, opus, fable
+  Claude: haiku, sonnet, opus, fable, fable-5.1
   OpenAI coding models: sol, terra, luna, nano, mini, max
   Cursor: grok, kimi-k3
   Gemini: flash, 3.7, gemini-3.7-flash-tiered

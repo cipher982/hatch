@@ -33,7 +33,7 @@ var surfaces = map[string]struct {
 	backend string
 	models  map[string]string
 }{
-	"claude":     {"claude", map[string]string{"haiku": "haiku", "sonnet": "sonnet", "opus": "opus", "fable": "fable"}},
+	"claude":     {"claude", provider.ClaudeSurfaceModels},
 	"cursor":     {"cursor", provider.CursorSurfaceModels},
 	"codex":      {"opencode", provider.CodexSurfaceModels},
 	"gemini":     {"omp", provider.GeminiSurfaceModels},
@@ -196,6 +196,11 @@ func normalizeSurface(args []string) ([]string, error) {
 			}
 			return append(result, after...), nil
 		}
+		if surfaceName == "claude" {
+			if alias == "fable-5" {
+				return nil, fmt.Errorf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
+			}
+		}
 		message := fmt.Sprintf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
 		if surfaceName == "cursor" {
 			message += `. For a raw Cursor model ID, use: hatch cursor grok --model <cursor-model-id> "prompt"`
@@ -227,7 +232,7 @@ func normalizeModelShorthand(args []string) []string {
 
 func shorthandSurface(alias string) string {
 	switch alias {
-	case "haiku", "sonnet", "opus", "fable":
+	case "haiku", "sonnet", "opus", "fable", "fable-5.1", "fable-5":
 		return "claude"
 	case "sol", "terra", "luna", "nano", "mini", "max":
 		return "codex"
@@ -285,7 +290,7 @@ func splitLongFlag(arg string) (string, string, bool) {
 
 func modelChoices(models map[string]string) string {
 	// Stable public order, matching each surface's documented preference.
-	order := []string{"sol", "terra", "luna", "nano", "mini", "max", "haiku", "sonnet", "opus", "fable", "grok", "flash", "3.7", "gemini-3.7-flash-tiered", "deepseek-v4-flash", "deepseek-v4-pro", "glm-5.3-flash", "kimi-k3"}
+	order := []string{"sol", "terra", "luna", "nano", "mini", "max", "haiku", "sonnet", "opus", "fable", "fable-5.1", "grok", "flash", "3.7", "gemini-3.7-flash-tiered", "deepseek-v4-flash", "deepseek-v4-pro", "glm-5.3-flash", "kimi-k3"}
 	choices := make([]string, 0, len(models))
 	for _, name := range order {
 		if _, ok := models[name]; ok {

@@ -8,6 +8,8 @@ func TestParseSurfacedCommands(t *testing.T) {
 		backend, model string
 	}{
 		{[]string{"claude", "haiku", "--json", "-"}, "claude", "haiku"},
+		{[]string{"claude", "fable", "--json", "-"}, "claude", "claude-fable-5-1"},
+		{[]string{"claude", "fable-5.1", "--json", "-"}, "claude", "claude-fable-5-1"},
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "cursor-grok-4.6-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-5.6-sol"},
@@ -72,6 +74,8 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		alias, backend, model string
 	}{
 		{"opus", "claude", "opus"},
+		{"fable", "claude", "claude-fable-5-1"},
+		{"fable-5.1", "claude", "claude-fable-5-1"},
 		{"sol", "opencode", "openai/gpt-5.6-sol"},
 		{"grok", "cursor", "cursor-grok-4.6-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
@@ -139,6 +143,17 @@ func TestParseRejectsDeprecatedGeminiAlias(t *testing.T) {
 		t.Fatalf("Parse deprecated Gemini alias error = %v", err)
 	}
 }
+func TestParseRejectsDeprecatedFable5Alias(t *testing.T) {
+	_, err := Parse([]string{"claude", "fable-5", "review"}, true)
+	if err == nil || err.Error() != `invalid claude model "fable-5". Choose one of: haiku, sonnet, opus, fable, fable-5.1` {
+		t.Fatalf("Parse deprecated Claude alias error = %v", err)
+	}
+	_, err = Parse([]string{"fable-5", "review"}, true)
+	if err == nil || err.Error() != `invalid claude model "fable-5". Choose one of: haiku, sonnet, opus, fable, fable-5.1` {
+		t.Fatalf("Parse deprecated Claude alias shorthand error = %v", err)
+	}
+}
+
 
 func TestOpenRouterKimiK3IsRejected(t *testing.T) {
 	if _, err := Parse([]string{"openrouter", "kimi-k3", "review"}, true); err == nil {

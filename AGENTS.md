@@ -22,7 +22,7 @@ explicit emergency rollback.
 CLI surface (also covered in the global `~/git/me/AGENTS.md`; the status quo
 here is authoritative when they differ):
 
-- `hatch claude <haiku|sonnet|opus|fable>` → Claude via the official local Claude Code CLI OAuth/subscription path (`opus` = Opus 5, current default; `fable` = Fable-class)
+- `hatch claude <haiku|sonnet|opus|fable|fable-5.1>` → Claude via the official local Claude Code CLI OAuth/subscription path (`opus` = Opus 5, current default; `fable`/`fable-5.1` = Claude Fable 5.1)
 - `hatch codex <sol|terra|luna>` → GPT-5.6 on OpenAI (`nano|mini|max` remain compatibility aliases)
 - `hatch cursor <grok|kimi-k3>` → Grok 4.5 High and Kimi K3 via local Cursor Agent CLI
 - `hatch gemini [flash|3.7|gemini-3.7-flash-tiered]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.7-flash-tiered`, current default)
@@ -156,3 +156,4 @@ explicit surfaced provider.
 - (2026-08-12) [contract] The bounded-run contract forbids re-reading the same file or re-running identical searches and requires starting the answer once core files are read. Cancelled/timed-out OpenCode runs with no meaningful text across many tool-only steps and repeated identical tool calls emit a `stall_detected` warning with step/tool/text statistics.
 - (2026-08-18) [gemini] `hatch gemini` routes to Oh My Pi with `google-antigravity/gemini-3.7-flash-tiered` by default (aliases: `flash`, `3.7`, `gemini-3.7-flash-tiered`). OMP coordinator isolation preserves user database/auth (`models.db*`, `config.yml`, `models.yml`) via symlinks while keeping session state isolated under the run artifact root.
 - (2026-08-28) [routing] OpenRouter `glm-5.3-flash` (`openrouter/z-ai/glm-5.3-flash`) runs via OpenCode with provider order pinned to Modal first, with fallbacks to Z.AI/Novita/Together/Parasail/DeepInfra (`allow_fallbacks: true`), and supports native reasoning effort via `--variant`. Modal's OpenRouter endpoint lacks `tool_choice: auto` parameter support, so strict fallback-disabled routing causes OpenRouter to return 404 No endpoints found on tool-calling agent runs.
+- (2026-09-01) [models] Claude Fable 5.1 (`claude-fable-5-1`) swapped in for `fable` and `fable-5.1` aliases; Fable 5 (`claude-fable-5`) deprecated.

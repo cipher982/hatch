@@ -431,7 +431,7 @@ func hashFile(path string) (string, error) {
 
 func fieldSurface(surface string) (string, bool) {
 	switch surface {
-	case "claude.haiku", "claude.sonnet", "claude.opus", "claude.fable":
+	case "claude.haiku", "claude.sonnet", "claude.opus", "claude.fable", "claude.fable-5.1":
 		return "claude", true
 	case "codex.sol", "codex.terra", "codex.luna", "codex.nano", "codex.mini", "codex.max":
 		return "codex", true
