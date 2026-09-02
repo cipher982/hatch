@@ -108,7 +108,7 @@ func TestCheckOMPModels(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "omp")
 	script := `#!/bin/sh
-printf '%s\n' '{"models":[{"id":"gemini-3.7-flash-tiered","selector":"google-antigravity/gemini-3.7-flash-tiered"}]}'
+printf '%s\n' '{"models":[{"id":"gemini-3.8-flash-low","selector":"google-antigravity/gemini-3.8-flash-low"}]}'
 `
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)

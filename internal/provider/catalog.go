@@ -42,9 +42,9 @@ var OpenRouterSurfaceModels = map[string]string{
 }
 
 var GeminiSurfaceModels = map[string]string{
-	"flash":                   "google-antigravity/gemini-3.7-flash-tiered",
-	"3.7":                     "google-antigravity/gemini-3.7-flash-tiered",
-	"gemini-3.7-flash-tiered": "google-antigravity/gemini-3.7-flash-tiered",
+	"flash":                "google-antigravity/gemini-3.8-flash-low",
+	"3.8":                  "google-antigravity/gemini-3.8-flash-low",
+	"gemini-3.8-flash-low": "google-antigravity/gemini-3.8-flash-low",
 }
 
 // SurfaceCatalog returns every surfaced model in a stable order for help,

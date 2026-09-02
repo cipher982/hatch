@@ -186,7 +186,7 @@ func normalizeSurface(args []string) ([]string, error) {
 	model, ok := surface.models[alias]
 	if !ok {
 		if surfaceName == "gemini" {
-			if alias == "pro" {
+			if alias == "pro" || alias == "3.7" || alias == "gemini-3.7-flash-tiered" {
 				return nil, fmt.Errorf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
 			}
 			result := append([]string(nil), before...)
@@ -238,7 +238,7 @@ func shorthandSurface(alias string) string {
 		return "codex"
 	case "grok", "kimi-k3":
 		return "cursor"
-	case "flash", "3.7", "gemini-3.7-flash-tiered":
+	case "flash", "3.8", "gemini-3.8-flash-low", "3.7", "gemini-3.7-flash-tiered":
 		return "gemini"
 	case "deepseek-v4-flash", "deepseek-v4-pro", "glm-5.3-flash":
 		return "openrouter"
@@ -290,7 +290,7 @@ func splitLongFlag(arg string) (string, string, bool) {
 
 func modelChoices(models map[string]string) string {
 	// Stable public order, matching each surface's documented preference.
-	order := []string{"sol", "terra", "luna", "nano", "mini", "max", "haiku", "sonnet", "opus", "fable", "fable-5.1", "grok", "flash", "3.7", "gemini-3.7-flash-tiered", "deepseek-v4-flash", "deepseek-v4-pro", "glm-5.3-flash", "kimi-k3"}
+	order := []string{"sol", "terra", "luna", "nano", "mini", "max", "haiku", "sonnet", "opus", "fable", "fable-5.1", "grok", "flash", "3.8", "gemini-3.8-flash-low", "deepseek-v4-flash", "deepseek-v4-pro", "glm-5.3-flash", "kimi-k3"}
 	choices := make([]string, 0, len(models))
 	for _, name := range order {
 		if _, ok := models[name]; ok {

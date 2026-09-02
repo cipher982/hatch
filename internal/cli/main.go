@@ -311,7 +311,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
        hatch codex <sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
-       hatch gemini [flash|3.7|gemini-3.7-flash-tiered] [OPTIONS] "prompt"
+       hatch gemini [flash|3.8|gemini-3.8-flash-low] [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4-flash|deepseek-v4-pro|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|audit|gc> [OPTIONS]
@@ -327,7 +327,7 @@ Model-first aliases:
   Claude: haiku, sonnet, opus, fable, fable-5.1
   OpenAI coding models: sol, terra, luna, nano, mini, max
   Cursor: grok, kimi-k3
-  Gemini: flash, 3.7, gemini-3.7-flash-tiered
+  Gemini: flash, 3.8, gemini-3.8-flash-low
   OpenRouter: deepseek-v4-flash, deepseek-v4-pro, glm-5.3-flash
 Start here:
   hatch opus "Review this diff"

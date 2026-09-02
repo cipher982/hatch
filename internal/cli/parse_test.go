@@ -13,8 +13,9 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "cursor-grok-4.6-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-5.6-sol"},
-		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-3.7-flash-tiered"},
-		{[]string{"gemini", "flash", "--json", "-"}, "omp", "google-antigravity/gemini-3.7-flash-tiered"},
+		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
+		{[]string{"gemini", "flash", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
+		{[]string{"gemini", "3.8", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
 		{[]string{"openrouter", "deepseek-v4-flash", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
 		{[]string{"openrouter", "deepseek-v4-pro", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
 		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "opencode", "openrouter/z-ai/glm-5.3-flash"},
@@ -79,9 +80,9 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"sol", "opencode", "openai/gpt-5.6-sol"},
 		{"grok", "cursor", "cursor-grok-4.6-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
-		{"flash", "omp", "google-antigravity/gemini-3.7-flash-tiered"},
-		{"3.7", "omp", "google-antigravity/gemini-3.7-flash-tiered"},
-		{"gemini-3.7-flash-tiered", "omp", "google-antigravity/gemini-3.7-flash-tiered"},
+		{"flash", "omp", "google-antigravity/gemini-3.8-flash-low"},
+		{"3.8", "omp", "google-antigravity/gemini-3.8-flash-low"},
+		{"gemini-3.8-flash-low", "omp", "google-antigravity/gemini-3.8-flash-low"},
 		{"deepseek-v4-flash", "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
 		{"deepseek-v4-pro", "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
 		{"glm-5.3-flash", "opencode", "openrouter/z-ai/glm-5.3-flash"},
@@ -116,8 +117,8 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"double dash", []string{"--", "claude", "review"}, []string{"--", "claude", "review"}},
 		{"surface help", []string{"codex", "--help"}, []string{"codex", "--help"}},
 		{"surface advanced help", []string{"claude", "--advanced-help"}, []string{"claude", "--advanced-help"}},
-		{"gemini default prompt", []string{"gemini", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.7-flash-tiered", "review"}},
-		{"gemini shorthand", []string{"flash", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.7-flash-tiered", "review"}},
+		{"gemini default prompt", []string{"gemini", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.8-flash-low", "review"}},
+		{"gemini shorthand", []string{"flash", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.8-flash-low", "review"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -138,9 +139,17 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 }
 
 func TestParseRejectsDeprecatedGeminiAlias(t *testing.T) {
-	_, err := Parse([]string{"gemini", "pro", "review"}, true)
-	if err == nil || err.Error() != `invalid gemini model "pro". Choose one of: flash, 3.7, gemini-3.7-flash-tiered` {
-		t.Fatalf("Parse deprecated Gemini alias error = %v", err)
+	for _, alias := range []string{"pro", "3.7", "gemini-3.7-flash-tiered"} {
+		_, err := Parse([]string{"gemini", alias, "review"}, true)
+		if err == nil || err.Error() != `invalid gemini model "`+alias+`". Choose one of: flash, 3.8, gemini-3.8-flash-low` {
+			t.Fatalf("Parse deprecated Gemini alias %q error = %v", alias, err)
+		}
+		if alias != "pro" {
+			_, err = Parse([]string{alias, "review"}, true)
+			if err == nil || err.Error() != `invalid gemini model "`+alias+`". Choose one of: flash, 3.8, gemini-3.8-flash-low` {
+				t.Fatalf("Parse deprecated Gemini alias shorthand %q error = %v", alias, err)
+			}
+		}
 	}
 }
 func TestParseRejectsDeprecatedFable5Alias(t *testing.T) {
