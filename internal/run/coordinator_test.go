@@ -272,9 +272,9 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 	}{
 		{"claude", "claude", "haiku", "success_claude", "fake claude output", "claude-session-oracle"},
 		{"cursor", "cursor", "cursor-grok-4.6-high", "success_cursor", "fake cursor output", "cursor-session-oracle"},
-		{"opencode", "opencode", "openai/gpt-5.6-sol", "success_opencode", "fake opencode output", "ses_oracle1234"},
-		{"pi", "pi", "openai/gpt-5.6-sol", "success_pi", "fake success_pi output", ""},
-		{"omp", "omp", "openai/gpt-5.6-sol", "success_omp", "fake success_omp output", ""},
+		{"opencode", "opencode", "openai/gpt-6-astra", "success_opencode", "fake opencode output", "ses_oracle1234"},
+		{"pi", "pi", "openai/gpt-6-astra", "success_pi", "fake success_pi output", ""},
+		{"omp", "omp", "openai/gpt-6-astra", "success_omp", "fake success_omp output", ""},
 		{"cursor-kimi", "cursor", "kimi-k3", "success_cursor_kimi", "fake cursor kimi output", "cursor-kimi-session-oracle"},
 	}
 	for _, test := range tests {
@@ -339,9 +339,9 @@ func TestCoordinatorStructuredFailureAndRecovery(t *testing.T) {
 		warnings                                          int
 	}{
 		{"cursor error", "cursor", "cursor-grok-4.6-high", "cursor_error", "", "request rejected", false, OutcomeFailed, 0},
-		{"opencode error", "opencode", "openai/gpt-5.6-sol", "opencode_error", "", "provider unavailable", false, OutcomeFailed, 0},
-		{"opencode recovered", "opencode", "openai/gpt-5.6-sol", "opencode_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
-		{"opencode missing terminal", "opencode", "openai/gpt-5.6-sol", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 1},
+		{"opencode error", "opencode", "openai/gpt-6-astra", "opencode_error", "", "provider unavailable", false, OutcomeFailed, 0},
+		{"opencode recovered", "opencode", "openai/gpt-6-astra", "opencode_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
+		{"opencode missing terminal", "opencode", "openai/gpt-6-astra", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 1},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -444,7 +444,7 @@ func TestCoordinatorCancelledBeforeProviderLaunch(t *testing.T) {
 
 func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-astra", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +452,7 @@ func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 	invocation.ProviderVersion = "opencode 1.2.3"
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "hang_opencode"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "codex.sol", Provider: "openai", Model: "openai/gpt-5.6-sol", CWD: t.TempDir(), Prompt: "prompt",
+		Surface: "codex.astra", Provider: "openai", Model: "openai/gpt-6-astra", CWD: t.TempDir(), Prompt: "prompt",
 		Timeout: 2 * time.Second, Invocation: invocation,
 	})
 	if result.Status != "timeout" || result.Run == nil || result.Run.ProviderState.RecoveryHint == nil ||
@@ -472,14 +472,14 @@ func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
 
 func TestOpenCodeDoesNotClaimInspectionWithoutToolVersion(t *testing.T) {
 	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-astra", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	invocation.Argv[0] = fake
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_opencode"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", Prompt: "prompt",
+		Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "openai/gpt-6-astra", Prompt: "prompt",
 		Timeout: time.Second, Invocation: invocation,
 	})
 	if !result.OK || result.Run == nil || result.Run.ProviderState.SnapshotPath != nil ||
@@ -491,12 +491,12 @@ func TestOpenCodeDoesNotClaimInspectionWithoutToolVersion(t *testing.T) {
 
 func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), "runs"))
-	openCode, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
+	openCode, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-astra", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	openCode.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(t.TempDir(), "reviewed-opencode-config")
-	artifact, err := store.Prepare(PreparedRun{Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", Request: "prompt", ReasoningPolicy: openCode.ReasoningPolicy})
+	artifact, err := store.Prepare(PreparedRun{Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "openai/gpt-6-astra", Request: "prompt", ReasoningPolicy: openCode.ReasoningPolicy})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -540,6 +540,26 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 	defer codexCleanup()
 	if !strings.HasPrefix(codex.SetEnv["CODEX_HOME"], codexArtifact.Path) || codex.SetEnv["CODEX_HOME"] == openCode.SetEnv["XDG_DATA_HOME"] {
 		t.Fatalf("Codex isolation = %#v", codex.SetEnv)
+	}
+
+	cursor, err := provider.Build(provider.Request{Backend: "cursor", Model: "cursor-grok-4.6-high", Prompt: "prompt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cursorArtifact, err := store.Prepare(PreparedRun{Surface: "cursor.grok", Backend: "cursor", Provider: "cursor", Model: "cursor-grok-4.6-high", Request: "prompt", ReasoningPolicy: cursor.ReasoningPolicy})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cursorCleanup, err := prepareProviderState(cursorArtifact, &cursor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cursorCleanup()
+	if !strings.HasPrefix(cursor.SetEnv["HOME"], cursorArtifact.Path) || cursor.SetEnv["HOME"] == codex.SetEnv["CODEX_HOME"] {
+		t.Fatalf("Cursor isolation = %#v", cursor.SetEnv)
+	}
+	if _, err := os.Stat(filepath.Join(cursor.SetEnv["HOME"], ".cursor")); err != nil {
+		t.Fatalf("Cursor home missing .cursor: %v", err)
 	}
 }
 
@@ -619,7 +639,7 @@ func TestRawCodexRunRecordsEphemeralIsolation(t *testing.T) {
 
 func TestOpenCodeRecoveryHintIncludesPolicyAndIsolation(t *testing.T) {
 	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-astra", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -627,7 +647,7 @@ func TestOpenCodeRecoveryHintIncludesPolicyAndIsolation(t *testing.T) {
 	invocation.ProviderVersion = "opencode 1.2.3"
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "hang_opencode"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", CWD: t.TempDir(), Prompt: "prompt",
+		Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "openai/gpt-6-astra", CWD: t.TempDir(), Prompt: "prompt",
 		Timeout: 2 * time.Second, Invocation: invocation,
 	})
 	if result.Run == nil || result.Run.ProviderState.RecoveryHint == nil {

@@ -696,6 +696,15 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 		invocation.SetEnv["CODEX_HOME"] = root
 		return func() { _ = discardProviderRuntime(artifact, "codex") }, nil
 	}
+	if invocation.Adapter == "cursor" {
+		root := filepath.Join(artifact.Path, "provider", "cursor")
+		if err := secureMkdirAll(root); err != nil {
+			return nil, err
+		}
+		linkUserCursorConfig(root)
+		invocation.SetEnv["HOME"] = root
+		return func() { _ = discardProviderRuntime(artifact, "cursor") }, nil
+	}
 	return func() {}, nil
 }
 
@@ -759,6 +768,33 @@ func linkUserPiLikeConfig(adapter, targetRoot string) {
 			}
 			sourcePath := filepath.Join(sourceDir, name)
 			_ = os.Symlink(sourcePath, destPath)
+		}
+	}
+}
+func linkUserCursorConfig(targetRoot string) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return
+	}
+	libraryDir := filepath.Join(targetRoot, "Library")
+	if err := secureMkdirAll(libraryDir); err == nil {
+		keychains := filepath.Join(home, "Library", "Keychains")
+		if info, err := os.Stat(keychains); err == nil && info.IsDir() {
+			_ = os.Symlink(keychains, filepath.Join(libraryDir, "Keychains"))
+		}
+		appSupport := filepath.Join(home, "Library", "Application Support")
+		if info, err := os.Stat(appSupport); err == nil && info.IsDir() {
+			_ = os.Symlink(appSupport, filepath.Join(libraryDir, "Application Support"))
+		}
+	}
+	cursorDir := filepath.Join(targetRoot, ".cursor")
+	if err := secureMkdirAll(cursorDir); err == nil {
+		userCursorDir := filepath.Join(home, ".cursor")
+		for _, name := range []string{"auth.json", "cli-config.json", "argv.json", "mcp.json", "ide_state.json"} {
+			src := filepath.Join(userCursorDir, name)
+			if info, err := os.Stat(src); err == nil && !info.IsDir() {
+				_ = os.Symlink(src, filepath.Join(cursorDir, name))
+			}
 		}
 	}
 }
