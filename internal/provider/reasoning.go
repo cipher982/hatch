@@ -128,21 +128,21 @@ func resolveNativeReasoning(providerName, requested, model string) (ReasoningPol
 	if effort == "" {
 		effort, source = DefaultReasoningEffort, "default"
 	}
-	known, supportsMax := knownOpenAIModel(model)
+	known, supportsNone, supportsMax := knownOpenAIModel(model)
 	if model != "" && !known {
 		if requested == "" {
 			return ReasoningPolicy{}, fmt.Errorf("%s model %q has no verified reasoning variants; pass --reasoning-effort explicitly", providerName, model)
 		}
 		return ReasoningPolicy{Effort: effort, Source: source, Support: "unknown"}, nil
 	}
-	if effort == "max" && !supportsMax && known {
+	if known && (effort == "max" && !supportsMax || effort == "none" && !supportsNone) {
 		return ReasoningPolicy{}, fmt.Errorf("reasoning effort %q is not supported by %s model %q", effort, providerName, model)
 	}
 	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
 }
 
 func resolveOpenCodeOpenAIReasoning(model, requested string) (ReasoningPolicy, error) {
-	known, supportsMax := knownOpenAIModel(model)
+	known, supportsNone, supportsMax := knownOpenAIModel(model)
 	if !known {
 		if requested == "" {
 			return ReasoningPolicy{}, fmt.Errorf("OpenCode model %q has no verified reasoning variants; pass --reasoning-effort explicitly", model)
@@ -153,7 +153,7 @@ func resolveOpenCodeOpenAIReasoning(model, requested string) (ReasoningPolicy, e
 	if effort == "" {
 		effort, source = DefaultReasoningEffort, "default"
 	}
-	if effort == "max" && !supportsMax {
+	if effort == "max" && !supportsMax || effort == "none" && !supportsNone {
 		return ReasoningPolicy{}, fmt.Errorf("reasoning effort %q is not supported by OpenCode model %q", effort, model)
 	}
 	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
@@ -167,17 +167,19 @@ func resolveOpenCodeGLMReasoning(model, requested string) (ReasoningPolicy, erro
 	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
 }
 
-func knownOpenAIModel(model string) (known, supportsMax bool) {
+func knownOpenAIModel(model string) (known, supportsNone, supportsMax bool) {
 	name := strings.TrimPrefix(model, "openai/")
 	for _, suffix := range []string{"-fast", "-pro"} {
 		name = strings.TrimSuffix(name, suffix)
 	}
 	switch name {
+	case "gpt-6-astra":
+		return true, false, true
 	case "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna":
-		return true, true
+		return true, true, true
 	case "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano":
-		return true, false
+		return true, true, false
 	default:
-		return false, false
+		return false, false, false
 	}
 }
