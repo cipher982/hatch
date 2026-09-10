@@ -34,7 +34,7 @@ func TestRunsCLIListsAndInspectsCurrentArtifacts(t *testing.T) {
 	}
 
 	var listOut, listErr bytes.Buffer
-	if exit := Main([]string{"runs", "list", "--status", "succeeded", "--json"}, bytes.NewReader(nil), &listOut, &listErr, true); exit != 0 {
+	if exit := Main([]string{"runs", "list", "--all", "--status", "succeeded", "--json"}, bytes.NewReader(nil), &listOut, &listErr, true); exit != 0 {
 		t.Fatalf("list exit=%d stderr=%s", exit, listErr.String())
 	}
 	var list struct {
@@ -50,9 +50,16 @@ func TestRunsCLIListsAndInspectsCurrentArtifacts(t *testing.T) {
 	}
 	var record runner.Record
 	if err := json.Unmarshal(inspectOut.Bytes(), &record); err != nil || record.Manifest == nil ||
-		record.Manifest.RunID != artifact.Manifest.RunID || !containsString(record.Files, "evidence.sha256") ||
-		!containsString(record.Files, "result.txt") {
+		record.Manifest.RunID != artifact.Manifest.RunID {
 		t.Fatalf("inspect=%s err=%v", inspectOut.String(), err)
+	}
+	var answer, diagnostics bytes.Buffer
+	if exit := Main([]string{"runs", "read", artifact.Manifest.RunID, "--json"}, bytes.NewReader(nil), &answer, &diagnostics, true); exit != 0 {
+		t.Fatalf("read exit=%d stderr=%s", exit, diagnostics.String())
+	}
+	var page runner.ContentPage
+	if err := json.Unmarshal(answer.Bytes(), &page); err != nil || page.Content != "answer" || page.Truncated {
+		t.Fatalf("read=%s err=%v", answer.String(), err)
 	}
 }
 

@@ -35,6 +35,8 @@ what assumption you are making.
 type Options struct {
 	Context                        context.Context
 	Prompt, Model, ReasoningEffort string
+	Title, CWD                     string
+	Provenance                     *runner.Provenance
 	WebSearch                      bool
 	Timeout                        time.Duration
 	APIKey, BaseURL                string
@@ -116,7 +118,8 @@ func Run(options Options) Result {
 	coordinator := runner.NewCoordinator(options.Store)
 	var final map[string]any
 	public := coordinator.ExecuteHTTP(runner.HTTPRequest{
-		Context: options.Context, Surface: "expert", Backend: "responses", Provider: "openai", Model: options.Model, Prompt: options.Prompt,
+		Context: options.Context, Surface: "expert", Backend: "responses", Provider: "openai", Model: options.Model,
+		CWD: options.CWD, Title: options.Title, Provenance: options.Provenance, Prompt: options.Prompt,
 		Timeout: options.Timeout, CredentialNames: []string{"OPENAI_API_KEY"}, ReasoningPolicy: policy, Progress: options.Progress,
 		Execute: func(ctx context.Context, record func([]byte) error) runner.HTTPOutcome {
 			return execute(ctx, options, payload, record, &final)

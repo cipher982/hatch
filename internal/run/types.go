@@ -35,8 +35,10 @@ type Manifest struct {
 	Backend         string                   `json:"backend"`
 	Provider        string                   `json:"provider"`
 	Model           string                   `json:"model"`
+	Title           string                   `json:"title,omitempty"`
 	ReasoningPolicy provider.ReasoningPolicy `json:"reasoning_policy"`
 	CWD             string                   `json:"cwd"`
+	Provenance      *Provenance              `json:"provenance,omitempty"`
 	Execution       string                   `json:"execution"`
 	Invocation      Invocation               `json:"invocation"`
 	Process         *Process                 `json:"process"`

@@ -14,6 +14,10 @@ type Request struct {
 	Model                  string
 	PromptArgs             []string
 	CWD                    string
+	Title                  string
+	CallerSession          string
+	CallerRequest          string
+	MaxOutputBytes         int
 	TimeoutSeconds         int
 	ReasoningEffort        string
 	OutputFormat           string
@@ -45,6 +49,7 @@ var flagsWithValue = map[string]bool{
 	"-C": true, "--cwd": true, "--model": true, "--reasoning-effort": true,
 	"--output-format": true, "--api-key": true, "-r": true, "--resume": true,
 	"--harness": true,
+	"--title":   true, "--caller-session": true, "--caller-request": true, "--max-output-bytes": true,
 }
 
 func Parse(args []string, stdoutTTY bool) (Request, error) {
@@ -52,7 +57,7 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 	if err != nil {
 		return Request{JSON: hasFlag(args, "--json") || !stdoutTTY}, err
 	}
-	req := Request{TimeoutSeconds: 1800, OutputFormat: "text", JSON: !stdoutTTY, Automation: !stdoutTTY}
+	req := Request{TimeoutSeconds: 1800, OutputFormat: "text", JSON: !stdoutTTY, Automation: !stdoutTTY, MaxOutputBytes: defaultOutputBytes}
 	literal := false
 	for i := 0; i < len(normalized); i++ {
 		arg := normalized[i]
@@ -83,7 +88,7 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 			req.SkipGitRepoCheck = true
 		case "--include-partial-messages":
 			req.IncludePartialMessages = true
-		case "-b", "--backend", "--model", "-C", "--cwd", "-t", "--timeout", "--reasoning-effort", "--output-format", "--api-key", "-r", "--resume", "--harness":
+		case "-b", "--backend", "--model", "-C", "--cwd", "-t", "--timeout", "--reasoning-effort", "--output-format", "--api-key", "-r", "--resume", "--harness", "--title", "--caller-session", "--caller-request", "--max-output-bytes":
 			value := inlineValue
 			if !hasInlineValue {
 				if i+1 >= len(normalized) {
@@ -104,6 +109,17 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 				req.Model = value
 			case "-C", "--cwd":
 				req.CWD = value
+			case "--title":
+				req.Title = value
+			case "--caller-session":
+				req.CallerSession = value
+			case "--caller-request":
+				req.CallerRequest = value
+			case "--max-output-bytes":
+				req.MaxOutputBytes, err = parseOutputLimit(value)
+				if err != nil {
+					return req, err
+				}
 			case "-t", "--timeout":
 				req.TimeoutSeconds, err = strconv.Atoi(value)
 				if err != nil || req.TimeoutSeconds <= 0 {

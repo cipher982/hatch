@@ -11,6 +11,8 @@ import (
 type HTTPRequest struct {
 	Context                                        context.Context
 	Surface, Backend, Provider, Model, CWD, Prompt string
+	Title                                          string
+	Provenance                                     *Provenance
 	Timeout                                        time.Duration
 	CredentialNames                                []string
 	ReasoningPolicy                                provider.ReasoningPolicy
@@ -33,9 +35,20 @@ type HTTPOutcome struct {
 
 func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 	started := c.Now()
+	if err := ValidateTitle(req.Title); err != nil {
+		return failedResult(-3, started, c.Now(), err.Error(), nil)
+	}
+	if req.Provenance == nil {
+		provenance, err := ResolveProvenance("", "")
+		if err != nil {
+			return failedResult(-3, started, c.Now(), fmt.Sprintf("resolve provenance: %v", err), nil)
+		}
+		req.Provenance = provenance
+	}
+	targetCWD := effectiveCWD(req.CWD)
 	artifact, err := c.Store.Prepare(PreparedRun{
-		Surface: req.Surface, Backend: req.Backend, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
-		Request: req.Prompt, RedactedArgv: []string{"POST", "<responses-url>"}, CredentialNames: req.CredentialNames,
+		Surface: req.Surface, Backend: req.Backend, Provider: req.Provider, Model: req.Model, Title: req.Title,
+		CWD: targetCWD, Provenance: req.Provenance, Request: req.Prompt, RedactedArgv: []string{"POST", "<responses-url>"}, CredentialNames: req.CredentialNames,
 		ReasoningPolicy:  req.ReasoningPolicy,
 		StructuredStdout: true, Execution: "http",
 	})
@@ -44,7 +57,11 @@ func (c Coordinator) ExecuteHTTP(req HTTPRequest) PublicResult {
 	}
 	artifactPath := artifact.Path
 	if req.Progress != nil {
-		req.Progress(fmt.Sprintf("[hatch] run %s artifact %s", artifact.Manifest.RunID, artifact.Path))
+		receipt := fmt.Sprintf("[hatch] run %s artifact %s", shellJoin([]string{artifact.Manifest.RunID}), shellJoin([]string{artifact.Path}))
+		if req.Title != "" {
+			receipt += " title=" + shellJoin([]string{req.Title})
+		}
+		req.Progress(receipt)
 	}
 	stdoutSink, stderrSink, err := c.Store.OpenStreams(artifact)
 	if err != nil {

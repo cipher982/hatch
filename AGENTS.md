@@ -72,13 +72,15 @@ Credentials are resolved explicitly before backend launch:
   owning a secret-manager integration
 
 Machine callers:
-- non-interactive CLI runs default to JSON output and automation mode automatically
+- non-interactive agent runs default to JSON output and automation mode; `expert` requires explicit `--json`
 - agent prompts automatically receive a bounded-run contract: stay within scope,
   investigate proportionally, synthesize once evidence is sufficient
 - set `HATCH_DISABLE_SECRET_HELPER=1` when you need tests or subprocesses to fail fast instead of loading secrets from the local helper
 - surfaced Claude/Codex/Cursor runs stream terse live progress to stderr while preserving only the final answer on stdout/JSON
 - every run allocates a durable artifact before provider launch and preserves raw stdout/stderr under `~/.local/state/hatch/runs/`; JSON results carry the run ID, artifact path, capture state, and provider identity when available
-- `hatch runs list` / `hatch runs inspect <run-id>` recover results independently of an outer terminal wrapper; `hatch runs audit --json` verifies stored artifact integrity
+- Give agent calls a short `--title` and the actual caller session/request IDs (`--caller-session` / `--caller-request`, or `HATCH_CALLER_SESSION_ID` / `HATCH_CALLER_REQUEST_ID`). Keep the returned run IDs; do not recover ownership by model and timestamp.
+- `hatch runs list` is scoped to the caller session or exact launch directory; use `--all` explicitly across projects. `runs read <run-id> --part result` retrieves bounded answers; follow `next_command`. `inspect --files` opts into file inventory. Titles and request previews are not review verdicts.
+- Invocation output is a bounded preview with truncation flags; full results and raw streams remain in the artifact. `hatch runs audit --json` verifies stored artifact integrity. See README's recovery section for scope and byte-paging semantics.
 
 ## Architecture
 
@@ -114,7 +116,7 @@ explicit surfaced provider.
 - **Container-aware** - auto-sets HOME=/tmp for read-only filesystems
 - **Keep the surfaced CLI small** - `codex`, `claude`, and `cursor` are the human/agent-facing entrypoints; raw backend flags are escape hatches
 - **Do not leak internal runtime nouns into the public contract** - `opencode` is an implementation detail, not part of the default user/agent mental model
-- **Machine callers should not remember flags** - real non-interactive CLI runs default to JSON output + automation mode
+- **Machine callers should not remember flags** - non-interactive agent runs default to JSON output + automation mode; `expert` retains explicit `--json` selection
 - **Nested Hatch is permitted, but bounded** - a surfaced run may launch a small number of narrowly scoped child `hatch` runs for parallel/independent subwork. Children need deadlines, recursion requires explicit authorization, and the parent synthesizes surviving results instead of waiting indefinitely for a child.
 
 ## Gotchas

@@ -320,17 +320,20 @@ func TestContractLegacyParity(t *testing.T) {
 				Argv        []string          `json:"argv"`
 				StdinSHA256 string            `json:"stdin_sha256"`
 				StdinBytes  int               `json:"stdin_bytes"`
+				Stdin       string            `json:"stdin"`
 				Environment map[string]string `json:"environment"`
 			}
 			readJSON(t, record, &invocation)
-			prepared := strings.TrimSuffix(string(mustRead(t, filepath.Join(root, "testdata", "contracts", "fixtures", "oracle_prepared_prompt.txt"))), "\n")
-			for index, arg := range invocation.Argv {
-				if arg == prepared {
-					invocation.Argv[index] = "$PREPARED_PROMPT"
-				}
+			argv := normalizePromptArgs(t, invocation.Argv, testCase.Expected.ProviderArgv, testCase.Stdin)
+			if !reflect.DeepEqual(argv, testCase.Expected.ProviderArgv) {
+				t.Errorf("provider flags differ: got %#v want %#v", argv, testCase.Expected.ProviderArgv)
 			}
-			if !reflect.DeepEqual(invocation.Argv, testCase.Expected.ProviderArgv) || invocation.StdinSHA256 != testCase.Expected.ProviderStdinSHA256 || invocation.StdinBytes != testCase.Expected.ProviderStdinBytes {
-				t.Errorf("provider boundary = argv %#v stdin %s/%d", invocation.Argv, invocation.StdinSHA256, invocation.StdinBytes)
+			if testCase.Expected.ProviderStdinBytes == 0 {
+				if invocation.Stdin != "" {
+					t.Error("argv-prompt provider unexpectedly received stdin")
+				}
+			} else if !strings.HasSuffix(invocation.Stdin, testCase.Stdin) {
+				t.Error("stdin-prompt provider did not receive the original task intact")
 			}
 			if invocation.Environment["DCG_NO_SELF_HEAL"] != "1" {
 				t.Error("DCG_NO_SELF_HEAL missing")

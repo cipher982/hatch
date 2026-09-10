@@ -30,7 +30,7 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 		return runExpert(ctx, args[1:], stdin, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "runs" {
-		return runRuns(args[1:], stdout, stderr)
+		return runRuns(args[1:], stdout, stderr, stdoutTTY)
 	}
 	if len(args) > 0 && args[0] == "doctor" {
 		return runDoctor(args[1:], stdout, stderr)
@@ -61,6 +61,13 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 		}
 		fmt.Fprintf(stdout, "hatch %s (commit=%s dirty=%s go=%s target=%s)\n", Version, Commit, Dirty, goVersion, target)
 		return 0
+	}
+	if err := runner.ValidateTitle(request.Title); err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
+	provenance, err := runner.ResolveProvenance(request.CallerSession, request.CallerRequest)
+	if err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
 	if request.Harness != "" {
 		if !oneOf(request.Backend, "opencode", "pi", "omp") {
@@ -147,23 +154,12 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	coordinator := runner.NewCoordinator(runner.NewStore(root))
 	result := coordinator.Execute(runner.Request{
 		Context: ctx, Surface: surface, Backend: request.Backend, Provider: providerName, Model: request.Model, CWD: request.CWD,
+		Title: request.Title, Provenance: provenance,
 		Prompt: prompt, Timeout: time.Duration(request.TimeoutSeconds) * time.Second,
 		Invocation: invocation, CredentialNames: credentialNames, Automation: request.Automation,
-		ProgressLabel: progressLabel(surface), Progress: func(message string) { fmt.Fprintln(stderr, message) },
+		ProgressLabel: progressLabel(surface), Progress: newProgressSink(stderr),
 	})
-	if request.JSON {
-		encoder := json.NewEncoder(stdout)
-		encoder.SetEscapeHTML(false)
-		if err := encoder.Encode(result); err != nil {
-			fmt.Fprintf(stderr, "Error: encode result: %v\n", err)
-			return 1
-		}
-	} else if result.OK {
-		fmt.Fprintln(stdout, strings.TrimRight(result.Output, "\n"))
-	} else if result.Error != nil {
-		fmt.Fprintf(stderr, "Error: %s\n", strings.TrimRight(*result.Error, "\n"))
-	}
-	return result.CLIExitCode()
+	return renderResult(result, request.MaxOutputBytes, request.JSON, stdout, stderr)
 }
 
 func progressLabel(surface string) string {
@@ -252,10 +248,10 @@ func renderConfigError(jsonOutput bool, stdout, stderr io.Writer, err error) int
 	if jsonOutput {
 		_ = json.NewEncoder(stdout).Encode(map[string]any{
 			"ok": false, "status": "config_error", "output": "", "exit_code": 4,
-			"duration_ms": 0, "error": err.Error(), "stderr": nil,
+			"duration_ms": 0, "error": configErrorPreview(err), "stderr": nil,
 		})
 	} else {
-		fmt.Fprintf(stderr, "Error: %v\n", err)
+		fmt.Fprintf(stderr, "Error: %s\n", configErrorPreview(err))
 	}
 	return 4
 }
@@ -314,7 +310,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch gemini [flash|3.8|gemini-3.8-flash-low] [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4-flash|deepseek-v4-pro|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
-       hatch runs <list|inspect|audit|gc> [OPTIONS]
+       hatch runs <list|inspect|read|audit|gc> [OPTIONS]
 
 One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls
 
@@ -344,6 +340,10 @@ Start here:
 
 Common options:
   -C, --cwd DIR        Working directory for the agent
+  --title TEXT         Short single-line task title (up to 160 bytes)
+  --caller-session ID  Originating conversation ID (or HATCH_CALLER_SESSION_ID)
+  --caller-request ID  Group runs from one request (or HATCH_CALLER_REQUEST_ID)
+  --max-output-bytes N  Inline answer preview, 256..32768 bytes (default: 8192)
   -t, --timeout SEC    Hard timeout (default: 1800)
   --harness NAME       Select opencode, pi, or omp for codex/openrouter
   --reasoning-effort LEVEL  none|low|medium|high|xhigh|max
@@ -353,8 +353,9 @@ Common options:
 Other commands:
   hatch catalog --json
   hatch doctor [--json]
-  hatch runs list [--status STATUS] [--json]
-  hatch runs inspect <run-id> [--json]
+  hatch runs list [--all|--session ID|--under DIR] [--query TEXT] [--limit N] [--json]
+  hatch runs inspect <run-id> [--files] [--json]
+  hatch runs read <run-id> [--part result|request|stdout|stderr] [--offset N] [--limit N] [--json]
   hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
   hatch runs gc [--apply] [--json]
 `

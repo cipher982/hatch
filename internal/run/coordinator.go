@@ -31,7 +31,9 @@ type Request struct {
 	Backend         string
 	Provider        string
 	Model           string
+	Title           string
 	CWD             string
+	Provenance      *Provenance
 	Prompt          string
 	Timeout         time.Duration
 	Invocation      provider.Invocation
@@ -44,20 +46,30 @@ type Request struct {
 func NewCoordinator(store RunStore) Coordinator {
 	return Coordinator{Store: store, Now: time.Now}
 }
-
 func (c Coordinator) Execute(req Request) PublicResult {
 	started := c.Now()
 	ctx := req.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if err := ValidateTitle(req.Title); err != nil {
+		return failedResult(-3, started, c.Now(), err.Error(), nil)
+	}
+	if req.Provenance == nil {
+		provenance, err := ResolveProvenance("", "")
+		if err != nil {
+			return failedResult(-3, started, c.Now(), fmt.Sprintf("resolve provenance: %v", err), nil)
+		}
+		req.Provenance = provenance
+	}
+	targetCWD := effectiveCWD(req.CWD)
 	redacted, err := validatedRedactedArgv(req.Invocation)
 	if err != nil {
 		return failedResult(-3, started, c.Now(), err.Error(), nil)
 	}
 	artifact, err := c.Store.Prepare(PreparedRun{
-		Surface: req.Surface, Backend: req.Backend, Provider: req.Provider, Model: req.Model, CWD: effectiveCWD(req.CWD),
-		Request: req.Prompt, RedactedArgv: redacted, CredentialNames: req.CredentialNames,
+		Surface: req.Surface, Backend: req.Backend, Provider: req.Provider, Model: req.Model, Title: req.Title,
+		CWD: targetCWD, Provenance: req.Provenance, Request: req.Prompt, RedactedArgv: redacted, CredentialNames: req.CredentialNames,
 		ReasoningPolicy:  req.Invocation.ReasoningPolicy,
 		StructuredStdout: req.Invocation.StreamFormat == "jsonl",
 	})
@@ -66,7 +78,11 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 	artifactPath := artifact.Path
 	if req.Progress != nil {
-		req.Progress(fmt.Sprintf("[hatch] run %s artifact %s", artifact.Manifest.RunID, artifact.Path))
+		receipt := fmt.Sprintf("[hatch] run %s artifact %s", shellJoin([]string{artifact.Manifest.RunID}), shellJoin([]string{artifact.Path}))
+		if req.Title != "" {
+			receipt += " title=" + shellJoin([]string{req.Title})
+		}
+		req.Progress(receipt)
 		req.Progress(fmt.Sprintf("[hatch] reasoning effort=%s source=%s support=%s", displayReasoningEffort(req.Invocation.ReasoningPolicy), req.Invocation.ReasoningPolicy.Source, req.Invocation.ReasoningPolicy.Support))
 		if req.ProgressLabel != "" && (req.Invocation.Adapter == "" || req.Invocation.Adapter == "raw") {
 			req.Progress(fmt.Sprintf("[hatch] %s started", req.ProgressLabel))
@@ -103,8 +119,8 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	cmd := exec.Command(req.Invocation.Argv[0], req.Invocation.Argv[1:]...)
 	configureProcess(cmd)
 	cmd.WaitDelay = time.Second
-	cmd.Dir = req.CWD
-	cmd.Env = buildEnvironment(req.Invocation, artifact.Manifest.RunID, req.Automation)
+	cmd.Dir = targetCWD
+	cmd.Env = buildEnvironment(req.Invocation, artifact.Manifest.RunID, req.Provenance, req.Automation)
 	if req.Invocation.Stdin != nil {
 		cmd.Stdin = bytes.NewReader(req.Invocation.Stdin)
 	}
@@ -337,8 +353,8 @@ func (c Coordinator) Execute(req Request) PublicResult {
 					state.Capabilities["inspect"] = "supported_same_version"
 					if timedOut {
 						argv := append(append([]string(nil), envArgs...), "opencode", "run", "--dangerously-skip-permissions")
-						if req.CWD != "" {
-							argv = append(argv, "--dir", req.CWD)
+						if targetCWD != "" {
+							argv = append(argv, "--dir", targetCWD)
 						}
 						if hasInvocationArg(req.Invocation.Argv, "--pure") {
 							argv = append(argv, "--pure")
@@ -544,16 +560,18 @@ func (w *captureWriter) Flush() {
 	}
 }
 
-func buildEnvironment(invocation provider.Invocation, runID string, automation bool) []string {
+func buildEnvironment(invocation provider.Invocation, runID string, provenance *Provenance, automation bool) []string {
 	values := make(map[string]string)
 	for _, entry := range os.Environ() {
 		if index := strings.IndexByte(entry, '='); index >= 0 {
 			values[entry[:index]] = entry[index+1:]
 		}
 	}
+	for _, name := range invocation.UnsetEnv {
+		delete(values, name)
+	}
 	delete(values, "DCG_BYPASS")
 	values["DCG_NO_SELF_HEAL"] = "1"
-	values["LONGHOUSE_HATCH_RUN_ID"] = runID
 	if automation {
 		values["LONGHOUSE_IS_SIDECHAIN"] = "1"
 		values["LONGHOUSE_ORIGIN_KIND"] = "hatch_automation"
@@ -568,11 +586,25 @@ func buildEnvironment(invocation provider.Invocation, runID string, automation b
 			values["LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT"] = filepath.Join(home, "provider-session-metadata", "opencode")
 		}
 	}
-	for _, name := range invocation.UnsetEnv {
-		delete(values, name)
-	}
 	for name, value := range invocation.SetEnv {
 		values[name] = value
+	}
+	delete(values, "HATCH_TITLE")
+	delete(values, "HATCH_RUN_ID")
+	delete(values, "LONGHOUSE_HATCH_RUN_ID")
+	delete(values, "HATCH_CALLER_SESSION_ID")
+	delete(values, "HATCH_CALLER_REQUEST_ID")
+	delete(values, "HATCH_CALLER_KIND")
+	values["HATCH_RUN_ID"] = runID
+	values["LONGHOUSE_HATCH_RUN_ID"] = runID
+	if provenance != nil {
+		values["HATCH_CALLER_KIND"] = provenance.CallerKind
+		if provenance.CallerSessionID != "" {
+			values["HATCH_CALLER_SESSION_ID"] = provenance.CallerSessionID
+		}
+		if provenance.CallerRequestID != "" {
+			values["HATCH_CALLER_REQUEST_ID"] = provenance.CallerRequestID
+		}
 	}
 	result := make([]string, 0, len(values))
 	for name, value := range values {

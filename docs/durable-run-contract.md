@@ -571,21 +571,69 @@ Compatibility fields are projections:
 Their absence never carries canonical meaning. Deprecation occurs only after
 in-repo usage reaches zero and a time-boxed external compatibility window ends.
 
+The CLI renders a bounded display projection after the full `result.json` is
+written. `output_truncated`, `stderr_truncated`, `error_truncated` and
+`metadata_truncated` describe omitted display content; `read_command`,
+`stderr_command` and `manifest_command` point to the corresponding retained
+artifact. Expert responses also expose `evidence_command` for provider response
+metadata. Ordinary small payloads retain their existing fields and values.
+The default answer preview is 8192 bytes, configurable with
+`--max-output-bytes 256..32768`; encoded invocation JSON is capped at 64 KiB.
+Progress has a separate bounded display budget. Display truncation never
+changes lifecycle, outcome, capture state or artifact bytes.
+Expert preserves explicit text/`--json` selection, including when stdout is
+piped; non-interactive agent invocations default to JSON.
+Text mode prints answers only on success. Partial failed answers remain
+available through the result reader.
+
+Optional `title` and `provenance` fields are additive at schema version 1 and
+writer contract revision 1. Title is a flag-only, single-line value of at most
+160 UTF-8 bytes. Provenance records the launch directory, caller identity
+source, originating conversation/request IDs and immediate parent Hatch run.
+Caller identity strings allow up to 512 UTF-8 bytes; caller kind allows 64
+bytes, matching query and card limits.
+Explicit caller flags win over `HATCH_CALLER_*` environment values, then the
+existing Longhouse session/thread variables. Absent identity remains unknown.
+`HATCH_RUN_ID`, `HATCH_CALLER_KIND` and the caller IDs propagate to nested
+providers; the provider's own session ID remains a separate identity.
+
 ### Run commands
 
 ```text
-hatch runs list [--status ...] [--json]
-hatch runs inspect <run-id> [--json]
+hatch runs list [--all|--session ID|--under DIR|--cwd DIR] [--query TEXT] [--limit N] [--before RUN-ID] [--json]
+hatch runs inspect <run-id> [--files] [--offset N] [--limit N] [--json]
+hatch runs read <run-id> [--part PART] [--offset N] [--limit N] [--json]
 hatch runs audit [--minimum-total N] [--minimum-surface N] [--json]
 hatch runs gc [--apply] [--json]
 ```
 
-- `list` and `inspect` are local and never require provider credentials.
+- `list`, `inspect` and `read` are local and never require provider credentials.
+- `list` defaults to the inherited caller session or exact launch directory;
+  historical records without provenance fall back to their target directory.
+  Scope is echoed and never silently widened. `--request`, `--parent`,
+  `--caller-kind`, `--status`, `--since` and `--until` are additional filters.
+  Directory matching resolves existing symlinks on both sides.
+  Times accept RFC3339 or a nonnegative duration measured backward from now.
+- List pages default to 20 cards and allow at most 100, with a 64 KiB encoded
+  ceiling. The exclusive `--before` cursor uses the full chronological sort key.
+  Legacy update times are labelled ordering fallbacks, not invented creation
+  times. Unknown timestamps sort last. `--query` covers metadata and the first
+  4096 request bytes, with coverage and matched fields reported.
+- Read pages default to 8192 source bytes, allow at most 32768, and have a
+  256 KiB encoded ceiling. Byte offsets refer to the unchanged source; UTF-8
+  adjustment and replacement are explicit. Continuation arguments preserve
+  scope, filters and page position. A result read reports its run outcome and
+  complete/partial/absent answer state, not a review approval.
 - `gc` removes only classified provider runtime/config/cache material that was
   never canonical evidence. It is a dry run unless `--apply` is explicit and
   skips nonterminal and `.hatch-pin` runs.
-- `inspect` shows exact files, capture state, native identity/capabilities,
-  warnings, and any structured operator recovery hint.
+- `inspect` reads metadata and nonterminal process observations without traversing
+  provider snapshots. `--files` opts into a bounded file inventory, capped at
+  10,000 directory entries. `walk_truncated` marks incomplete enumeration.
+  The stored artifact path allows targeted access outside that automatic
+  inventory. Large metadata is explicitly marked
+  partial and remains available through `read --part manifest`. Legacy response
+  bodies are not inlined by inspection.
 - `audit` is the authoritative Go artifact-integrity checker. It reuses the V1
   writer validator and closed-evidence verifier. With no minimum flags, passing
   means zero unexplained unsafe incidents; optional sample minimums are reporting

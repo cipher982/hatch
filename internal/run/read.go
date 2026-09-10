@@ -3,14 +3,15 @@ package run
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const maxMetadataBytes = 4 << 20
@@ -34,22 +35,60 @@ type InspectionObservation struct {
 }
 
 type Summary struct {
-	RunID     string  `json:"run_id"`
-	Kind      string  `json:"kind"`
-	Path      string  `json:"path"`
-	Lifecycle string  `json:"lifecycle"`
-	Outcome   string  `json:"outcome"`
-	Surface   string  `json:"surface"`
-	CreatedAt string  `json:"created_at,omitempty"`
-	Capture   string  `json:"capture,omitempty"`
-	NativeID  *string `json:"native_id,omitempty"`
+	RunID            string                 `json:"run_id"`
+	Kind             string                 `json:"kind"`
+	Path             string                 `json:"path"`
+	Lifecycle        string                 `json:"lifecycle"`
+	Outcome          string                 `json:"outcome"`
+	Surface          string                 `json:"surface"`
+	Model            string                 `json:"model,omitempty"`
+	Title            string                 `json:"title,omitempty"`
+	CWD              string                 `json:"cwd,omitempty"`
+	Provenance       *Provenance            `json:"provenance,omitempty"`
+	CreatedAt        string                 `json:"created_at,omitempty"`
+	Capture          string                 `json:"capture,omitempty"`
+	NativeID         *string                `json:"native_id,omitempty"`
+	Preview          string                 `json:"preview,omitempty"`
+	PreviewTruncated bool                   `json:"preview_truncated,omitempty"`
+	OutputBytes      int64                  `json:"output_bytes,omitempty"`
+	Answer           string                 `json:"answer,omitempty"`
+	TimeSource       string                 `json:"time_source,omitempty"`
+	MatchedIn        []string               `json:"matched_in,omitempty"`
+	Observation      *InspectionObservation `json:"observation,omitempty"`
+	SortTime         time.Time              `json:"-"`
+	rawPath          string
+	rawCWD           string
+	rawProvenance    *Provenance
+}
+
+type discoveryDiagnostics struct {
+	Skipped  int      `json:"skipped,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
+}
+
+func (d *discoveryDiagnostics) addSkip(err error) {
+	d.Skipped++
+	if err != nil && len(d.Warnings) < 8 {
+		d.Warnings = append(d.Warnings, boundString(err.Error(), 256))
+	}
+}
+func (d *discoveryDiagnostics) addWarning(err error) {
+	if err != nil && len(d.Warnings) < 8 {
+		d.Warnings = append(d.Warnings, boundString(err.Error(), 256))
+	}
 }
 
 func ListRecords(root, expertCache string) ([]Summary, error) {
+	result, _, err := discoverRecords(root, expertCache)
+	return result, err
+}
+
+func discoverRecords(root, expertCache string) ([]Summary, discoveryDiagnostics, error) {
 	result := []Summary{}
+	diagnostics := discoveryDiagnostics{}
 	entries, err := os.ReadDir(root)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, err
+		return nil, diagnostics, err
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
@@ -57,27 +96,31 @@ func ListRecords(root, expertCache string) ([]Summary, error) {
 		}
 		path := filepath.Join(root, entry.Name())
 		if regularNonSymlinkFile(filepath.Join(path, "manifest.json")) {
-			record, err := ReadRecord(path)
-			if err != nil {
+			record, err := ReadMetadata(path)
+			if err != nil || record.Manifest == nil {
+				diagnostics.addSkip(err)
 				continue
 			}
-			manifest := record.Manifest
-			outcome := ""
-			if manifest.Outcome != nil {
-				outcome = string(*manifest.Outcome)
+			if !metadataIdentityValid(record.Manifest.RunID, record.Manifest.Provenance) {
+				diagnostics.addSkip(fmt.Errorf("pathological run identity in %s", boundString(path, 256)))
+				continue
 			}
-			result = append(result, Summary{RunID: manifest.RunID, Kind: record.Kind, Path: path, Lifecycle: string(manifest.Lifecycle), Outcome: outcome, Surface: manifest.Surface, CreatedAt: manifest.CreatedAt.Format("2006-01-02T15:04:05.999999999Z07:00"), Capture: manifest.Capture.State, NativeID: manifest.ProviderState.NativeID})
+			result = append(result, summaryFromRecord(record))
 		} else if regularNonSymlinkFile(filepath.Join(path, "metadata.json")) {
 			legacy, err := readJSONObject(filepath.Join(path, "metadata.json"))
 			if err != nil || legacy["artifact_kind"] != "hatch_opencode_run" {
+				diagnostics.addSkip(err)
 				continue
 			}
 			id := readString(legacy["run_id"])
 			if id == "" {
 				id = entry.Name()
 			}
-			native := optionalString(legacy["session_id"])
-			result = append(result, Summary{RunID: id, Kind: "legacy_opencode", Path: path, Lifecycle: "terminal", Outcome: readString(legacy["outcome"]), Surface: "legacy.opencode", NativeID: native})
+			if !metadataIdentityValid(id, nil) || !legacyIdentityValid(legacy) {
+				diagnostics.addSkip(fmt.Errorf("pathological legacy identity in %s", boundString(path, 256)))
+				continue
+			}
+			result = append(result, summaryFromLegacy("legacy_opencode", path, id, legacy))
 		}
 	}
 	cacheEntries, cacheErr := os.ReadDir(expertCache)
@@ -88,25 +131,45 @@ func ListRecords(root, expertCache string) ([]Summary, error) {
 			}
 			path := filepath.Join(expertCache, entry.Name())
 			legacy, err := readJSONObject(path)
-			if err != nil || readString(legacy["response_id"]) == "" {
+			id := readString(legacy["response_id"])
+			if err != nil || id == "" {
+				diagnostics.addSkip(err)
 				continue
 			}
-			id := readString(legacy["response_id"])
-			result = append(result, Summary{RunID: id, Kind: "legacy_expert", Path: path, Lifecycle: "terminal", Outcome: readString(legacy["status"]), Surface: "expert", NativeID: &id})
+			if !metadataIdentityValid(id, nil) || !legacyIdentityValid(legacy) {
+				diagnostics.addSkip(fmt.Errorf("pathological legacy identity in %s", boundString(path, 256)))
+				continue
+			}
+			result = append(result, summaryFromLegacy("legacy_expert", path, id, legacy))
 		}
+	} else if !os.IsNotExist(cacheErr) {
+		diagnostics.addWarning(cacheErr)
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].RunID > result[j].RunID })
-	return result, nil
+	sort.SliceStable(result, func(i, j int) bool {
+		if !result[i].SortTime.IsZero() && !result[j].SortTime.IsZero() && !result[i].SortTime.Equal(result[j].SortTime) {
+			return result[i].SortTime.After(result[j].SortTime)
+		}
+		if result[i].SortTime.IsZero() != result[j].SortTime.IsZero() {
+			return !result[i].SortTime.IsZero()
+		}
+		return result[i].RunID > result[j].RunID
+	})
+	return result, diagnostics, nil
 }
 
 func InspectRecord(root, expertCache, id string) (Record, error) {
-	if id == "" || filepath.Base(id) != id || id == "." || id == ".." {
-		return Record{}, fmt.Errorf("invalid run id %q", id)
+	if id == "" || len(id) > 512 || filepath.Base(id) != id || id == "." || id == ".." {
+		return Record{}, fmt.Errorf("invalid run id %q", boundString(id, 512))
 	}
 	path := filepath.Join(root, id)
 	if info, err := os.Lstat(path); err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
-		return ReadRecord(path)
+		return ReadMetadata(path)
 	}
+	if path, ok := directExpertRecord(expertCache, id); ok {
+		legacy, err := readJSONObject(path)
+		return Record{Kind: "legacy_expert", Path: path, Legacy: legacy}, err
+	}
+	// Resolve legacy cache records without recursively walking run artifacts.
 	summaries, err := ListRecords(root, expertCache)
 	if err != nil {
 		return Record{}, err
@@ -118,86 +181,235 @@ func InspectRecord(root, expertCache, id string) (Record, error) {
 		switch summary.Kind {
 		case "legacy_opencode":
 			legacy, err := readJSONObject(filepath.Join(summary.Path, "metadata.json"))
-			return Record{Kind: summary.Kind, Path: summary.Path, Legacy: legacy, Raw: legacy}, err
+			return Record{Kind: summary.Kind, Path: summary.Path, Legacy: legacy}, err
 		case "legacy_expert":
 			legacy, err := readJSONObject(summary.Path)
-			return Record{Kind: summary.Kind, Path: summary.Path, Legacy: legacy, Raw: legacy}, err
+			return Record{Kind: summary.Kind, Path: summary.Path, Legacy: legacy}, err
 		default:
-			return ReadRecord(summary.Path)
+			return ReadMetadata(summary.Path)
 		}
 	}
 	return Record{}, fmt.Errorf("run %q not found", id)
 }
 
-func ReadRecord(path string) (Record, error) {
+// ReadMetadata reads only the manifest (or legacy metadata) and never inventories
+// the artifact directory. ReadRecord retains Raw for integrity callers.
+func ReadMetadata(path string) (Record, error) { return readRecord(path, false) }
+
+func ReadRecord(path string) (Record, error) { return readRecord(path, true) }
+
+func readRecord(path string, retainRaw bool) (Record, error) {
 	info, err := os.Lstat(path)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return Record{}, fmt.Errorf("unsafe or missing run directory: %s", path)
+		return Record{}, fmt.Errorf("unsafe or missing run directory: %s", boundString(path, 1024))
 	}
 	manifestPath := filepath.Join(path, "manifest.json")
-	raw, err := readJSONObject(manifestPath)
+	data, err := readJSONBytes(manifestPath)
 	if err != nil {
 		if legacy, legacyErr := readJSONObject(filepath.Join(path, "metadata.json")); legacyErr == nil && legacy["artifact_kind"] == "hatch_opencode_run" {
-			return Record{Kind: "legacy_opencode", Path: path, Legacy: legacy, Raw: legacy}, nil
+			record := Record{Kind: "legacy_opencode", Path: path, Legacy: legacy}
+			if retainRaw {
+				record.Raw = legacy
+			}
+			return record, nil
 		}
 		return Record{}, err
 	}
-	encoded, _ := json.Marshal(raw)
 	var manifest Manifest
-	if err := json.Unmarshal(encoded, &manifest); err != nil {
+	if err := json.Unmarshal(data, &manifest); err != nil {
 		return Record{}, err
 	}
 	if manifest.SchemaVersion != 1 {
 		return Record{}, fmt.Errorf("unsupported manifest schema version %d", manifest.SchemaVersion)
 	}
 	normalizeUnknownEnums(&manifest)
-	files, err := artifactFiles(path)
-	if err != nil {
-		return Record{}, err
+	record := Record{Kind: "hatch_run", Path: path,
+		Observation: inspectNonterminalProcess(&manifest), Manifest: &manifest}
+	if retainRaw {
+		var raw map[string]any
+		if err := json.Unmarshal(data, &raw); err != nil {
+			return Record{}, err
+		}
+		record.Raw = raw
 	}
-	return Record{
-		Kind: "hatch_run", Path: path, Files: files,
-		Observation: inspectNonterminalProcess(&manifest), Manifest: &manifest, Raw: raw,
-	}, nil
+	return record, nil
 }
 
-func artifactFiles(root string) ([]string, error) {
-	files := []string{}
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			if path != root && errors.Is(walkErr, os.ErrNotExist) {
-				return nil
+func summaryFromRecord(record Record) Summary {
+	m := record.Manifest
+	s := Summary{RunID: boundString(m.RunID, 512), Kind: record.Kind, Path: boundString(record.Path, 1024),
+		Lifecycle: boundString(string(m.Lifecycle), 64), Surface: boundString(m.Surface, 256), Model: boundString(m.Model, 256),
+		Title: boundString(m.Title, 160), CWD: boundString(m.CWD, 1024), Capture: boundString(m.Capture.State, 64),
+		NativeID: boundedPtr(m.ProviderState.NativeID, 512), Observation: record.Observation, OutputBytes: m.Result.OutputBytes,
+		SortTime: m.CreatedAt, TimeSource: "created_at", rawPath: record.Path, rawCWD: m.CWD, rawProvenance: m.Provenance}
+	if m.Outcome != nil {
+		s.Outcome = boundString(string(*m.Outcome), 64)
+	}
+	if m.CreatedAt.IsZero() {
+		s.CreatedAt = ""
+		s.SortTime = time.Time{}
+		s.TimeSource = "unknown"
+	} else {
+		s.CreatedAt = m.CreatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	s.Answer = answerState(s.Lifecycle, s.Outcome, m.Result.Output)
+	s.Provenance = m.Provenance
+	if s.Provenance != nil {
+		s.Provenance = boundedProvenance(s.Provenance)
+	}
+	return s
+}
+func summaryFromLegacy(kind, path, id string, legacy map[string]any) Summary {
+	s := Summary{RunID: boundString(id, 512), Kind: kind, Path: boundString(path, 1024),
+		Lifecycle: "terminal", Surface: "legacy.opencode", CWD: boundString(legacyCWD(legacy), 1024),
+		TimeSource: "unknown", Answer: "unknown", rawPath: path, rawCWD: legacyCWD(legacy)}
+	if kind == "legacy_expert" {
+		s.Surface = "expert"
+		s.NativeID = boundedPtr(optionalString(legacy["response_id"]), 512)
+		s.Outcome = boundString(readString(legacy["status"]), 64)
+		text, present := legacyExpertResult(legacy)
+		if present && text != "" {
+			s.OutputBytes = int64(len(text))
+			if s.Outcome == "completed" || s.Outcome == string(OutcomeSucceeded) || s.Outcome == string(OutcomeSucceededWarnings) {
+				s.Answer = "complete"
+			} else {
+				s.Answer = "partial"
 			}
-			return walkErr
 		}
-		if path == root {
-			return nil
+	} else {
+		s.Outcome = boundString(readString(legacy["outcome"]), 64)
+		s.NativeID = boundedPtr(optionalString(legacy["session_id"]), 512)
+	}
+	if t, source := legacyTime(legacy); !t.IsZero() {
+		s.SortTime, s.TimeSource = t, source
+		if source == "created_at" {
+			s.CreatedAt = t.UTC().Format(time.RFC3339Nano)
 		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return nil
+	}
+	if p := legacyProvenanceExact(legacy); p != nil {
+		s.rawProvenance = p
+		s.Provenance = boundedProvenance(p)
+	}
+	if s.Provenance != nil && s.Provenance.CallerCWD != "" {
+		s.CWD = boundString(s.Provenance.CallerCWD, 1024)
+	}
+	return s
+}
+
+func answerState(lifecycle, outcome, output string) string {
+	if lifecycle != string(LifecycleTerminal) {
+		if output == "present" {
+			return "partial"
 		}
-		if entry.IsDir() {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil {
-			if errors.Is(err, os.ErrNotExist) {
-				return nil
-			}
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			return nil
-		}
-		relative, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		files = append(files, filepath.ToSlash(relative))
+		return "absent"
+	}
+	if output != "present" {
+		return "absent"
+	}
+	if outcome == string(OutcomeSucceeded) || outcome == string(OutcomeSucceededWarnings) {
+		return "complete"
+	}
+	return "partial"
+}
+
+func boundedProvenance(p *Provenance) *Provenance {
+	if p == nil {
 		return nil
-	})
-	sort.Strings(files)
-	return files, err
+	}
+	q := *p
+	q.CallerCWD, q.CallerKind = boundString(q.CallerCWD, 1024), boundString(q.CallerKind, maxCallerKindBytes)
+	q.CallerSessionID, q.CallerRequestID, q.ParentRunID = boundString(q.CallerSessionID, 512), boundString(q.CallerRequestID, 512), boundString(q.ParentRunID, 512)
+	return &q
+}
+
+func legacyCWD(m map[string]any) string {
+	for _, key := range []string{"cwd", "working_directory", "target_cwd"} {
+		if v := strings.TrimSpace(readString(m[key])); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func boundedPtr(value *string, max int) *string {
+	if value == nil {
+		return nil
+	}
+	bounded := boundString(*value, max)
+	return &bounded
+}
+
+func legacyTime(m map[string]any) (time.Time, string) {
+	for _, item := range []struct{ key, source string }{{"updated_at", "updated_at"}, {"created_at", "created_at"}} {
+		switch value := m[item.key].(type) {
+		case json.Number:
+			seconds, err := strconv.ParseInt(value.String(), 10, 64)
+			if err == nil {
+				parsed := time.Unix(seconds, 0).UTC()
+				if year := parsed.Year(); year >= 1 && year <= 9999 {
+					return parsed, item.source
+				}
+			}
+		case string:
+			if value = strings.TrimSpace(value); value != "" {
+				if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+					return parsed, item.source
+				}
+			}
+		}
+	}
+	return time.Time{}, "unknown"
+}
+func metadataIdentityValid(runID string, p *Provenance) bool {
+	if runID == "" || len(runID) > 512 {
+		return false
+	}
+	if p == nil {
+		return true
+	}
+	return len(p.CallerSessionID) <= 512 && len(p.CallerRequestID) <= 512 && len(p.ParentRunID) <= 512
+}
+func legacyIdentityValid(m map[string]any) bool {
+	value, ok := m["provenance"].(map[string]any)
+	if !ok {
+		return true
+	}
+	for _, key := range []string{"caller_session_id", "caller_request_id", "parent_run_id"} {
+		if len(readString(value[key])) > 512 {
+			return false
+		}
+	}
+	return true
+}
+
+func legacyProvenanceExact(m map[string]any) *Provenance {
+	value, ok := m["provenance"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	var p Provenance
+	if json.Unmarshal(data, &p) != nil {
+		return nil
+	}
+	return &p
+}
+
+func boundString(value string, max int) string {
+	if max < 0 {
+		return ""
+	}
+	for len(value) > max {
+		_, size := utf8.DecodeLastRuneInString(value)
+		if size <= 0 {
+			size = 1
+		}
+		value = value[:len(value)-size]
+	}
+	return strings.ToValidUTF8(value, "\uFFFD")
 }
 
 func inspectNonterminalProcess(manifest *Manifest) *InspectionObservation {
@@ -239,9 +451,9 @@ func normalizeUnknownEnums(manifest *Manifest) {
 	}
 }
 
-func readJSONObject(path string) (map[string]any, error) {
+func readJSONBytes(path string) ([]byte, error) {
 	if !regularNonSymlinkFile(path) {
-		return nil, fmt.Errorf("unsafe or missing metadata file: %s", path)
+		return nil, fmt.Errorf("unsafe or missing metadata file: %s", boundString(path, 1024))
 	}
 	file, err := os.Open(path)
 	if err != nil {
@@ -254,6 +466,14 @@ func readJSONObject(path string) (map[string]any, error) {
 	}
 	if len(data) > maxMetadataBytes {
 		return nil, fmt.Errorf("metadata exceeds %d bytes", maxMetadataBytes)
+	}
+	return data, nil
+}
+
+func readJSONObject(path string) (map[string]any, error) {
+	data, err := readJSONBytes(path)
+	if err != nil {
+		return nil, err
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()

@@ -47,6 +47,8 @@ type Artifact struct {
 
 type PreparedRun struct {
 	Surface, Backend, Provider, Model, CWD, Request string
+	Title                                           string
+	Provenance                                      *Provenance
 	Execution                                       string
 	RedactedArgv                                    []string
 	CredentialNames                                 []string
@@ -73,6 +75,11 @@ func NewStore(root string) Store {
 }
 
 func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
+	if spec.Provenance != nil {
+		if err := validateCallerKind(spec.Provenance.CallerKind); err != nil {
+			return nil, err
+		}
+	}
 	now := s.Now().UTC()
 	runID, err := s.IDGen(now)
 	if err != nil {
@@ -101,7 +108,7 @@ func (s Store) Prepare(spec PreparedRun) (*Artifact, error) {
 		SchemaVersion: 1, Writer: Writer{Implementation: "go", ContractRevision: 1},
 		RunID: runID, CreatedAt: now, UpdatedAt: now,
 		Lifecycle: LifecyclePrepared, Surface: valueOrUnknown(spec.Surface), Backend: valueOrUnknown(spec.Backend), Provider: valueOrUnknown(spec.Provider),
-		Model: valueOrUnknown(spec.Model), CWD: spec.CWD, Execution: executionOrDefault(spec.Execution),
+		Model: valueOrUnknown(spec.Model), Title: spec.Title, CWD: spec.CWD, Provenance: cloneProvenance(spec.Provenance), Execution: executionOrDefault(spec.Execution),
 		ReasoningPolicy: spec.ReasoningPolicy,
 		Invocation: Invocation{
 			RequestFile: "request.txt", RequestSHA256: hex.EncodeToString(digest[:]),

@@ -44,13 +44,23 @@ func TestListAndInspectCurrentAndLegacyRecords(t *testing.T) {
 		t.Fatalf("summaries = %#v, %v", summaries, err)
 	}
 	current, err := InspectRecord(root, expertCache, "hatch_current")
-	if err != nil || current.Manifest == nil || current.Manifest.RunID != "hatch_current" ||
-		!contains(current.Files, "evidence.sha256") || !contains(current.Files, "manifest.json") {
-		t.Fatalf("current = %#v, %v", current, err)
+	if err != nil || current.Manifest == nil || current.Manifest.RunID != "hatch_current" || len(current.Files) != 0 {
+		t.Fatalf("current metadata = %#v, %v", current, err)
 	}
 	legacy, err := InspectRecord(root, expertCache, "legacy_run")
 	if err != nil || legacy.Kind != "legacy_opencode" {
 		t.Fatalf("legacy = %#v, %v", legacy, err)
+	}
+	page, err := ReadContent(root, expertCache, "legacy_run", ContentOptions{Part: "manifest", Limit: 64})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(legacyDirectory, "metadata.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Content != string(raw[:64]) || !page.Truncated || page.NextOffset == nil {
+		t.Fatalf("legacy metadata page = %#v", page)
 	}
 	expert, err := InspectRecord(root, expertCache, "resp_old")
 	if err != nil || expert.Kind != "legacy_expert" {

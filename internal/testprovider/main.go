@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -20,6 +21,7 @@ type invocation struct {
 	CWD         string            `json:"cwd"`
 	StdinSHA256 string            `json:"stdin_sha256"`
 	StdinBytes  int               `json:"stdin_bytes"`
+	Stdin       string            `json:"stdin"`
 	Environment map[string]string `json:"environment"`
 }
 
@@ -141,6 +143,11 @@ func main() {
 		time.Sleep(10 * time.Second)
 	case "invalid_utf8":
 		_, _ = os.Stdout.Write([]byte{'o', 'k', ':', 0xff, 0xfe, '\n'})
+	case "large_answer":
+		fmt.Fprint(os.Stdout, strings.Repeat("€<&\n", 1<<15))
+	case "large_failure":
+		fmt.Fprint(os.Stderr, strings.Repeat("failure:\x00", 1<<14))
+		os.Exit(23)
 	case "large_output":
 		chunk := make([]byte, 1024*1024)
 		for index := range chunk {
@@ -191,6 +198,7 @@ func writeRecord(path string, stdin []byte) error {
 		CWD:         cwd,
 		StdinSHA256: hex.EncodeToString(digest[:]),
 		StdinBytes:  len(stdin),
+		Stdin:       string(stdin),
 		Environment: selectedEnvironment(),
 	}
 	encoded, err := json.MarshalIndent(record, "", "  ")
@@ -209,8 +217,13 @@ func selectedEnvironment() map[string]string {
 	for _, name := range []string{
 		"DCG_BYPASS",
 		"DCG_NO_SELF_HEAL",
+		"CLAUDE_CODE_USE_BEDROCK",
 		"GEMINI_API_KEY",
 		"HATCH_AUTOMATION",
+		"HATCH_RUN_ID",
+		"HATCH_CALLER_SESSION_ID",
+		"HATCH_CALLER_REQUEST_ID",
+		"HATCH_CALLER_KIND",
 		"LONGHOUSE_HATCH_RUN_ID",
 		"LONGHOUSE_IS_SIDECHAIN",
 		"LONGHOUSE_ORIGIN_KIND",

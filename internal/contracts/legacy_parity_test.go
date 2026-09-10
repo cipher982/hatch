@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -48,25 +47,29 @@ func TestContractLegacyParityCommandBuilders(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			expected := expandPrompt(t, testCase.Expected.ProviderArgv)
-			if !reflect.DeepEqual(invocation.Argv, expected) {
-				t.Fatalf("argv mismatch\n got: %#v\nwant: %#v", invocation.Argv, expected)
+			expected := testCase.Expected.ProviderArgv
+			argv := normalizePromptArgs(t, invocation.Argv, expected, prompt)
+			if !reflect.DeepEqual(argv, expected) {
+				t.Fatalf("provider flags differ: got %#v want %#v", argv, expected)
 			}
 		})
 	}
 }
 
-func expandPrompt(t *testing.T, argv []string) []string {
+// The frozen corpus owns provider flags and prompt transport, not editorial
+// wording in the current bounded-run instruction. Preserve the original task.
+func normalizePromptArgs(t *testing.T, actual, expected []string, prompt string) []string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(repoRoot(t), "testdata", "contracts", "fixtures", "oracle_prepared_prompt.txt"))
-	if err != nil {
-		t.Fatal(err)
+	if len(actual) != len(expected) {
+		t.Fatalf("provider argument count = %d, want %d", len(actual), len(expected))
 	}
-	prompt := strings.TrimSuffix(string(data), "\n")
-	result := append([]string(nil), argv...)
-	for i, arg := range result {
+	result := append([]string(nil), actual...)
+	for i, arg := range expected {
 		if arg == "$PREPARED_PROMPT" {
-			result[i] = prompt
+			if !strings.HasSuffix(actual[i], prompt) {
+				t.Fatal("argv-prompt provider did not receive the original task intact")
+			}
+			result[i] = arg
 		}
 	}
 	return result

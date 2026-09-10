@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +16,11 @@ import (
 
 type expertRequest struct {
 	PromptArgs      []string
+	Title           string
+	CallerSession   string
+	CallerRequest   string
+	CWD             string
+	MaxOutputBytes  int
 	Model           string
 	ReasoningEffort string
 	APIKey          string
@@ -34,6 +38,19 @@ func runExpert(ctx context.Context, args []string, stdin io.Reader, stdout, stde
 	if request.Help {
 		fmt.Fprint(stdout, ExpertHelp)
 		return 0
+	}
+	if err := runner.ValidateTitle(request.Title); err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
+	provenance, err := runner.ResolveProvenance(request.CallerSession, request.CallerRequest)
+	if err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
+	if request.CWD != "" {
+		info, err := os.Stat(request.CWD)
+		if err != nil || !info.IsDir() {
+			return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("cwd is not a directory: %s", request.CWD))
+		}
 	}
 	policy, err := provider.ResolveReasoning("expert", request.Model, request.ReasoningEffort)
 	if err != nil {
@@ -57,23 +74,12 @@ func runExpert(ctx context.Context, args []string, stdin io.Reader, stdout, stde
 	fmt.Fprintf(stderr, "[hatch] expert call started: model=%s reasoning=%s source=%s support=%s web_search=%t\n", request.Model, policy.Effort, policy.Source, policy.Support, request.WebSearch)
 	result := expert.Run(expert.Options{
 		Context: ctx, Prompt: prompt, Model: request.Model, ReasoningEffort: request.ReasoningEffort, ReasoningPolicy: policy, WebSearch: request.WebSearch,
+		Title: request.Title, Provenance: provenance, CWD: request.CWD,
 		Timeout: time.Duration(request.TimeoutSeconds) * time.Second, APIKey: apiKey,
 		BaseURL: strings.TrimSpace(os.Getenv("HATCH_EXPERT_RESPONSES_URL")), Store: runner.NewStore(root),
-		Progress: func(message string) { fmt.Fprintln(stderr, message) },
+		Progress: newProgressSink(stderr),
 	})
-	if request.JSON {
-		encoder := json.NewEncoder(stdout)
-		encoder.SetEscapeHTML(false)
-		if err := encoder.Encode(result); err != nil {
-			fmt.Fprintf(stderr, "Error: encode result: %v\n", err)
-			return 1
-		}
-	} else if result.OK {
-		fmt.Fprintln(stdout, strings.TrimRight(result.Output, "\n"))
-	} else if result.Error != nil {
-		fmt.Fprintf(stderr, "Error: %s\n", *result.Error)
-	}
-	return result.ExitCode
+	return renderExpertResult(result, request.MaxOutputBytes, request.JSON, stdout, stderr)
 }
 
 func parseExpert(args []string) (expertRequest, error) {
@@ -81,7 +87,7 @@ func parseExpert(args []string) (expertRequest, error) {
 	if model == "" {
 		model = expert.DefaultModel
 	}
-	result := expertRequest{Model: model, TimeoutSeconds: 900, WebSearch: true}
+	result := expertRequest{Model: model, TimeoutSeconds: 900, WebSearch: true, MaxOutputBytes: defaultOutputBytes}
 	literal := false
 	for index := 0; index < len(args); index++ {
 		arg := args[index]
@@ -94,7 +100,7 @@ func parseExpert(args []string) (expertRequest, error) {
 			continue
 		}
 		name, inline, hasInline := splitLongFlag(arg)
-		if hasInline && !oneOf(name, "--model", "--reasoning-effort", "--api-key", "--timeout") {
+		if hasInline && !oneOf(name, "--model", "--reasoning-effort", "--api-key", "--timeout", "--title", "--caller-session", "--caller-request", "--cwd", "--max-output-bytes") {
 			return result, fmt.Errorf("unrecognized argument: %s", arg)
 		}
 		switch name {
@@ -106,7 +112,7 @@ func parseExpert(args []string) (expertRequest, error) {
 			result.WebSearch = true
 		case "--no-web-search":
 			result.WebSearch = false
-		case "--model", "--reasoning-effort", "--api-key", "-t", "--timeout":
+		case "--model", "--reasoning-effort", "--api-key", "-t", "--timeout", "--title", "--caller-session", "--caller-request", "-C", "--cwd", "--max-output-bytes":
 			value := inline
 			if !hasInline {
 				if index+1 >= len(args) {
@@ -118,6 +124,20 @@ func parseExpert(args []string) (expertRequest, error) {
 			switch name {
 			case "--model":
 				result.Model = value
+			case "--title":
+				result.Title = value
+			case "--caller-session":
+				result.CallerSession = value
+			case "--caller-request":
+				result.CallerRequest = value
+			case "-C", "--cwd":
+				result.CWD = value
+			case "--max-output-bytes":
+				n, err := parseOutputLimit(value)
+				if err != nil {
+					return result, err
+				}
+				result.MaxOutputBytes = n
 			case "--reasoning-effort":
 				if !oneOf(value, "none", "low", "medium", "high", "xhigh", "max") {
 					return result, fmt.Errorf("invalid reasoning effort %q", value)
@@ -147,6 +167,10 @@ const ExpertHelp = `usage: hatch expert [OPTIONS] "prompt"
 Ask one slow synchronous expert question using the Responses API.
 
 Options:
+  --title TEXT
+  --caller-session ID / --caller-request ID
+  -C, --cwd DIRECTORY
+  --max-output-bytes N  256..32768 (default: 8192)
   --reasoning-effort LEVEL  none|low|medium|high|xhigh|max (default: medium)
   --web-search / --no-web-search
   -t, --timeout SECONDS

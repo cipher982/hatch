@@ -36,8 +36,10 @@ result, provider/session facts when available, and timeout or cancellation
 details. A terminal manifest is written only after the result is captured.
 
 ```sh
-hatch runs list
-hatch runs inspect hatch_01K...
+hatch runs list                       # this caller session, or exact launch directory
+hatch runs list --all --query factory # explicitly search across projects
+hatch runs inspect <run-id>           # metadata, not the execution trace
+hatch runs read <run-id> --part result # bounded final-answer page
 hatch runs audit --json
 hatch runs gc                 # report derived provider-runtime bloat
 hatch runs gc --apply         # remove it from terminal, unpinned runs
@@ -45,6 +47,62 @@ hatch runs gc --apply         # remove it from terminal, unpinned runs
 
 Artifacts live under `~/.local/state/hatch/runs/` by default. They are local and
 private; Hatch does not run a daemon or upload them anywhere.
+
+### Finding a previous review
+
+Give agent calls a short task title, usually 5–10 words. Pass the calling
+harness's actual session and request IDs when available, not a shared label:
+
+```sh
+hatch claude fable --title "Review provider factory release readiness" \
+  --caller-session "$SESSION_ID" --caller-request "$REQUEST_ID" "Review instructions"
+hatch runs list --session "$SESSION_ID"
+hatch runs list --under /path/to/repo --since 24h --query factory
+hatch runs read <run-id> --part result --offset 8192 --limit 8192
+```
+
+`HATCH_CALLER_SESSION_ID` and `HATCH_CALLER_REQUEST_ID` supply the same metadata
+for repeated calls. Existing Longhouse session variables are a fallback.
+Nested Hatch calls inherit that conversation scope and caller kind
+(`HATCH_CALLER_KIND`), and record their immediate parent in
+`provenance.parent_run_id`. The top-level `session_id` in invocation JSON is
+still the **child provider's** session ID.
+Caller IDs allow up to 512 UTF-8 bytes; caller kind allows up to 64.
+
+The manifest records both the caller's launch directory and the child's target
+`cwd`; `-C` changes only the target. Without caller identity, `runs list` uses
+the exact launch directory. Old artifacts without provenance use their recorded
+target directory. `--all`, `--session`, `--under` and `--cwd` select explicit
+scopes. Empty results never broaden the search automatically.
+Existing symlinks are resolved for launch directories and directory filters.
+
+Listings return up to 20 cards by default. `--before RUN-ID` continues in
+chronological order without shifting when newer runs arrive. JSON includes the
+applied scope and executable continuation arguments. `--query` searches metadata
+and only the first 4 KiB of the request, not the final answer or trace.
+Untitled cards have a labelled request preview; it is not an LLM summary.
+
+Invocation output defaults to an 8 KiB answer preview. Truncation flags and
+`read_command` identify how to retrieve more; full `result.txt`, `result.json`,
+stdout and stderr remain on disk. `--max-output-bytes` accepts 256–32768 bytes,
+subject to a 64 KiB encoded invocation-response limit. Error and stderr previews
+are bounded separately. A successful process may still conclude that a review
+is on hold; execution status is not an approval verdict.
+`expert` keeps text output unless `--json` is explicit; non-interactive agent
+invocations default to JSON.
+Text mode prints answers only on success; partial failed answers remain in the
+artifact and are available through `runs read`.
+
+`runs read` pages by original byte offset, not by line. The default is 8192
+source bytes, with a maximum of 32768 and a 256 KiB encoded-response ceiling.
+UTF-8 boundary adjustments and invalid-byte replacements are reported; the
+underlying bytes are unchanged. Follow `next_command` rather than calculating
+an offset from decoded text. Parts include `result`, `request`, `stdout`,
+`stderr`, `manifest`, `result-json` and `evidence`. `inspect --files` opts into
+a paged file inventory. Automatic enumeration stops after 10,000 directory
+entries; `walk_truncated: true` marks an incomplete inventory. The artifact
+path remains available for targeted filesystem access.
+Retrieval needs no model call or provider credentials.
 
 ## The small public surface
 
