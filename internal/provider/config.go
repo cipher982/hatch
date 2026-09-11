@@ -186,11 +186,7 @@ func Build(req Request) (Invocation, error) {
 		if strings.HasPrefix(req.Model, "openrouter/") && req.APIKey != "" {
 			invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
 		}
-		if strings.HasPrefix(req.Model, "openrouter/") {
-			if routing := FindRoutingPolicy(req.Model); routing != nil {
-				invocation.OpenCodeConfigJSON = openCodeRoutingConfig(strings.TrimPrefix(req.Model, "openrouter/"), routing)
-			}
-		}
+		invocation.OpenCodeConfigJSON = openCodeConfigJSON(req.Model, policy.Effort)
 		if strings.HasPrefix(req.Model, "amazon-bedrock/") {
 			invocation.SetEnv["AWS_PROFILE"] = "zh-ml-mlengineer"
 			invocation.SetEnv["AWS_REGION"] = "us-east-1"
@@ -242,26 +238,47 @@ func redactInvocation(invocation Invocation, promptIndices ...int) Invocation {
 	return invocation
 }
 
-func openCodeRoutingConfig(model string, policy *RoutingPolicy) []byte {
-	config := map[string]any{
-		"provider": map[string]any{
-			"openrouter": map[string]any{
+// openAIPriorityServiceTier is the OpenAI service tier that puts a request in
+// the priority processing queue.
+const openAIPriorityServiceTier = "priority"
+
+// openCodeConfigJSON returns the per-run OpenCode configuration for one model:
+// aggregator routing pins for OpenRouter runs, and OpenAI priority processing
+// when the model and reasoning effort call for it. It returns nil when the run
+// needs no per-run configuration.
+func openCodeConfigJSON(model, effort string) []byte {
+	providers := map[string]any{}
+	if strings.HasPrefix(model, "openrouter/") {
+		if routing := FindRoutingPolicy(model); routing != nil {
+			providers["openrouter"] = map[string]any{
 				"models": map[string]any{
-					model: map[string]any{
+					strings.TrimPrefix(model, "openrouter/"): map[string]any{
 						"options": map[string]any{
 							"provider": map[string]any{
-								"order":           policy.ProviderOrder,
-								"allow_fallbacks": policy.AllowFallbacks,
+								"order":           routing.ProviderOrder,
+								"allow_fallbacks": routing.AllowFallbacks,
 							},
 						},
 					},
 				},
-			},
-		},
+			}
+		}
 	}
-	encoded, err := json.Marshal(config)
+	if RequestsPriorityTier(model, effort) {
+		providers["openai"] = map[string]any{
+			"models": map[string]any{
+				strings.TrimPrefix(model, "openai/"): map[string]any{
+					"options": map[string]any{"serviceTier": openAIPriorityServiceTier},
+				},
+			},
+		}
+	}
+	if len(providers) == 0 {
+		return nil
+	}
+	encoded, err := json.Marshal(map[string]any{"provider": providers})
 	if err != nil {
-		panic("static opencode routing config cannot fail to marshal")
+		panic("static opencode config cannot fail to marshal")
 	}
 	return encoded
 }

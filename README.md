@@ -184,6 +184,15 @@ Claude and Bedrock use a fixed `low` policy. OpenRouter, Cursor, and Gemini
 report reasoning as unsupported instead of accepting a misleading override.
 Unknown OpenAI models require an explicit effort before Hatch launches them.
 
+`luna` at `xhigh` is the one model/effort pair that opts into OpenAI's priority
+processing tier (`service_tier=priority`), which is billed above standard rates;
+every other run stays on the default tier. OpenCode receives the tier as a
+per-run `serviceTier` model option, in the same injected configuration that
+carries aggregator routing pins, and Oh My Pi receives `--service-tier
+priority`, so the choice never depends on local provider configuration. The Pi
+harness and the raw Codex backend have no equivalent in their Hatch invocation
+and stay on the standard tier.
+
 Provider session state is isolated per run. OpenCode receives private XDG data
 and state paths, while version-keyed config dependencies and cache are shared
 outside run artifacts. Successful runs discard native OpenCode state after the

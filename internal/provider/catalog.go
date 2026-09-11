@@ -30,6 +30,10 @@ type ModelSpec struct {
 	Backend    string         `json:"backend"`
 	Deprecated []string       `json:"deprecated,omitempty"`
 	Routing    *RoutingPolicy `json:"routing,omitempty"`
+	// PriorityEfforts lists the reasoning efforts that request the provider's
+	// priority processing tier. Priority is billed above standard rates, so it
+	// stays opt-in per model and effort instead of a blanket default.
+	PriorityEfforts []string `json:"priority_efforts,omitempty"`
 }
 
 // ModelRegistry is the single source of truth for surfaced models in Hatch.
@@ -38,7 +42,7 @@ var ModelRegistry = []ModelSpec{
 	// Codex
 	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "opencode", Deprecated: []string{"sol"}},
 	{Surface: "codex", Alias: "terra", Model: "openai/gpt-5.6-terra", Backend: "opencode"},
-	{Surface: "codex", Alias: "luna", Model: "openai/gpt-5.6-luna", Backend: "opencode"},
+	{Surface: "codex", Alias: "luna", Model: "openai/gpt-5.6-luna", Backend: "opencode", PriorityEfforts: []string{"xhigh"}},
 	{Surface: "codex", Alias: "nano", Model: "openai/gpt-5.4-nano", Backend: "opencode"},
 	{Surface: "codex", Alias: "mini", Model: "openai/gpt-5.4-mini", Backend: "opencode"},
 	{Surface: "codex", Alias: "max", Model: "openai/gpt-5.5", Backend: "opencode"},
@@ -97,6 +101,7 @@ var (
 	deprecatedAliasMap = map[string]string{}
 	surfaceBackendMap  = map[string]string{}
 	routingPolicyMap   = map[string]*RoutingPolicy{}
+	priorityEffortMap  = map[string]map[string]bool{}
 	routingPrefixes    = []string{}
 )
 
@@ -124,6 +129,13 @@ func init() {
 
 		if spec.Routing != nil {
 			routingPolicyMap[spec.Model] = spec.Routing
+		}
+		if len(spec.PriorityEfforts) > 0 {
+			efforts := make(map[string]bool, len(spec.PriorityEfforts))
+			for _, effort := range spec.PriorityEfforts {
+				efforts[effort] = true
+			}
+			priorityEffortMap[spec.Model] = efforts
 		}
 	}
 	for prefix := range routingPolicyMap {
@@ -161,6 +173,14 @@ func FindRoutingPolicy(model string) *RoutingPolicy {
 		}
 	}
 	return nil
+}
+
+// RequestsPriorityTier reports whether a surfaced model at the given reasoning
+// effort should ask its provider for priority processing (OpenAI's
+// service_tier=priority). Priority is billed above standard rates, so only the
+// model/effort pairs declared in ModelRegistry qualify.
+func RequestsPriorityTier(model, effort string) bool {
+	return priorityEffortMap[model][effort]
 }
 
 // PublicModelOrder returns the documented public alias order across all surfaces.

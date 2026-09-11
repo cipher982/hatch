@@ -28,6 +28,11 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 	if policy.Effort != "" && policy.Support != "unsupported" {
 		argv = append(argv, "--thinking", policy.Effort)
 	}
+	// Oh My Pi exposes OpenAI's service tier directly; Pi has no equivalent
+	// flag, so a Pi run stays on the standard tier.
+	if command == "omp" && RequestsPriorityTier(req.Model, policy.Effort) {
+		argv = append(argv, "--service-tier", openAIPriorityServiceTier)
+	}
 	argv = append(argv, PreparePrompt(req.Prompt))
 
 	invocation := Invocation{

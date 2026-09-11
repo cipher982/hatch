@@ -44,6 +44,14 @@ func TestModelRegistryInvariants(t *testing.T) {
 				t.Fatalf("ShorthandSurface(deprecated %q) = %q, want %q", dep, shorthand, spec.Surface)
 			}
 		}
+		for _, effort := range spec.PriorityEfforts {
+			if !IsValidReasoningEffort(effort) {
+				t.Fatalf("%s declares unknown priority effort %q", spec.Model, effort)
+			}
+			if !RequestsPriorityTier(spec.Model, effort) {
+				t.Fatalf("RequestsPriorityTier(%q, %q) = false, want true", spec.Model, effort)
+			}
+		}
 	}
 }
 
@@ -129,6 +137,71 @@ func TestBuildOpenCodeGLMRoutingConfig(t *testing.T) {
 	model := config.Provider.OpenRouter.Models["z-ai/glm-5.3-flash"]
 	if !model.Options.Provider.AllowFallbacks || len(model.Options.Provider.Order) == 0 || model.Options.Provider.Order[0] != "Modal" {
 		t.Fatalf("routing config = %s", invocation.OpenCodeConfigJSON)
+	}
+}
+
+func TestBuildOpenCodePriorityTierConfig(t *testing.T) {
+	type openAIConfig struct {
+		Provider struct {
+			OpenAI struct {
+				Models map[string]struct {
+					Options struct {
+						ServiceTier string `json:"serviceTier"`
+					} `json:"options"`
+				} `json:"models"`
+			} `json:"openai"`
+		} `json:"provider"`
+	}
+	serviceTier := func(invocation Invocation) string {
+		t.Helper()
+		if len(invocation.OpenCodeConfigJSON) == 0 {
+			return ""
+		}
+		var config openAIConfig
+		if err := json.Unmarshal(invocation.OpenCodeConfigJSON, &config); err != nil {
+			t.Fatalf("priority config is not valid JSON: %v", err)
+		}
+		return config.Provider.OpenAI.Models["gpt-5.6-luna"].Options.ServiceTier
+	}
+
+	invocation, err := Build(Request{
+		Backend: "opencode", Model: "openai/gpt-5.6-luna", Prompt: "prompt",
+		APIKey: "fake", ReasoningEffort: "xhigh",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := serviceTier(invocation); got != "priority" {
+		t.Fatalf("luna xhigh serviceTier = %q, want priority: %s", got, invocation.OpenCodeConfigJSON)
+	}
+	if got := invocation.ReasoningPolicy; got != (ReasoningPolicy{Effort: "xhigh", Source: "explicit", Support: "native"}) {
+		t.Fatalf("luna xhigh reasoning policy = %#v", got)
+	}
+
+	for _, effort := range []string{"", "medium", "high", "max"} {
+		other, err := Build(Request{
+			Backend: "opencode", Model: "openai/gpt-5.6-luna", Prompt: "prompt",
+			APIKey: "fake", ReasoningEffort: effort,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(other.OpenCodeConfigJSON) != 0 {
+			t.Fatalf("luna effort %q must not request priority processing: %s", effort, other.OpenCodeConfigJSON)
+		}
+	}
+
+	for _, model := range []string{"openai/gpt-6-astra", "openai/gpt-5.6-terra"} {
+		other, err := Build(Request{
+			Backend: "opencode", Model: model, Prompt: "prompt",
+			APIKey: "fake", ReasoningEffort: "xhigh",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(other.OpenCodeConfigJSON) != 0 {
+			t.Fatalf("%s xhigh must not request priority processing: %s", model, other.OpenCodeConfigJSON)
+		}
 	}
 }
 
@@ -272,6 +345,33 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("omp requests priority tier for luna xhigh", func(t *testing.T) {
+		got, err := Build(Request{Backend: "omp", Model: "openai/gpt-5.6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantTail := []string{"--thinking", "xhigh", "--service-tier", "priority", PreparePrompt("p")}
+		if !reflect.DeepEqual(got.Argv[len(got.Argv)-len(wantTail):], wantTail) {
+			t.Fatalf("omp luna xhigh argv = %#v", got.Argv)
+		}
+	})
+
+	t.Run("pi and non-xhigh omp stay on the standard tier", func(t *testing.T) {
+		for _, request := range []Request{
+			{Backend: "pi", Model: "openai/gpt-5.6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"},
+			{Backend: "omp", Model: "openai/gpt-5.6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "high"},
+			{Backend: "omp", Model: "openai/gpt-5.6-terra", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"},
+		} {
+			got, err := Build(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(strings.Join(got.Argv, " "), "--service-tier") {
+				t.Fatalf("%s %s %s argv requests a service tier: %#v", request.Backend, request.Model, request.ReasoningEffort, got.Argv)
+			}
+		}
+	})
 
 	t.Run("bedrock defaults", func(t *testing.T) {
 		got, err := Build(Request{Backend: "bedrock", Prompt: "p", OutputFormat: "text"})
