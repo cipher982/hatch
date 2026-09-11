@@ -1,6 +1,9 @@
 package provider
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // CatalogEntry is one stable Hatch surface alias. It is intentionally local
 // configuration, not a live provider listing: agents must only be taught
@@ -11,40 +14,162 @@ type CatalogEntry struct {
 	Model   string `json:"model"`
 }
 
-// Surface model catalogs are the single source used by CLI alias resolution and
-// doctor drift checks. Treat these maps as immutable.
-var ClaudeSurfaceModels = map[string]string{
-	"haiku":     "haiku",
-	"sonnet":    "sonnet",
-	"opus":      "opus",
-	"fable":     "claude-fable-5-1",
-	"fable-5.1": "claude-fable-5-1",
+// RoutingPolicy configures upstream provider preferences and fallbacks for models
+// routed through aggregators (such as OpenRouter).
+type RoutingPolicy struct {
+	ProviderOrder  []string `json:"provider_order,omitempty"`
+	AllowFallbacks bool     `json:"allow_fallbacks"`
 }
 
-var CodexSurfaceModels = map[string]string{
-	"sol":   "openai/gpt-5.6-sol",
-	"terra": "openai/gpt-5.6-terra",
-	"luna":  "openai/gpt-5.6-luna",
-	"nano":  "openai/gpt-5.4-nano",
-	"mini":  "openai/gpt-5.4-mini",
-	"max":   "openai/gpt-5.5",
+// ModelSpec defines a single surfaced model, its canonical model identifier,
+// backend harness, retired aliases, and routing constraints.
+type ModelSpec struct {
+	Surface    string         `json:"surface"`
+	Alias      string         `json:"alias"`
+	Model      string         `json:"model"`
+	Backend    string         `json:"backend"`
+	Deprecated []string       `json:"deprecated,omitempty"`
+	Routing    *RoutingPolicy `json:"routing,omitempty"`
 }
 
-var CursorSurfaceModels = map[string]string{
-	"grok":    "cursor-grok-4.6-high",
-	"kimi-k3": "kimi-k3",
+// ModelRegistry is the single source of truth for surfaced models in Hatch.
+// Order defines the stable public model preference used for help and choices.
+var ModelRegistry = []ModelSpec{
+	// Codex
+	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "opencode", Deprecated: []string{"sol"}},
+	{Surface: "codex", Alias: "terra", Model: "openai/gpt-5.6-terra", Backend: "opencode"},
+	{Surface: "codex", Alias: "luna", Model: "openai/gpt-5.6-luna", Backend: "opencode"},
+	{Surface: "codex", Alias: "nano", Model: "openai/gpt-5.4-nano", Backend: "opencode"},
+	{Surface: "codex", Alias: "mini", Model: "openai/gpt-5.4-mini", Backend: "opencode"},
+	{Surface: "codex", Alias: "max", Model: "openai/gpt-5.5", Backend: "opencode"},
+
+	// Claude
+	{Surface: "claude", Alias: "haiku", Model: "haiku", Backend: "claude"},
+	{Surface: "claude", Alias: "sonnet", Model: "sonnet", Backend: "claude"},
+	{Surface: "claude", Alias: "opus", Model: "opus", Backend: "claude"},
+	{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1", Backend: "claude", Deprecated: []string{"fable-5"}},
+	{Surface: "claude", Alias: "fable-5.1", Model: "claude-fable-5-1", Backend: "claude"},
+
+	// Cursor
+	{Surface: "cursor", Alias: "grok", Model: "cursor-grok-4.6-high", Backend: "cursor"},
+
+	// Gemini
+	{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash-low", Backend: "omp", Deprecated: []string{"pro", "3.7", "gemini-3.7-flash-tiered"}},
+	{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash-low", Backend: "omp"},
+	{Surface: "gemini", Alias: "gemini-3.8-flash-low", Model: "google-antigravity/gemini-3.8-flash-low", Backend: "omp"},
+
+	// OpenRouter
+	{
+		Surface:    "openrouter",
+		Alias:      "deepseek-v4.1-flash",
+		Model:      "openrouter/deepseek/deepseek-v4.1-flash",
+		Backend:    "opencode",
+		Deprecated: []string{"deepseek-v4-flash", "deepseek-v4-pro"},
+		Routing: &RoutingPolicy{
+			ProviderOrder:  []string{"DeepSeek"},
+			AllowFallbacks: false,
+		},
+	},
+	{
+		Surface: "openrouter",
+		Alias:   "glm-5.3-flash",
+		Model:   "openrouter/z-ai/glm-5.3-flash",
+		Backend: "opencode",
+		Routing: &RoutingPolicy{
+			ProviderOrder:  []string{"Modal", "Z.AI", "Novita", "Together", "Parasail", "DeepInfra"},
+			AllowFallbacks: true,
+		},
+	},
+
+	// Cursor
+	{Surface: "cursor", Alias: "kimi-k3", Model: "kimi-k3", Backend: "cursor"},
 }
 
-var OpenRouterSurfaceModels = map[string]string{
-	"deepseek-v4-flash": "openrouter/deepseek/deepseek-v4-flash-0731",
-	"deepseek-v4-pro":   "openrouter/deepseek/deepseek-v4-pro-0813",
-	"glm-5.3-flash":     "openrouter/z-ai/glm-5.3-flash",
+// Surface model maps generated from ModelRegistry for backward compatibility.
+var (
+	ClaudeSurfaceModels     = map[string]string{}
+	CodexSurfaceModels      = map[string]string{}
+	CursorSurfaceModels     = map[string]string{}
+	GeminiSurfaceModels     = map[string]string{}
+	OpenRouterSurfaceModels = map[string]string{}
+
+	shorthandMap       = map[string]string{}
+	deprecatedAliasMap = map[string]string{}
+	surfaceBackendMap  = map[string]string{}
+	routingPolicyMap   = map[string]*RoutingPolicy{}
+	routingPrefixes    = []string{}
+)
+
+func init() {
+	for _, spec := range ModelRegistry {
+		switch spec.Surface {
+		case "claude":
+			ClaudeSurfaceModels[spec.Alias] = spec.Model
+		case "codex":
+			CodexSurfaceModels[spec.Alias] = spec.Model
+		case "cursor":
+			CursorSurfaceModels[spec.Alias] = spec.Model
+		case "gemini":
+			GeminiSurfaceModels[spec.Alias] = spec.Model
+		case "openrouter":
+			OpenRouterSurfaceModels[spec.Alias] = spec.Model
+		}
+
+		shorthandMap[spec.Alias] = spec.Surface
+		for _, dep := range spec.Deprecated {
+			shorthandMap[dep] = spec.Surface
+			deprecatedAliasMap[dep] = spec.Surface
+		}
+		surfaceBackendMap[spec.Surface] = spec.Backend
+
+		if spec.Routing != nil {
+			routingPolicyMap[spec.Model] = spec.Routing
+		}
+	}
+	for prefix := range routingPolicyMap {
+		routingPrefixes = append(routingPrefixes, prefix)
+	}
+	sort.Slice(routingPrefixes, func(i, j int) bool {
+		return len(routingPrefixes[i]) > len(routingPrefixes[j])
+	})
 }
 
-var GeminiSurfaceModels = map[string]string{
-	"flash":                "google-antigravity/gemini-3.8-flash-low",
-	"3.8":                  "google-antigravity/gemini-3.8-flash-low",
-	"gemini-3.8-flash-low": "google-antigravity/gemini-3.8-flash-low",
+// ShorthandSurface returns the canonical surface for a shorthand model alias (active or deprecated).
+func ShorthandSurface(alias string) string {
+	return shorthandMap[alias]
+}
+
+// IsDeprecatedAlias returns whether an alias is a retired alias for the given surface.
+func IsDeprecatedAlias(surface, alias string) bool {
+	return deprecatedAliasMap[alias] == surface
+}
+
+// SurfaceBackend returns the default backend harness for a surfaced provider name.
+func SurfaceBackend(surface string) string {
+	return surfaceBackendMap[surface]
+}
+
+// FindRoutingPolicy returns the routing policy for an OpenRouter model if configured.
+// It matches exact model names first, then the longest registered prefix deterministically.
+func FindRoutingPolicy(model string) *RoutingPolicy {
+	if policy, ok := routingPolicyMap[model]; ok {
+		return policy
+	}
+	for _, prefix := range routingPrefixes {
+		if strings.HasPrefix(model, prefix) {
+			return routingPolicyMap[prefix]
+		}
+	}
+	return nil
+}
+
+// PublicModelOrder returns the documented public alias order across all surfaces.
+func PublicModelOrder() []string {
+	order := make([]string, 0, len(ModelRegistry))
+	for _, m := range ModelRegistry {
+		order = append(order, m.Alias)
+	}
+	return order
 }
 
 // SurfaceCatalog returns every surfaced model in a stable order for help,

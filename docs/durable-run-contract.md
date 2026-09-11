@@ -374,7 +374,7 @@ Required rules:
   justified for IDs.
 - Times are UTC RFC 3339 with subsecond precision.
 - `surface`, `backend`, and `provider` are distinct. For example,
-  `surface=codex.sol`, internal adapter `opencode`, `provider=openai`. The local
+  `surface=codex.astra`, internal adapter `opencode`, `provider=openai`. The local
   manifest may expose the internal adapter for diagnostics; the normal public
   JSON projection omits it so OpenCode does not become a user-facing Hatch noun.
 - `execution` is `subprocess` or `http`. `process` is required only for a

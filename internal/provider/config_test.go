@@ -10,15 +10,60 @@ import (
 
 func TestSurfaceCatalogIncludesCurrentOpenRouterSurfaces(t *testing.T) {
 	entries := SurfaceCatalog()
-	if !slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-flash", Model: "openrouter/deepseek/deepseek-v4-flash-0731"}) ||
-		!slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-pro", Model: "openrouter/deepseek/deepseek-v4-pro-0813"}) ||
+	if !slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4.1-flash", Model: "openrouter/deepseek/deepseek-v4.1-flash"}) ||
 		!slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) {
 		t.Fatalf("catalog = %#v", entries)
+	}
+	for _, entry := range entries {
+		if entry.Surface == "openrouter" && (entry.Alias == "deepseek-v4-pro" || entry.Alias == "deepseek-v4-flash") {
+			t.Fatalf("catalog must not contain deprecated alias %q: %#v", entry.Alias, entries)
+		}
+	}
+}
+func TestModelRegistryInvariants(t *testing.T) {
+	seenAliases := map[string]bool{}
+	for _, spec := range ModelRegistry {
+		if spec.Surface == "" || spec.Alias == "" || spec.Model == "" || spec.Backend == "" {
+			t.Fatalf("incomplete ModelSpec: %#v", spec)
+		}
+		if seenAliases[spec.Alias] {
+			t.Fatalf("duplicate model alias %q", spec.Alias)
+		}
+		seenAliases[spec.Alias] = true
+		if backend := SurfaceBackend(spec.Surface); backend != spec.Backend {
+			t.Fatalf("SurfaceBackend(%q) = %q, want %q", spec.Surface, backend, spec.Backend)
+		}
+		if shorthand := ShorthandSurface(spec.Alias); shorthand != spec.Surface {
+			t.Fatalf("ShorthandSurface(%q) = %q, want %q", spec.Alias, shorthand, spec.Surface)
+		}
+		for _, dep := range spec.Deprecated {
+			if !IsDeprecatedAlias(spec.Surface, dep) {
+				t.Fatalf("IsDeprecatedAlias(%q, %q) = false, want true", spec.Surface, dep)
+			}
+			if shorthand := ShorthandSurface(dep); shorthand != spec.Surface {
+				t.Fatalf("ShorthandSurface(deprecated %q) = %q, want %q", dep, shorthand, spec.Surface)
+			}
+		}
+	}
+}
+
+func TestFindRoutingPolicyDeterministicLongestPrefix(t *testing.T) {
+	policy := FindRoutingPolicy("openrouter/deepseek/deepseek-v4.1-flash")
+	if policy == nil || len(policy.ProviderOrder) != 1 || policy.ProviderOrder[0] != "DeepSeek" || policy.AllowFallbacks {
+		t.Fatalf("unexpected policy for deepseek-v4.1-flash: %#v", policy)
+	}
+	// Snapshot suffix match
+	policySnapshot := FindRoutingPolicy("openrouter/deepseek/deepseek-v4.1-flash-0910")
+	if policySnapshot == nil || len(policySnapshot.ProviderOrder) != 1 || policySnapshot.ProviderOrder[0] != "DeepSeek" {
+		t.Fatalf("unexpected policy for snapshot: %#v", policySnapshot)
+	}
+	if plain := FindRoutingPolicy("openai/gpt-6-astra"); plain != nil {
+		t.Fatalf("unrouted model returned routing policy: %#v", plain)
 	}
 }
 
 func TestBuildOpenCodeDeepSeekRoutingConfig(t *testing.T) {
-	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,8 +87,8 @@ func TestBuildOpenCodeDeepSeekRoutingConfig(t *testing.T) {
 	if err := json.Unmarshal(invocation.OpenCodeConfigJSON, &config); err != nil {
 		t.Fatalf("routing config is not valid JSON: %v", err)
 	}
-	model := config.Provider.OpenRouter.Models["deepseek/deepseek-v4-flash-0731"]
-	if !model.Options.Provider.AllowFallbacks || len(model.Options.Provider.Order) == 0 || model.Options.Provider.Order[0] != "DeepSeek" {
+	model := config.Provider.OpenRouter.Models["deepseek/deepseek-v4.1-flash"]
+	if model.Options.Provider.AllowFallbacks || len(model.Options.Provider.Order) != 1 || model.Options.Provider.Order[0] != "DeepSeek" {
 		t.Fatalf("routing config = %s", invocation.OpenCodeConfigJSON)
 	}
 

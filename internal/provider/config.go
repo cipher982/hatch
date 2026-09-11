@@ -186,10 +186,10 @@ func Build(req Request) (Invocation, error) {
 		if strings.HasPrefix(req.Model, "openrouter/") && req.APIKey != "" {
 			invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
 		}
-		if strings.HasPrefix(req.Model, "openrouter/deepseek/deepseek-v4-flash") {
-			invocation.OpenCodeConfigJSON = openCodeDeepSeekRoutingConfig(strings.TrimPrefix(req.Model, "openrouter/"))
-		} else if strings.HasPrefix(req.Model, "openrouter/z-ai/glm-5.3-flash") {
-			invocation.OpenCodeConfigJSON = openCodeGLMRoutingConfig(strings.TrimPrefix(req.Model, "openrouter/"))
+		if strings.HasPrefix(req.Model, "openrouter/") {
+			if routing := FindRoutingPolicy(req.Model); routing != nil {
+				invocation.OpenCodeConfigJSON = openCodeRoutingConfig(strings.TrimPrefix(req.Model, "openrouter/"), routing)
+			}
 		}
 		if strings.HasPrefix(req.Model, "amazon-bedrock/") {
 			invocation.SetEnv["AWS_PROFILE"] = "zh-ml-mlengineer"
@@ -242,15 +242,7 @@ func redactInvocation(invocation Invocation, promptIndices ...int) Invocation {
 	return invocation
 }
 
-// openCodeDeepSeekRoutingConfig pins an OpenRouter deepseek-v4-flash model to a
-// provider order with working prefix caching. Measured on the hatch account
-// (2026-08): DeepSeek 98% cache hit, CoreWeave 91%, Novita 91%, DeepInfra 90%;
-// the default price-based load balancer frequently picks non-caching endpoints
-// (DigitalOcean, OpenInference) that re-encode the full growing context on
-// every agent step, adding tens of seconds of latency per step. Setting
-// provider.order disables load balancing and is tried in order; allow_fallbacks
-// engages only on provider failure.
-func openCodeDeepSeekRoutingConfig(model string) []byte {
+func openCodeRoutingConfig(model string, policy *RoutingPolicy) []byte {
 	config := map[string]any{
 		"provider": map[string]any{
 			"openrouter": map[string]any{
@@ -258,35 +250,8 @@ func openCodeDeepSeekRoutingConfig(model string) []byte {
 					model: map[string]any{
 						"options": map[string]any{
 							"provider": map[string]any{
-								"order":           []string{"DeepSeek", "CoreWeave", "Novita", "DeepInfra"},
-								"allow_fallbacks": true,
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	encoded, err := json.Marshal(config)
-	if err != nil {
-		panic("static opencode routing config cannot fail to marshal")
-	}
-	return encoded
-}
-
-// openCodeGLMRoutingConfig configures OpenRouter GLM-5.3 Flash with Modal as the
-// preferred provider and fallbacks to healthy providers (Z.AI, Novita, Together,
-// Parasail, DeepInfra) when Modal lacks specific parameter support (such as tool_choice: auto).
-func openCodeGLMRoutingConfig(model string) []byte {
-	config := map[string]any{
-		"provider": map[string]any{
-			"openrouter": map[string]any{
-				"models": map[string]any{
-					model: map[string]any{
-						"options": map[string]any{
-							"provider": map[string]any{
-								"order":           []string{"Modal", "Z.AI", "Novita", "Together", "Parasail", "DeepInfra"},
-								"allow_fallbacks": true,
+								"order":           policy.ProviderOrder,
+								"allow_fallbacks": policy.AllowFallbacks,
 							},
 						},
 					},

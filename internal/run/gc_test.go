@@ -61,7 +61,7 @@ func TestCollectGarbageSkipsNonterminalAndPinnedRuns(t *testing.T) {
 func createGarbageRun(t *testing.T, root string, terminal bool) *Artifact {
 	t.Helper()
 	store := NewStore(root)
-	artifact, err := store.Prepare(PreparedRun{Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", Request: "prompt"})
+	artifact, err := store.Prepare(PreparedRun{Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "openai/gpt-6-astra", Request: "prompt"})
 	if err != nil {
 		t.Fatal(err)
 	}

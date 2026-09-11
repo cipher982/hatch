@@ -81,7 +81,7 @@ func TestMainSelectsOMPForSurfacedCodexRun(t *testing.T) {
 	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", filepath.Join(root, "runs"))
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Main([]string{"codex", "sol", "--harness", "omp", "--json", "prompt"}, bytes.NewReader(nil), &stdout, &stderr, true)
+	exitCode := Main([]string{"codex", "astra", "--harness", "omp", "--json", "prompt"}, bytes.NewReader(nil), &stdout, &stderr, true)
 	if exitCode != 0 {
 		t.Fatalf("exit=%d stderr=%s stdout=%s", exitCode, stderr.String(), stdout.String())
 	}
@@ -97,8 +97,18 @@ func TestMainSelectsOMPForSurfacedCodexRun(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || result.Output != "fake success_omp output" || result.Run.Surface != "codex.sol" || result.Run.Backend != "omp" || result.Run.Model != "openai/gpt-5.6-sol" {
+	if !result.OK || result.Output != "fake success_omp output" || result.Run.Surface != "codex.astra" || result.Run.Backend != "omp" || result.Run.Model != "openai/gpt-6-astra" {
 		t.Fatalf("unexpected OMP result: %#v", result)
+	}
+	for _, args := range [][]string{
+		{"sol", "--harness", "omp", "--json", "prompt"},
+		{"codex", "sol", "--harness", "omp", "--json", "prompt"},
+	} {
+		stdout.Reset()
+		stderr.Reset()
+		if exit := Main(args, bytes.NewReader(nil), &stdout, &stderr, true); exit != 4 {
+			t.Fatalf("retired alias %v exit=%d stdout=%s stderr=%s", args, exit, stdout.String(), stderr.String())
+		}
 	}
 }
 
@@ -115,7 +125,7 @@ func buildTestProviderForCLI(t *testing.T, root string) string {
 
 func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 	for model, want := range map[string]string{
-		"openai/gpt-5.6-sol":  "codex.sol",
+		"openai/gpt-6-astra":  "codex.astra",
 		"openai/gpt-5.4-nano": "codex.nano",
 		"kimi-k3":             "cursor.kimi-k3",
 	} {
@@ -188,7 +198,7 @@ func TestMainDoctorJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-5.6-sol' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4-flash-0731' 'openrouter/deepseek/deepseek-v4-pro-0813' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
+	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-6-astra' 'openai/gpt-5.6-terra' 'openai/gpt-5.6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4.1-flash' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	piBinary := filepath.Join(directory, "pi")
@@ -249,8 +259,7 @@ func TestMainCatalogJSON(t *testing.T) {
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash-low"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash-low"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "gemini-3.8-flash-low", Model: "google-antigravity/gemini-3.8-flash-low"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-flash", Model: "openrouter/deepseek/deepseek-v4-flash-0731"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4-pro", Model: "openrouter/deepseek/deepseek-v4-pro-0813"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4.1-flash", Model: "openrouter/deepseek/deepseek-v4.1-flash"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) {
 		t.Fatalf("catalog = %#v", catalog)
 	}

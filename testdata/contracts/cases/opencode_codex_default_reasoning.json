@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "opencode_codex_default_reasoning",
   "provider_binaries": ["opencode"],
-  "arguments": ["codex", "sol", "--json", "-"],
+  "arguments": ["codex", "astra", "--json", "-"],
   "stdin": "oracle prompt",
   "scenario": "success_opencode",
   "environment": {"OPENAI_API_KEY": "fake-test-key"},
@@ -27,7 +27,7 @@
     },
     "provider_argv": [
       "opencode", "run", "--dangerously-skip-permissions", "--pure", "--print-logs",
-      "--log-level", "ERROR", "--format", "json", "-m", "openai/gpt-5.6-sol",
+      "--log-level", "ERROR", "--format", "json", "-m", "openai/gpt-6-astra",
       "--variant", "medium", "$PREPARED_PROMPT"
     ],
     "provider_stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

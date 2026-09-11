@@ -13,6 +13,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/cipher982/hatch/internal/provider"
 )
 
 type FieldAudit struct {
@@ -430,20 +432,15 @@ func hashFile(path string) (string, error) {
 }
 
 func fieldSurface(surface string) (string, bool) {
-	switch surface {
-	case "claude.haiku", "claude.sonnet", "claude.opus", "claude.fable", "claude.fable-5.1":
-		return "claude", true
-	case "codex.sol", "codex.terra", "codex.luna", "codex.nano", "codex.mini", "codex.max":
-		return "codex", true
-	case "cursor.grok", "cursor.kimi-k3":
-		return "cursor", true
-	case "gemini.flash", "gemini.3.8", "gemini.gemini-3.8-flash-low", "gemini.3.7", "gemini.gemini-3.7-flash-tiered":
-		return "gemini", true
-	case "openrouter.deepseek-v4-flash", "openrouter.deepseek-v4-pro", "openrouter.glm-5.3-flash":
-		return "openrouter", true
-	case "expert":
+	if surface == "expert" {
 		return "expert", true
-	default:
+	}
+	prefix, alias, ok := strings.Cut(surface, ".")
+	if !ok || alias == "" || alias == "raw" {
 		return "", false
 	}
+	if s := provider.ShorthandSurface(alias); s == prefix {
+		return prefix, true
+	}
+	return "", false
 }

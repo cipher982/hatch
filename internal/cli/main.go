@@ -305,10 +305,10 @@ func identity(backend, model string) (string, string) {
 
 const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
-       hatch codex <sol|terra|luna> [OPTIONS] "prompt"
+       hatch codex <astra|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
        hatch gemini [flash|3.8|gemini-3.8-flash-low] [OPTIONS] "prompt"
-       hatch openrouter <deepseek-v4-flash|deepseek-v4-pro|glm-5.3-flash> [OPTIONS] "prompt"
+       hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|read|audit|gc> [OPTIONS]
 
@@ -321,17 +321,16 @@ Coding harness selection:
 
 Model-first aliases:
   Claude: haiku, sonnet, opus, fable, fable-5.1
-  OpenAI coding models: sol, terra, luna, nano, mini, max
+  OpenAI coding models: astra, terra, luna, nano, mini, max
   Cursor: grok, kimi-k3
   Gemini: flash, 3.8, gemini-3.8-flash-low
-  OpenRouter: deepseek-v4-flash, deepseek-v4-pro, glm-5.3-flash
+  OpenRouter: deepseek-v4.1-flash, glm-5.3-flash
 Start here:
   hatch opus "Review this diff"
   hatch gemini "Review this branch"
-  hatch sol --harness omp "Review this branch"
+  hatch astra --harness omp "Review this branch"
   hatch grok "Review this branch"
-  hatch deepseek-v4-flash "Fix the failing tests"
-  hatch deepseek-v4-pro "Review this architecture"
+  hatch deepseek-v4.1-flash "Fix the failing tests"
   hatch glm-5.3-flash "Fix the failing tests"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"

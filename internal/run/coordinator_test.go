@@ -565,14 +565,14 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 
 func TestOpenCodeProviderStateWritesRoutingConfig(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), "runs"))
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(invocation.OpenCodeConfigJSON) == 0 {
 		t.Fatal("openrouter deepseek run missing routing config")
 	}
-	artifact, err := store.Prepare(PreparedRun{Surface: "openrouter.deepseek-v4-flash", Backend: "opencode", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Request: "prompt", ReasoningPolicy: invocation.ReasoningPolicy})
+	artifact, err := store.Prepare(PreparedRun{Surface: "openrouter.deepseek-v4.1-flash", Backend: "opencode", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4.1-flash", Request: "prompt", ReasoningPolicy: invocation.ReasoningPolicy})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -582,7 +582,7 @@ func TestOpenCodeProviderStateWritesRoutingConfig(t *testing.T) {
 	}
 	defer cleanup()
 	data := []byte(invocation.SetEnv["OPENCODE_CONFIG_CONTENT"])
-	if !bytes.Contains(data, []byte(`"DeepSeek"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":true`)) {
+	if !bytes.Contains(data, []byte(`"DeepSeek"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":false`)) {
 		t.Fatalf("inline routing config content = %s", data)
 	}
 	if _, err := os.Stat(filepath.Join(invocation.SetEnv["OPENCODE_CONFIG_DIR"], "opencode.json")); !os.IsNotExist(err) {
@@ -733,14 +733,14 @@ func TestCoordinatorRedactsPromptAndCredentialValues(t *testing.T) {
 	fake := buildTestProvider(t)
 	secret := "sk-secret-never-persist"
 	prompt := "prompt with $(shell) and 'quotes'"
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: prompt, APIKey: secret})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash", Prompt: prompt, APIKey: secret})
 	if err != nil {
 		t.Fatal(err)
 	}
 	invocation.Argv[0] = fake
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_opencode"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "openrouter.deepseek-v4-flash", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4-flash-0731", Prompt: prompt,
+		Surface: "openrouter.deepseek-v4.1-flash", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4.1-flash", Prompt: prompt,
 		Timeout: 5 * time.Second, Invocation: invocation, CredentialNames: []string{"OPENROUTER_API_KEY"},
 	})
 	if !result.OK || result.ArtifactPath == nil {
@@ -759,7 +759,7 @@ func TestCoordinatorFailsClosedOnRedactionMetadataDrift(t *testing.T) {
 	fake := buildTestProvider(t)
 	record := filepath.Join(t.TempDir(), "provider-ran")
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "openrouter.deepseek-v4-flash", Provider: "openrouter", Prompt: "sensitive prompt", Timeout: time.Second,
+		Surface: "openrouter.deepseek-v4.1-flash", Provider: "openrouter", Prompt: "sensitive prompt", Timeout: time.Second,
 		Invocation: provider.Invocation{
 			Argv: []string{fake, "sensitive prompt"}, RedactedArgv: []string{fake},
 			SetEnv: map[string]string{"HATCH_TEST_RECORD": record},

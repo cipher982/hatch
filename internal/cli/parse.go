@@ -37,11 +37,11 @@ var surfaces = map[string]struct {
 	backend string
 	models  map[string]string
 }{
-	"claude":     {"claude", provider.ClaudeSurfaceModels},
-	"cursor":     {"cursor", provider.CursorSurfaceModels},
-	"codex":      {"opencode", provider.CodexSurfaceModels},
-	"gemini":     {"omp", provider.GeminiSurfaceModels},
-	"openrouter": {"opencode", provider.OpenRouterSurfaceModels},
+	"claude":     {provider.SurfaceBackend("claude"), provider.ClaudeSurfaceModels},
+	"cursor":     {provider.SurfaceBackend("cursor"), provider.CursorSurfaceModels},
+	"codex":      {provider.SurfaceBackend("codex"), provider.CodexSurfaceModels},
+	"gemini":     {provider.SurfaceBackend("gemini"), provider.GeminiSurfaceModels},
+	"openrouter": {provider.SurfaceBackend("openrouter"), provider.OpenRouterSurfaceModels},
 }
 
 var flagsWithValue = map[string]bool{
@@ -201,21 +201,13 @@ func normalizeSurface(args []string) ([]string, error) {
 	alias := after[0]
 	model, ok := surface.models[alias]
 	if !ok {
-		if surfaceName == "gemini" {
-			if alias == "pro" || alias == "3.7" || alias == "gemini-3.7-flash-tiered" {
-				return nil, fmt.Errorf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
-			}
+		if surfaceName == "gemini" && !provider.IsDeprecatedAlias(surfaceName, alias) {
 			result := append([]string(nil), before...)
 			result = append(result, "--backend", surface.backend)
 			if !hasExplicitModel {
 				result = append(result, "--model", surface.models["flash"])
 			}
 			return append(result, after...), nil
-		}
-		if surfaceName == "claude" {
-			if alias == "fable-5" {
-				return nil, fmt.Errorf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
-			}
 		}
 		message := fmt.Sprintf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
 		if surfaceName == "cursor" {
@@ -247,19 +239,7 @@ func normalizeModelShorthand(args []string) []string {
 }
 
 func shorthandSurface(alias string) string {
-	switch alias {
-	case "haiku", "sonnet", "opus", "fable", "fable-5.1", "fable-5":
-		return "claude"
-	case "sol", "terra", "luna", "nano", "mini", "max":
-		return "codex"
-	case "grok", "kimi-k3":
-		return "cursor"
-	case "flash", "3.8", "gemini-3.8-flash-low", "3.7", "gemini-3.7-flash-tiered":
-		return "gemini"
-	case "deepseek-v4-flash", "deepseek-v4-pro", "glm-5.3-flash":
-		return "openrouter"
-	}
-	return ""
+	return provider.ShorthandSurface(alias)
 }
 
 func aliasCandidateIndex(args []string) int {
@@ -305,8 +285,7 @@ func splitLongFlag(arg string) (string, string, bool) {
 }
 
 func modelChoices(models map[string]string) string {
-	// Stable public order, matching each surface's documented preference.
-	order := []string{"sol", "terra", "luna", "nano", "mini", "max", "haiku", "sonnet", "opus", "fable", "fable-5.1", "grok", "flash", "3.8", "gemini-3.8-flash-low", "deepseek-v4-flash", "deepseek-v4-pro", "glm-5.3-flash", "kimi-k3"}
+	order := provider.PublicModelOrder()
 	choices := make([]string, 0, len(models))
 	for _, name := range order {
 		if _, ok := models[name]; ok {

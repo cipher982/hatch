@@ -12,12 +12,11 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"claude", "fable-5.1", "--json", "-"}, "claude", "claude-fable-5-1"},
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "cursor-grok-4.6-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
-		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-5.6-sol"},
+		{[]string{"codex", "astra", "--json", "-"}, "opencode", "openai/gpt-6-astra"},
 		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
 		{[]string{"gemini", "flash", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
 		{[]string{"gemini", "3.8", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
-		{[]string{"openrouter", "deepseek-v4-flash", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
-		{[]string{"openrouter", "deepseek-v4-pro", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
+		{[]string{"openrouter", "deepseek-v4.1-flash", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4.1-flash"},
 		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
@@ -51,21 +50,21 @@ func TestParseExplicitJSONIsAutomationEvenWithTTY(t *testing.T) {
 }
 
 func TestParseExplicitHarness(t *testing.T) {
-	got, err := Parse([]string{"codex", "sol", "--harness", "omp", "--json", "prompt"}, true)
+	got, err := Parse([]string{"codex", "astra", "--harness", "omp", "--json", "prompt"}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "openai/gpt-5.6-sol" {
+	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "openai/gpt-6-astra" {
 		t.Fatalf("parsed harness = %#v", got)
 	}
 }
 
 func TestParseCodexTierShorthand(t *testing.T) {
-	got, err := Parse([]string{"sol", "--harness", "omp", "--json", "prompt"}, true)
+	got, err := Parse([]string{"astra", "--harness", "omp", "--json", "prompt"}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "openai/gpt-5.6-sol" || len(got.PromptArgs) != 1 || got.PromptArgs[0] != "prompt" {
+	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "openai/gpt-6-astra" || len(got.PromptArgs) != 1 || got.PromptArgs[0] != "prompt" {
 		t.Fatalf("parsed shorthand = %#v", got)
 	}
 }
@@ -77,14 +76,13 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"opus", "claude", "opus"},
 		{"fable", "claude", "claude-fable-5-1"},
 		{"fable-5.1", "claude", "claude-fable-5-1"},
-		{"sol", "opencode", "openai/gpt-5.6-sol"},
+		{"astra", "opencode", "openai/gpt-6-astra"},
 		{"grok", "cursor", "cursor-grok-4.6-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
 		{"flash", "omp", "google-antigravity/gemini-3.8-flash-low"},
 		{"3.8", "omp", "google-antigravity/gemini-3.8-flash-low"},
 		{"gemini-3.8-flash-low", "omp", "google-antigravity/gemini-3.8-flash-low"},
-		{"deepseek-v4-flash", "opencode", "openrouter/deepseek/deepseek-v4-flash-0731"},
-		{"deepseek-v4-pro", "opencode", "openrouter/deepseek/deepseek-v4-pro-0813"},
+		{"deepseek-v4.1-flash", "opencode", "openrouter/deepseek/deepseek-v4.1-flash"},
 		{"glm-5.3-flash", "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
@@ -109,7 +107,7 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"explicit backend equals wins", []string{"--backend=gemini", "claude", "review"}, []string{"--backend=gemini", "claude", "review"}},
 		{"explicit model wins", []string{"codex", "--model", "openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-5.4", "review"}},
 		{"explicit model equals routes", []string{"--model=openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model=openai/gpt-5.4", "review"}},
-		{"model shorthand", []string{"sol", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-5.6-sol", "review"}},
+		{"model shorthand", []string{"astra", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-6-astra", "review"}},
 		{"cursor raw override", []string{"cursor", "grok", "--model", "cursor-grok-4.5-low", "review"}, []string{"--backend", "cursor", "--model", "cursor-grok-4.5-low", "review"}},
 		{"option value provider", []string{"--cwd", "claude", "review"}, []string{"--cwd", "claude", "review"}},
 		{"option equals provider", []string{"--cwd=claude", "review"}, []string{"--cwd=claude", "review"}},
@@ -162,7 +160,18 @@ func TestParseRejectsDeprecatedFable5Alias(t *testing.T) {
 		t.Fatalf("Parse deprecated Claude alias shorthand error = %v", err)
 	}
 }
-
+func TestParseRejectsDeprecatedDeepSeekAliases(t *testing.T) {
+	for _, alias := range []string{"deepseek-v4-flash", "deepseek-v4-pro"} {
+		_, err := Parse([]string{"openrouter", alias, "review"}, true)
+		if err == nil || err.Error() != `invalid openrouter model "`+alias+`". Choose one of: deepseek-v4.1-flash, glm-5.3-flash` {
+			t.Fatalf("Parse deprecated OpenRouter alias %q error = %v", alias, err)
+		}
+		_, err = Parse([]string{alias, "review"}, true)
+		if err == nil || err.Error() != `invalid openrouter model "`+alias+`". Choose one of: deepseek-v4.1-flash, glm-5.3-flash` {
+			t.Fatalf("Parse deprecated OpenRouter alias shorthand %q error = %v", alias, err)
+		}
+	}
+}
 
 func TestOpenRouterKimiK3IsRejected(t *testing.T) {
 	if _, err := Parse([]string{"openrouter", "kimi-k3", "review"}, true); err == nil {

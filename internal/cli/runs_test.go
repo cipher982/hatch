@@ -68,7 +68,7 @@ func TestRunsCLIGarbageCollectionRequiresApply(t *testing.T) {
 	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", root)
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	store := runner.NewStore(root)
-	artifact, err := store.Prepare(runner.PreparedRun{Surface: "codex.sol", Backend: "opencode", Provider: "openai", Model: "openai/gpt-5.6-sol", Request: "prompt"})
+	artifact, err := store.Prepare(runner.PreparedRun{Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "openai/gpt-6-astra", Request: "prompt"})
 	if err != nil {
 		t.Fatal(err)
 	}

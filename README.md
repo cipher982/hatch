@@ -110,10 +110,9 @@ The preferred form is model-first. Hatch infers the provider from the alias:
 
 ```bash
 hatch opus "Review this diff"
-hatch sol --harness omp "Review this branch"
+hatch astra --harness omp "Review this branch"
 hatch grok "Review this branch"
-hatch deepseek-v4-flash "Fix the failing tests"
-hatch deepseek-v4-pro "Review this architecture"
+hatch deepseek-v4.1-flash "Fix the failing tests"
 hatch glm-5.3-flash "Fix the failing tests"
 ```
 
@@ -121,22 +120,25 @@ The explicit provider forms remain valid when they make a call easier to read:
 
 ```bash
 hatch claude opus "Review this diff"
-hatch codex sol --harness omp "Review this branch"
-hatch openrouter deepseek-v4-flash "Fix the failing tests"
-hatch openrouter deepseek-v4-pro "Review this architecture"
+hatch codex astra --harness omp "Review this branch"
+hatch openrouter deepseek-v4.1-flash "Fix the failing tests"
 hatch openrouter glm-5.3-flash "Fix the failing tests"
 ```
 
 | Command | What it uses |
 | --- | --- |
 | `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login |
-| `hatch codex <sol\|terra\|luna>` | OpenAI coding model via the selected harness |
+| `hatch codex <astra\|terra\|luna>` | OpenAI coding model via the selected harness |
 | `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
-| `hatch openrouter <deepseek-v4-flash\|deepseek-v4-pro\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |
+| `hatch openrouter <deepseek-v4.1-flash\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.
+
+`astra` targets OpenAI `gpt-6-astra`; `terra` and `luna` remain on GPT-5.6.
+Astra defaults to `medium` reasoning and supports `low|medium|high|xhigh|max`
+(not `none`).
 
 ### Select the coding harness
 
@@ -144,20 +146,19 @@ Codex and OpenRouter surfaces default to OpenCode, but callers can choose the
 harness explicitly:
 
 ```bash
-hatch codex sol --harness opencode "Review this branch"
-hatch codex sol --harness pi "Review this branch"
-hatch codex sol --harness omp "Review this branch"
-hatch openrouter deepseek-v4-flash --harness omp "Fix the failing tests"
-hatch openrouter deepseek-v4-pro --harness omp "Review this architecture"
+hatch codex astra --harness opencode "Review this branch"
+hatch codex astra --harness pi "Review this branch"
+hatch codex astra --harness omp "Review this branch"
+hatch openrouter deepseek-v4.1-flash --harness omp "Fix the failing tests"
 ```
 
 The common Codex tier shorthand is also accepted:
 
 ```bash
-hatch sol --harness omp "Review this branch"
+hatch astra --harness omp "Review this branch"
 ```
 
-Here, `sol` identifies the OpenAI model tier and `omp` identifies the execution
+Here, `astra` identifies the OpenAI model and `omp` identifies the execution
 harness. The run manifest still records the inferred provider and effective
 harness separately.
 
@@ -230,7 +231,7 @@ JSON result, making it convenient for scripts and agent callers:
 To make the reasoning choice explicit:
 
 ```sh
-./hatch codex sol --reasoning-effort high "Review the risky parts of this change"
+./hatch codex astra --reasoning-effort high "Review the risky parts of this change"
 ```
 
 Use the doctor after installing or upgrading Cursor or OpenCode. It checks the
