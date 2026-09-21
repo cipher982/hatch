@@ -140,7 +140,7 @@ func Build(req Request) (Invocation, error) {
 	case "cursor":
 		model := req.Model
 		if model == "" {
-			model = "cursor-grok-4.6-high"
+			model = CursorSurfaceModels["grok"]
 		}
 		invocation := Invocation{
 			Argv: []string{

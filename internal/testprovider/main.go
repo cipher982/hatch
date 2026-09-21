@@ -52,7 +52,7 @@ func main() {
 		})
 	case "success_cursor":
 		emitJSON(map[string]any{
-			"type": "system", "subtype": "init", "model": "cursor-grok-4.6-high",
+			"type": "system", "subtype": "init", "model": "grok-4.7-high",
 			"session_id": "cursor-session-oracle",
 		})
 		emitJSON(map[string]any{

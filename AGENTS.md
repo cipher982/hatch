@@ -24,7 +24,7 @@ here is authoritative when they differ):
 
 - `hatch claude <haiku|sonnet|opus|fable|fable-5.1>` → Claude via the official local Claude Code CLI OAuth/subscription path (`opus` = Opus 5, current default; `fable`/`fable-5.1` = Claude Fable 5.1)
 - `hatch codex <astra|terra|luna>` → OpenAI (`astra` = GPT-6 Astra; `terra`/`luna` = GPT-5.6; `nano|mini|max` remain compatibility aliases)
-- `hatch cursor <grok|kimi-k3>` → Grok 4.5 High and Kimi K3 via local Cursor Agent CLI
+- `hatch cursor <grok|kimi-k3>` → Grok 4.7 High (`grok-4.7-high`) and Kimi K3 via local Cursor Agent CLI
 - `hatch gemini [flash|3.8|gemini-3.8-flash-low]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.8-flash-low`, current default)
 - `hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash>` → OpenRouter models via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
