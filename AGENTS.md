@@ -23,17 +23,14 @@ CLI surface (also covered in the global `~/git/me/AGENTS.md`; the status quo
 here is authoritative when they differ):
 
 - `hatch claude <haiku|sonnet|opus|fable|fable-5.1>` → Claude via the official local Claude Code CLI OAuth/subscription path (`opus` = Opus 5.5, current default; `opus-5` is deprecated; `fable`/`fable-5.1` = Claude Fable 5.1)
-- `hatch codex <astra|terra|luna>` → OpenAI (`astra` = GPT-6 Astra; `terra`/`luna` = GPT-5.6; `nano|mini|max` remain compatibility aliases)
+- `hatch codex <astra|sol|luna>` → OpenAI (`astra` = GPT-6 Astra; `sol` = GPT-6 Sol; `luna` = GPT-6 Luna; `nano|mini|max` remain compatibility aliases; `terra` is deprecated)
 - `hatch cursor <grok|kimi-k3>` → Grok 4.7 High (`grok-4.7-high`) and Kimi K3 via local Cursor Agent CLI
 - `hatch gemini [flash|3.8|gemini-3.8-flash-low]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.8-flash-low`, current default)
 - `hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash>` → OpenRouter models via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
-Default tiers: `opus` (Claude Opus 5.5) for Claude (supersedes `sonnet`/`fable` for most work as of 2026-09-22), `astra` for Codex; `sonnet` cheaper/faster Claude, `terra` lower-cost
-Codex balance, `luna` high-volume. GPT-6 Astra (`astra`) reasoning accepts
-`low|medium|high|xhigh|max`, defaulting to `medium`. GPT-5.6 (`terra`/`luna`)
-also accepts `none`. `fable` only when always-on adaptive thinking is wanted.
+Default tiers: `opus` (Claude Opus 5.5) for Claude (supersedes `sonnet`/`fable` for most work as of 2026-09-22), `astra` for Codex; `sol` is the cost-balanced coding choice and `luna` is high-volume. GPT-6 Astra defaults to `medium` and supports `low|medium|high|xhigh|max`; GPT-6 Sol and Luna also accept `none`. `fable` only when always-on adaptive thinking is wanted.
 `openrouter deepseek-v4.1-flash` and `openrouter glm-5.3-flash` are the default non-OpenAI/non-Anthropic choices.
 
 Agent runs target a concise result within ~15 minutes and have a default 30

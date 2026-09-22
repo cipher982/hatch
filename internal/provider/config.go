@@ -242,10 +242,54 @@ func redactInvocation(invocation Invocation, promptIndices ...int) Invocation {
 // the priority processing queue.
 const openAIPriorityServiceTier = "priority"
 
+// OpenCodeCatalogConfigJSON adds explicit GPT-6 Sol and Luna entries to
+// OpenCode's built-in OpenAI catalog. The same model definitions are injected
+// per run and into doctor probes.
+func OpenCodeCatalogConfigJSON() []byte {
+	models := make(map[string]any, len(openAIGPT6Models))
+	for id, definition := range openAIGPT6Models {
+		models[id] = definition
+	}
+	return encodeOpenCodeConfig(map[string]any{
+		"openai": map[string]any{"models": models},
+	})
+}
+
+var openAIGPT6Models = map[string]map[string]any{
+	"gpt-6-sol":  openAIGPT6Model("GPT-6 Sol"),
+	"gpt-6-luna": openAIGPT6Model("GPT-6 Luna"),
+}
+
+func openAIGPT6Model(name string) map[string]any {
+	variants := make(map[string]any, 6)
+	for _, effort := range []string{"none", "low", "medium", "high", "xhigh", "max"} {
+		variants[effort] = map[string]any{
+			"reasoningEffort":  effort,
+			"reasoningSummary": "auto",
+			"include":          []string{"reasoning.encrypted_content"},
+		}
+	}
+	return map[string]any{
+		"name":       name,
+		"reasoning":  true,
+		"tool_call":  true,
+		"attachment": true,
+		"limit": map[string]any{
+			"context": 1_050_000,
+			"input":   922_000,
+			"output":  128_000,
+		},
+		"modalities": map[string]any{
+			"input":  []string{"text", "image"},
+			"output": []string{"text"},
+		},
+		"variants": variants,
+	}
+}
+
 // openCodeConfigJSON returns the per-run OpenCode configuration for one model:
-// aggregator routing pins for OpenRouter runs, and OpenAI priority processing
-// when the model and reasoning effort call for it. It returns nil when the run
-// needs no per-run configuration.
+// custom GPT-6 catalog entries, aggregator routing pins, and priority processing
+// when the model and reasoning effort call for it.
 func openCodeConfigJSON(model, effort string) []byte {
 	providers := map[string]any{}
 	if strings.HasPrefix(model, "openrouter/") {
@@ -264,18 +308,27 @@ func openCodeConfigJSON(model, effort string) []byte {
 			}
 		}
 	}
-	if RequestsPriorityTier(model, effort) {
+	modelID := strings.TrimPrefix(model, "openai/")
+	openAIModel, hasOpenAIModel := openAIGPT6Models[modelID]
+	if hasOpenAIModel || RequestsPriorityTier(model, effort) {
+		modelConfig := make(map[string]any, len(openAIModel)+1)
+		for key, value := range openAIModel {
+			modelConfig[key] = value
+		}
+		if RequestsPriorityTier(model, effort) {
+			modelConfig["options"] = map[string]any{"serviceTier": openAIPriorityServiceTier}
+		}
 		providers["openai"] = map[string]any{
-			"models": map[string]any{
-				strings.TrimPrefix(model, "openai/"): map[string]any{
-					"options": map[string]any{"serviceTier": openAIPriorityServiceTier},
-				},
-			},
+			"models": map[string]any{modelID: modelConfig},
 		}
 	}
 	if len(providers) == 0 {
 		return nil
 	}
+	return encodeOpenCodeConfig(providers)
+}
+
+func encodeOpenCodeConfig(providers map[string]any) []byte {
 	encoded, err := json.Marshal(map[string]any{"provider": providers})
 	if err != nil {
 		panic("static opencode config cannot fail to marshal")

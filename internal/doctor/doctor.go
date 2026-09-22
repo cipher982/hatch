@@ -108,6 +108,9 @@ func checkOpenCodeModels(name, providerName, credentialName string, credential C
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "opencode", "models", providerName)
 	cmd.Env = replaceEnvironment(os.Environ(), credentialName, credential.Value)
+	if providerName == "openai" {
+		cmd.Env = replaceEnvironment(cmd.Env, "OPENCODE_CONFIG_CONTENT", string(provider.OpenCodeCatalogConfigJSON()))
+	}
 	stdout, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
 		return Check{Name: name, Detail: "opencode models timed out after 30s"}

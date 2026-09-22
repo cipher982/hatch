@@ -525,11 +525,11 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 		t.Fatalf("reviewed config was not preserved: %#v", openCode.SetEnv)
 	}
 
-	codex, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-5.6", Prompt: "prompt", APIKey: "fake"})
+	codex, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-6-sol", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	codexArtifact, err := store.Prepare(PreparedRun{Surface: "codex.raw", Backend: "codex", Provider: "openai", Model: "gpt-5.6", Request: "prompt", ReasoningPolicy: codex.ReasoningPolicy})
+	codexArtifact, err := store.Prepare(PreparedRun{Surface: "codex.raw", Backend: "codex", Provider: "openai", Model: "gpt-6-sol", Request: "prompt", ReasoningPolicy: codex.ReasoningPolicy})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -619,14 +619,14 @@ func TestOpenCodeGLMProviderStateWritesRoutingConfig(t *testing.T) {
 
 func TestRawCodexRunRecordsEphemeralIsolation(t *testing.T) {
 	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-5.6", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-6-sol", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	invocation.Argv[0] = fake
 	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_text"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "codex.raw", Backend: "codex", Provider: "openai", Model: "gpt-5.6", Prompt: "prompt", Invocation: invocation,
+		Surface: "codex.raw", Backend: "codex", Provider: "openai", Model: "gpt-6-sol", Prompt: "prompt", Invocation: invocation,
 	})
 	if !result.OK || result.Run == nil || result.ArtifactPath == nil || result.Run.ProviderState.Capabilities["state_isolation"] != "hatch_per_run" ||
 		result.Run.ProviderState.Capabilities["session_persistence"] != "disabled_ephemeral" || result.Run.ProviderState.Capabilities["recovery"] != "unsupported_ephemeral" {

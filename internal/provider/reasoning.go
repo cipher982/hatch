@@ -175,7 +175,7 @@ func knownOpenAIModel(model string) (known, supportsNone, supportsMax bool) {
 	switch name {
 	case "gpt-6-astra":
 		return true, false, true
-	case "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna":
+	case "gpt-6-sol", "gpt-6-luna":
 		return true, true, true
 	case "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano":
 		return true, true, false

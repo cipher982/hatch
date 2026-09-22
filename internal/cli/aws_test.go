@@ -11,7 +11,7 @@ import (
 
 func TestPreflightBedrockSkipsOtherProviders(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	if err := preflightBedrock("openai/gpt-5.6", provider.Invocation{}); err != nil {
+	if err := preflightBedrock("openai/gpt-6-luna", provider.Invocation{}); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -15,7 +15,7 @@ import (
 	runner "github.com/cipher982/hatch/internal/run"
 )
 
-const DefaultModel = "gpt-5.6-sol"
+const DefaultModel = "gpt-6-sol"
 const DefaultURL = "https://api.openai.com/v1/responses"
 
 const Instructions = `You are an expert consultant. Answer the user's question directly.

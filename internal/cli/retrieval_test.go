@@ -159,12 +159,13 @@ func TestExpertTextOutputRequiresExplicitJSON(t *testing.T) {
 	if pipedOut.Len() != 0 || !strings.HasPrefix(pipedErr.String(), "Error:") {
 		t.Fatalf("piped expert selected JSON: stdout=%q stderr=%q", pipedOut.String(), pipedErr.String())
 	}
+	t.Setenv("HATCH_EXPERT_MODEL", "")
 	request, err := parseExpert([]string{"question"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if request.JSON {
-		t.Fatal("expert unexpectedly selected JSON without --json")
+	if request.JSON || request.Model != "gpt-6-sol" {
+		t.Fatalf("expert defaults = model:%q JSON:%t, want GPT-6 Sol and text output", request.Model, request.JSON)
 	}
 	var stdout, stderr bytes.Buffer
 	if exit := renderExpertResult(expert.Result{OK: true, Output: "answer"}, 8192, request.JSON, &stdout, &stderr); exit != 0 {

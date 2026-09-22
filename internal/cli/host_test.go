@@ -115,7 +115,7 @@ func TestApplyDCGOpenCodeIsolation(t *testing.T) {
 	if err := os.Symlink(binary, isolatedBinary); err != nil {
 		t.Fatal(err)
 	}
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-5.6", Prompt: "p", APIKey: "key"})
+	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-sol", Prompt: "p", APIKey: "key"})
 	if err != nil {
 		t.Fatal(err)
 	}

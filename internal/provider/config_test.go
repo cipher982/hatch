@@ -100,12 +100,12 @@ func TestBuildOpenCodeDeepSeekRoutingConfig(t *testing.T) {
 		t.Fatalf("routing config = %s", invocation.OpenCodeConfigJSON)
 	}
 
-	plain, err := Build(Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "prompt", APIKey: "fake"})
+	plain, err := Build(Request{Backend: "opencode", Model: "openai/gpt-6-sol", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plain.OpenCodeConfigJSON) != 0 {
-		t.Fatalf("non-deepseek opencode run must not carry routing config: %s", plain.OpenCodeConfigJSON)
+	if strings.Contains(string(plain.OpenCodeConfigJSON), `"openrouter"`) {
+		t.Fatalf("non-OpenRouter run must not carry aggregator routing config: %s", plain.OpenCodeConfigJSON)
 	}
 }
 
@@ -140,6 +140,71 @@ func TestBuildOpenCodeGLMRoutingConfig(t *testing.T) {
 	}
 }
 
+func TestBuildOpenCodeGPT6CatalogModels(t *testing.T) {
+	type modelDefinition struct {
+		Name       string `json:"name"`
+		Reasoning  bool   `json:"reasoning"`
+		ToolCall   bool   `json:"tool_call"`
+		Attachment bool   `json:"attachment"`
+		Limit      struct {
+			Context int `json:"context"`
+			Input   int `json:"input"`
+			Output  int `json:"output"`
+		} `json:"limit"`
+		Modalities struct {
+			Input  []string `json:"input"`
+			Output []string `json:"output"`
+		} `json:"modalities"`
+		Variants map[string]struct {
+			ReasoningEffort  string   `json:"reasoningEffort"`
+			ReasoningSummary string   `json:"reasoningSummary"`
+			Include          []string `json:"include"`
+		} `json:"variants"`
+	}
+	type openCodeConfig struct {
+		Provider struct {
+			OpenAI struct {
+				Models map[string]modelDefinition `json:"models"`
+			} `json:"openai"`
+		} `json:"provider"`
+	}
+	checkModels := func(encoded []byte, wantIDs ...string) {
+		t.Helper()
+		var config openCodeConfig
+		if err := json.Unmarshal(encoded, &config); err != nil {
+			t.Fatalf("OpenCode catalog config is invalid JSON: %v", err)
+		}
+		if len(config.Provider.OpenAI.Models) != len(wantIDs) {
+			t.Fatalf("configured models = %#v, want %v", config.Provider.OpenAI.Models, wantIDs)
+		}
+		for _, id := range wantIDs {
+			model, ok := config.Provider.OpenAI.Models[id]
+			if !ok || !model.Reasoning || !model.ToolCall || !model.Attachment ||
+				model.Limit.Context != 1_050_000 || model.Limit.Input != 922_000 || model.Limit.Output != 128_000 ||
+				!reflect.DeepEqual(model.Modalities.Input, []string{"text", "image"}) ||
+				!reflect.DeepEqual(model.Modalities.Output, []string{"text"}) || len(model.Variants) != 6 {
+				t.Fatalf("OpenCode model %s = %#v", id, model)
+			}
+			for _, effort := range []string{"none", "low", "medium", "high", "xhigh", "max"} {
+				variant, ok := model.Variants[effort]
+				if !ok || variant.ReasoningEffort != effort || variant.ReasoningSummary != "auto" ||
+					!reflect.DeepEqual(variant.Include, []string{"reasoning.encrypted_content"}) {
+					t.Fatalf("OpenCode model %s variant %s = %#v", id, effort, variant)
+				}
+			}
+		}
+	}
+
+	for _, model := range []string{"gpt-6-sol", "gpt-6-luna"} {
+		invocation, err := Build(Request{Backend: "opencode", Model: "openai/" + model, Prompt: "prompt", APIKey: "fake"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		checkModels(invocation.OpenCodeConfigJSON, model)
+	}
+	checkModels(OpenCodeCatalogConfigJSON(), "gpt-6-sol", "gpt-6-luna")
+}
+
 func TestBuildOpenCodePriorityTierConfig(t *testing.T) {
 	type openAIConfig struct {
 		Provider struct {
@@ -161,11 +226,11 @@ func TestBuildOpenCodePriorityTierConfig(t *testing.T) {
 		if err := json.Unmarshal(invocation.OpenCodeConfigJSON, &config); err != nil {
 			t.Fatalf("priority config is not valid JSON: %v", err)
 		}
-		return config.Provider.OpenAI.Models["gpt-5.6-luna"].Options.ServiceTier
+		return config.Provider.OpenAI.Models["gpt-6-luna"].Options.ServiceTier
 	}
 
 	invocation, err := Build(Request{
-		Backend: "opencode", Model: "openai/gpt-5.6-luna", Prompt: "prompt",
+		Backend: "opencode", Model: "openai/gpt-6-luna", Prompt: "prompt",
 		APIKey: "fake", ReasoningEffort: "xhigh",
 	})
 	if err != nil {
@@ -180,18 +245,18 @@ func TestBuildOpenCodePriorityTierConfig(t *testing.T) {
 
 	for _, effort := range []string{"", "medium", "high", "max"} {
 		other, err := Build(Request{
-			Backend: "opencode", Model: "openai/gpt-5.6-luna", Prompt: "prompt",
+			Backend: "opencode", Model: "openai/gpt-6-luna", Prompt: "prompt",
 			APIKey: "fake", ReasoningEffort: effort,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(other.OpenCodeConfigJSON) != 0 {
-			t.Fatalf("luna effort %q must not request priority processing: %s", effort, other.OpenCodeConfigJSON)
+		if got := serviceTier(other); got != "" {
+			t.Fatalf("luna effort %q must not request priority processing, got %q", effort, got)
 		}
 	}
 
-	for _, model := range []string{"openai/gpt-6-astra", "openai/gpt-5.6-terra"} {
+	for _, model := range []string{"openai/gpt-6-astra", "openai/gpt-6-sol"} {
 		other, err := Build(Request{
 			Backend: "opencode", Model: model, Prompt: "prompt",
 			APIKey: "fake", ReasoningEffort: "xhigh",
@@ -199,8 +264,8 @@ func TestBuildOpenCodePriorityTierConfig(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(other.OpenCodeConfigJSON) != 0 {
-			t.Fatalf("%s xhigh must not request priority processing: %s", model, other.OpenCodeConfigJSON)
+		if got := serviceTier(other); got != "" {
+			t.Fatalf("%s xhigh must not request priority processing, got %q", model, got)
 		}
 	}
 }
@@ -301,14 +366,14 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 
 	t.Run("raw codex", func(t *testing.T) {
 		got, err := Build(Request{
-			Backend: "codex", Model: "gpt-5.6", Prompt: "p", APIKey: "secret",
+			Backend: "codex", Model: "gpt-6-sol", Prompt: "p", APIKey: "secret",
 			ReasoningEffort: "high", SkipGitRepoCheck: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		want := []string{
-			"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral", "-m", "gpt-5.6",
+			"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral", "-m", "gpt-6-sol",
 			"-c", "model_reasoning_effort=high", "--skip-git-repo-check",
 		}
 		if !reflect.DeepEqual(got.Argv, want) || got.SetEnv["OPENAI_API_KEY"] != "secret" {
@@ -317,7 +382,7 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 	})
 
 	t.Run("opencode defaults reasoning explicitly", func(t *testing.T) {
-		got, err := Build(Request{Backend: "opencode", Model: "openai/gpt-5.6-sol", Prompt: "p", APIKey: "secret"})
+		got, err := Build(Request{Backend: "opencode", Model: "openai/gpt-6-sol", Prompt: "p", APIKey: "secret"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -329,7 +394,7 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 
 	for _, backend := range []string{"pi", "omp"} {
 		t.Run(backend+" uses explicit headless JSON mode", func(t *testing.T) {
-			got, err := Build(Request{Backend: backend, Model: "openai/gpt-5.6-sol", Prompt: "p", APIKey: "secret"})
+			got, err := Build(Request{Backend: backend, Model: "openai/gpt-6-sol", Prompt: "p", APIKey: "secret"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -338,7 +403,7 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 				t.Fatalf("%s invocation = %#v", backend, got)
 			}
 			joined := strings.Join(got.Argv, " ")
-			for _, want := range []string{"--mode json", "--no-session", "--model openai/gpt-5.6-sol", "--thinking medium"} {
+			for _, want := range []string{"--mode json", "--no-session", "--model openai/gpt-6-sol", "--thinking medium"} {
 				if !strings.Contains(joined, want) {
 					t.Fatalf("%s argv lacks %q: %#v", backend, want, got.Argv)
 				}
@@ -347,7 +412,7 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 	}
 
 	t.Run("omp requests priority tier for luna xhigh", func(t *testing.T) {
-		got, err := Build(Request{Backend: "omp", Model: "openai/gpt-5.6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"})
+		got, err := Build(Request{Backend: "omp", Model: "openai/gpt-6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -359,9 +424,9 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 
 	t.Run("pi and non-xhigh omp stay on the standard tier", func(t *testing.T) {
 		for _, request := range []Request{
-			{Backend: "pi", Model: "openai/gpt-5.6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"},
-			{Backend: "omp", Model: "openai/gpt-5.6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "high"},
-			{Backend: "omp", Model: "openai/gpt-5.6-terra", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"},
+			{Backend: "pi", Model: "openai/gpt-6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"},
+			{Backend: "omp", Model: "openai/gpt-6-luna", Prompt: "p", APIKey: "secret", ReasoningEffort: "high"},
+			{Backend: "omp", Model: "openai/gpt-6-sol", Prompt: "p", APIKey: "secret", ReasoningEffort: "xhigh"},
 		} {
 			got, err := Build(request)
 			if err != nil {

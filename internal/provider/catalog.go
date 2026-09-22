@@ -40,9 +40,9 @@ type ModelSpec struct {
 // Order defines the stable public model preference used for help and choices.
 var ModelRegistry = []ModelSpec{
 	// Codex
-	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "opencode", Deprecated: []string{"sol"}},
-	{Surface: "codex", Alias: "terra", Model: "openai/gpt-5.6-terra", Backend: "opencode"},
-	{Surface: "codex", Alias: "luna", Model: "openai/gpt-5.6-luna", Backend: "opencode", PriorityEfforts: []string{"xhigh"}},
+	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "opencode"},
+	{Surface: "codex", Alias: "sol", Model: "openai/gpt-6-sol", Backend: "opencode", Deprecated: []string{"terra"}},
+	{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna", Backend: "opencode", PriorityEfforts: []string{"xhigh"}},
 	{Surface: "codex", Alias: "nano", Model: "openai/gpt-5.4-nano", Backend: "opencode"},
 	{Surface: "codex", Alias: "mini", Model: "openai/gpt-5.4-mini", Backend: "opencode"},
 	{Surface: "codex", Alias: "max", Model: "openai/gpt-5.5", Backend: "opencode"},

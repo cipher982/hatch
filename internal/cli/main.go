@@ -305,7 +305,7 @@ func identity(backend, model string) (string, string) {
 
 const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
-       hatch codex <astra|terra|luna> [OPTIONS] "prompt"
+       hatch codex <astra|sol|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
        hatch gemini [flash|3.8|gemini-3.8-flash-low] [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash> [OPTIONS] "prompt"
@@ -321,7 +321,7 @@ Coding harness selection:
 
 Model-first aliases:
   Claude: haiku, sonnet, opus, fable, fable-5.1
-  OpenAI coding models: astra, terra, luna, nano, mini, max
+  OpenAI coding models: astra, sol, luna, nano, mini, max
   Cursor: grok, kimi-k3
   Gemini: flash, 3.8, gemini-3.8-flash-low
   OpenRouter: deepseek-v4.1-flash, glm-5.3-flash

@@ -11,7 +11,7 @@ someone else. It is not a replacement for the underlying agent CLIs, a hosted
 service, an MCP server, or a workflow engine.
 
 ```sh
-hatch codex terra -C . "Review this branch for correctness risks"
+hatch codex sol -C . "Review this branch for correctness risks"
 hatch claude opus -C . "Explain the failure and propose the smallest fix"
 hatch cursor grok -C . "Find the race condition"
 ```
@@ -128,7 +128,7 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | Command | What it uses |
 | --- | --- |
 | `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login |
-| `hatch codex <astra\|terra\|luna>` | OpenAI coding model via the selected harness |
+| `hatch codex <astra\|sol\|luna>` | OpenAI coding model via the selected harness |
 | `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
 | `hatch openrouter <deepseek-v4.1-flash\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
@@ -138,9 +138,11 @@ backend-specific options, use `hatch --advanced-help`.
 `opus` targets Claude Opus 5.5 through the local Claude Code CLI; the retired
 `opus-5` alias is rejected.
 
-`astra` targets OpenAI `gpt-6-astra`; `terra` and `luna` remain on GPT-5.6.
-Astra defaults to `medium` reasoning and supports `low|medium|high|xhigh|max`
-(not `none`).
+`astra` targets OpenAI `gpt-6-astra`; `sol` targets `gpt-6-sol`; and `luna`
+targets `gpt-6-luna`. The legacy `terra` alias is rejected, and GPT-5.6 Sol,
+Terra, and Luna are no longer surfaced by Hatch. Astra defaults to `medium`
+reasoning and supports `low|medium|high|xhigh|max` (not `none`); Sol and Luna
+support all documented efforts, including `none` and `max`.
 
 ### Select the coding harness
 
@@ -186,14 +188,14 @@ Claude and Bedrock use a fixed `low` policy. OpenRouter, Cursor, and Gemini
 report reasoning as unsupported instead of accepting a misleading override.
 Unknown OpenAI models require an explicit effort before Hatch launches them.
 
-`luna` at `xhigh` is the one model/effort pair that opts into OpenAI's priority
-processing tier (`service_tier=priority`), which is billed above standard rates;
-every other run stays on the default tier. OpenCode receives the tier as a
-per-run `serviceTier` model option, in the same injected configuration that
-carries aggregator routing pins, and Oh My Pi receives `--service-tier
-priority`, so the choice never depends on local provider configuration. The Pi
-harness and the raw Codex backend have no equivalent in their Hatch invocation
-and stay on the standard tier.
+`luna` at `xhigh` is the one model/effort pair that opts into OpenAI Fast mode
+(`service_tier=priority`), which is billed above standard rates. Every other
+run stays on the default tier. OpenCode receives the tier as a per-run
+`serviceTier` model option, in the same injected configuration that carries
+aggregator routing pins, and Oh My Pi receives `--service-tier priority`, so the
+choice never depends on local provider configuration. The Pi harness and raw
+Codex backend have no equivalent in their Hatch invocation and stay on the
+standard tier.
 
 Provider session state is isolated per run. OpenCode receives private XDG data
 and state paths, while version-keyed config dependencies and cache are shared
@@ -236,7 +238,7 @@ Then make a call. When stdout is not a terminal, Hatch automatically emits one
 JSON result, making it convenient for scripts and agent callers:
 
 ```sh
-./hatch codex terra -C "$PWD" --json "Summarize the architecture" | jq .output
+./hatch codex sol -C "$PWD" --json "Summarize the architecture" | jq .output
 ```
 
 To make the reasoning choice explicit:

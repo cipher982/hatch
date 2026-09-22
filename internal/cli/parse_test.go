@@ -183,6 +183,16 @@ func TestParseRejectsDeprecatedDeepSeekAliases(t *testing.T) {
 		}
 	}
 }
+func TestParseRejectsDeprecatedTerraAlias(t *testing.T) {
+	for _, args := range [][]string{
+		{"codex", "terra", "review"},
+		{"terra", "review"},
+	} {
+		if _, err := Parse(args, true); err == nil {
+			t.Fatalf("Parse(%v) accepted deprecated terra alias", args)
+		}
+	}
+}
 
 func TestOpenRouterKimiK3IsRejected(t *testing.T) {
 	if _, err := Parse([]string{"openrouter", "kimi-k3", "review"}, true); err == nil {
