@@ -73,7 +73,7 @@ func TestParseModelFirstShorthands(t *testing.T) {
 	tests := []struct {
 		alias, backend, model string
 	}{
-		{"opus", "claude", "opus"},
+		{"opus", "claude", "claude-opus-5-5"},
 		{"fable", "claude", "claude-fable-5-1"},
 		{"fable-5.1", "claude", "claude-fable-5-1"},
 		{"astra", "opencode", "openai/gpt-6-astra"},
@@ -158,6 +158,17 @@ func TestParseRejectsDeprecatedFable5Alias(t *testing.T) {
 	_, err = Parse([]string{"fable-5", "review"}, true)
 	if err == nil || err.Error() != `invalid claude model "fable-5". Choose one of: haiku, sonnet, opus, fable, fable-5.1` {
 		t.Fatalf("Parse deprecated Claude alias shorthand error = %v", err)
+	}
+}
+func TestParseRejectsDeprecatedOpus5Alias(t *testing.T) {
+	for _, args := range [][]string{
+		{"claude", "opus-5", "review"},
+		{"opus-5", "review"},
+	} {
+		_, err := Parse(args, true)
+		if err == nil || err.Error() != `invalid claude model "opus-5". Choose one of: haiku, sonnet, opus, fable, fable-5.1` {
+			t.Fatalf("Parse deprecated Claude alias %v error = %v", args, err)
+		}
 	}
 }
 func TestParseRejectsDeprecatedDeepSeekAliases(t *testing.T) {

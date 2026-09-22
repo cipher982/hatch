@@ -254,7 +254,8 @@ func TestMainCatalogJSON(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &catalog); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1"}) ||
+	if !slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "opus", Model: "claude-opus-5-5"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable-5.1", Model: "claude-fable-5-1"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash-low"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash-low"}) ||

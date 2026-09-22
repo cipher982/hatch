@@ -50,7 +50,7 @@ var ModelRegistry = []ModelSpec{
 	// Claude
 	{Surface: "claude", Alias: "haiku", Model: "haiku", Backend: "claude"},
 	{Surface: "claude", Alias: "sonnet", Model: "sonnet", Backend: "claude"},
-	{Surface: "claude", Alias: "opus", Model: "opus", Backend: "claude"},
+	{Surface: "claude", Alias: "opus", Model: "claude-opus-5-5", Backend: "claude", Deprecated: []string{"opus-5"}},
 	{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1", Backend: "claude", Deprecated: []string{"fable-5"}},
 	{Surface: "claude", Alias: "fable-5.1", Model: "claude-fable-5-1", Backend: "claude"},
 

@@ -135,6 +135,8 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.
+`opus` targets Claude Opus 5.5 through the local Claude Code CLI; the retired
+`opus-5` alias is rejected.
 
 `astra` targets OpenAI `gpt-6-astra`; `terra` and `luna` remain on GPT-5.6.
 Astra defaults to `medium` reasoning and supports `low|medium|high|xhigh|max`

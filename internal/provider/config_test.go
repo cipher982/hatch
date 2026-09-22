@@ -261,7 +261,7 @@ func TestBuildOracleInvocations(t *testing.T) {
 func TestBuildAdvancedBackendInvocations(t *testing.T) {
 	t.Run("claude resume and explicit stream", func(t *testing.T) {
 		got, err := Build(Request{
-			Backend: "claude", Model: "opus", Prompt: "p", OutputFormat: "stream-json",
+			Backend: "claude", Model: "claude-opus-5-5", Prompt: "p", OutputFormat: "stream-json",
 			IncludePartialMessages: true, Resume: "ses_1",
 		})
 		if err != nil {
@@ -275,13 +275,13 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 	})
 
 	t.Run("claude passes explicit effort", func(t *testing.T) {
-		got, err := Build(Request{Backend: "claude", Model: "opus", Prompt: "p", ReasoningEffort: "high"})
+		got, err := Build(Request{Backend: "claude", Model: "claude-opus-5-5", Prompt: "p", ReasoningEffort: "high"})
 		if err != nil {
 			t.Fatal(err)
 		}
 		want := []string{
 			"claude", "--verbose", "--print", "-", "--output-format", "stream-json",
-			"--model", "opus", "--dangerously-skip-permissions", "--setting-sources", "local",
+			"--model", "claude-opus-5-5", "--dangerously-skip-permissions", "--setting-sources", "local",
 			"--no-session-persistence", "--tools", "default", "--effort", "high", "--include-partial-messages",
 		}
 		if !reflect.DeepEqual(got.Argv, want) || got.ReasoningPolicy != (ReasoningPolicy{Effort: "high", Source: "explicit", Support: "native"}) {
@@ -290,7 +290,7 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 	})
 
 	t.Run("explicit claude stream remains raw", func(t *testing.T) {
-		got, err := Build(Request{Backend: "claude", Model: "opus", Prompt: "p", OutputFormat: "stream-json", RawStructuredOutput: true})
+		got, err := Build(Request{Backend: "claude", Model: "claude-opus-5-5", Prompt: "p", OutputFormat: "stream-json", RawStructuredOutput: true})
 		if err != nil {
 			t.Fatal(err)
 		}
