@@ -28,6 +28,7 @@ here is authoritative when they differ):
 - `hatch gemini [flash|3.8|gemini-3.8-flash-low]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.8-flash-low`, current default)
 - `hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash>` → OpenRouter models via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
+- `hatch review [MODEL ...]` → execs external `hatch-review` (review-hub in `~/git/me`): two-phase independent review of base..HEAD. Review policy (git range, requester intent, CI) lives there, not in Hatch; it takes no prompt by design
 - Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
 
 Default tiers: `opus` (Claude Opus 5.5) for Claude (supersedes `sonnet`/`fable` for most work as of 2026-09-22), `astra` for Codex; `sol` is the cost-balanced coding choice and `luna` is high-volume. GPT-6 Astra defaults to `medium` and supports `low|medium|high|xhigh|max`; GPT-6 Sol and Luna also accept `none`. `fable` only when always-on adaptive thinking is wanted.
