@@ -132,6 +132,13 @@ func ValidateManifest(manifest Manifest) error {
 			return fmt.Errorf("warning evidence path is unsafe: %q", *warning.EvidenceFile)
 		}
 	}
+	seenPayloads := map[string]bool{}
+	for _, payload := range manifest.CollectedPayloads {
+		if !oneOfString(payload.Path, "provider/opencode-snapshot", "provider/cursor") || !validSHA256(payload.EvidenceSHA256) || seenPayloads[payload.Path] || manifest.Capture.EvidenceSHA256 == nil || payload.EvidenceSHA256 != *manifest.Capture.EvidenceSHA256 {
+			return fmt.Errorf("invalid collected payload %q", payload.Path)
+		}
+		seenPayloads[payload.Path] = true
+	}
 	return nil
 }
 

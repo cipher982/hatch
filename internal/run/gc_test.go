@@ -4,7 +4,176 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+func TestCollectGarbageAgedSnapshotRetainsAuditableEvidence(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "runs")
+	store := NewStore(root)
+	store.Now = func() time.Time { return time.Now().UTC().Add(-20 * 24 * time.Hour) }
+	a, err := store.Prepare(PreparedRun{Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "model", Request: "prompt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, err := store.OpenStreams(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = stdout.Close()
+	_ = stderr.Close()
+	if err := store.MarkRunning(a, 123, store.Now(), "identity"); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := filepath.Join(a.Path, "provider", "opencode-snapshot", "data")
+	if err := os.MkdirAll(snapshot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshot, "session.db"), []byte("native state"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result, err := store.WriteResult(a, []byte("answer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := State{Retention: "hatch_preserved", NativeIDState: "observed", NativeID: stringPointer("session"), Capabilities: map[string]string{}, SnapshotPath: stringPointer("provider/opencode-snapshot")}
+	if err := store.CommitTerminal(a, OutcomeSucceeded, 0, Result{Output: "present", TerminalMarker: "observed", OutputBytes: 6, OutputFile: &result}, state, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WritePublicProjection(a, PublicResult{OK: true, Run: &a.Manifest}); err != nil {
+		t.Fatal(err)
+	}
+	before, err := AuditFieldEvidence(root, 0, 0)
+	if err != nil || !before.Passed() {
+		t.Fatalf("before audit: %+v %v", before, err)
+	}
+	dry, err := CollectGarbage(root, false)
+	if err != nil || dry.Classes[GarbageProviderPayload].LogicalBytes != int64(len("native state")) || len(dry.Candidates) != 1 {
+		t.Fatalf("dry: %+v %v", dry, err)
+	}
+	if _, err := os.Stat(filepath.Join(snapshot, "session.db")); err != nil {
+		t.Fatal(err)
+	}
+	applied, err := CollectGarbage(root, true)
+	if err != nil || len(applied.Errors) != 0 || applied.RemovedLogicalBytes != int64(len("native state")) {
+		t.Fatalf("apply: %+v %v", applied, err)
+	}
+	if _, err := os.Stat(snapshot); !os.IsNotExist(err) {
+		t.Fatalf("snapshot still exists: %v", err)
+	}
+	after, err := AuditFieldEvidence(root, 0, 0)
+	if err != nil || !after.Passed() || after.Eligible != before.Eligible {
+		t.Fatalf("after audit: %+v %v", after, err)
+	}
+	if _, err := InspectRecord(root, "", a.Manifest.RunID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadContent(root, "", a.Manifest.RunID, ContentOptions{Part: "result", Limit: 8192}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadContent(root, "", a.Manifest.RunID, ContentOptions{Part: "evidence", Limit: 8192}); err != nil {
+		t.Fatal(err)
+	}
+	again, err := CollectGarbage(root, true)
+	if err != nil || again.TotalPaths != 0 {
+		t.Fatalf("idempotence: %+v %v", again, err)
+	}
+}
+
+func TestCollectGarbageDoesNotRemoveRecentOrCorruptSnapshots(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "runs")
+	store := NewStore(root)
+	a, err := store.Prepare(PreparedRun{Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "model", Request: "prompt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, err := store.OpenStreams(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = stdout.Close()
+	_ = stderr.Close()
+	result, err := store.WriteResult(a, []byte("answer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(a.Path, "provider", "opencode-snapshot", "data")
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(path, "session.db")
+	if err := os.WriteFile(file, []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	state := State{Retention: "hatch_preserved", NativeIDState: "unavailable", Capabilities: map[string]string{}, SnapshotPath: stringPointer("provider/opencode-snapshot")}
+	if err := store.CommitTerminal(a, OutcomeFailed, 1, Result{Output: "present", TerminalMarker: "not_observed", OutputBytes: 6, OutputFile: &result}, state, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WritePublicProjection(a, PublicResult{Run: &a.Manifest}); err != nil {
+		t.Fatal(err)
+	}
+	recent, err := CollectGarbage(root, true)
+	if err != nil || recent.TotalPaths != 0 {
+		t.Fatalf("recent: %+v %v", recent, err)
+	}
+	a.Manifest.CreatedAt = time.Now().UTC().Add(-20 * 24 * time.Hour)
+	if err := store.writeManifest(a); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte("tampered"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	corrupt, err := CollectGarbage(root, true)
+	if err != nil || len(corrupt.Errors) != 1 {
+		t.Fatalf("corrupt: %+v %v", corrupt, err)
+	}
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("corrupt payload removed: %v", err)
+	}
+}
+
+func TestCollectGarbageAgedCursorRuntime(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "runs")
+	store := NewStore(root)
+	store.Now = func() time.Time { return time.Now().UTC().Add(-20 * 24 * time.Hour) }
+	a, err := store.Prepare(PreparedRun{Surface: "cursor.grok", Backend: "cursor", Provider: "cursor", Model: "grok", Request: "prompt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, err := store.OpenStreams(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = stdout.Close()
+	_ = stderr.Close()
+	if err := store.MarkRunning(a, 123, store.Now(), "identity"); err != nil {
+		t.Fatal(err)
+	}
+	result, err := store.WriteResult(a, []byte("answer"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CommitTerminal(a, OutcomeSucceeded, 0, Result{Output: "present", TerminalMarker: "observed", OutputBytes: 6, OutputFile: &result}, State{Retention: "unknown", NativeIDState: "unavailable", Capabilities: map[string]string{}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WritePublicProjection(a, PublicResult{Run: &a.Manifest}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(a.Path, "provider", "cursor", ".local", "share")
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "cache"), []byte("runtime"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	report, err := CollectGarbage(root, true)
+	if err != nil || len(report.Errors) != 0 || report.Classes[GarbageProviderPayload].LogicalBytes != 7 {
+		t.Fatalf("cursor report: %+v %v", report, err)
+	}
+	audit, err := AuditFieldEvidence(root, 0, 0)
+	if err != nil || !audit.Passed() {
+		t.Fatalf("cursor audit: %+v %v", audit, err)
+	}
+}
 
 func TestCollectGarbageIsDryRunByDefaultAndPreservesEvidence(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "runs")

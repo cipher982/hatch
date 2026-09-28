@@ -321,7 +321,7 @@ func verifyClosedEvidence(runDir string, manifest Manifest) error {
 		}
 		name := line[66:]
 		path, err := evidencePath(runDir, filepath.FromSlash(name))
-		if err != nil || filepath.ToSlash(filepath.FromSlash(name)) != name || !regularNonSymlinkFile(path) {
+		if err != nil || filepath.ToSlash(filepath.FromSlash(name)) != name {
 			return fmt.Errorf("unsafe evidence entry %q", name)
 		}
 		allowed := required[name]
@@ -330,6 +330,26 @@ func verifyClosedEvidence(runDir string, manifest Manifest) error {
 		}
 		if !allowed {
 			return fmt.Errorf("undeclared evidence entry %q", name)
+		}
+		collected := false
+		for _, payload := range manifest.CollectedPayloads {
+			if strings.HasPrefix(name, payload.Path+"/") {
+				collected = true
+			}
+		}
+		if collected {
+			if _, err := os.Lstat(path); !os.IsNotExist(err) {
+				return fmt.Errorf("collected evidence still exists or is unsafe %q", name)
+			}
+			if len(listed) > 0 && listed[len(listed)-1] >= name {
+				return fmt.Errorf("evidence manifest is unsorted or contains duplicates")
+			}
+			listed = append(listed, name)
+			delete(required, name)
+			continue
+		}
+		if !regularNonSymlinkFile(path) {
+			return fmt.Errorf("unsafe evidence entry %q", name)
 		}
 		fileDigest, err := hashFile(path)
 		if err != nil {
@@ -387,7 +407,17 @@ func verifyClosedEvidence(runDir string, manifest Manifest) error {
 		return err
 	}
 	sort.Strings(actual)
-	if !slices.Equal(listed, actual) {
+	retained := listed[:0]
+	for _, name := range listed {
+		removed := false
+		for _, payload := range manifest.CollectedPayloads {
+			removed = removed || strings.HasPrefix(name, payload.Path+"/")
+		}
+		if !removed {
+			retained = append(retained, name)
+		}
+	}
+	if !slices.Equal(retained, actual) {
 		return fmt.Errorf("artifact contains undeclared evidence")
 	}
 	return nil

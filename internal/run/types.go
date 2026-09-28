@@ -24,30 +24,37 @@ const (
 )
 
 type Manifest struct {
-	SchemaVersion   int                      `json:"schema_version"`
-	Writer          Writer                   `json:"writer"`
-	RunID           string                   `json:"run_id"`
-	CreatedAt       time.Time                `json:"created_at"`
-	UpdatedAt       time.Time                `json:"updated_at"`
-	Lifecycle       Lifecycle                `json:"lifecycle"`
-	Outcome         *Outcome                 `json:"outcome"`
-	Surface         string                   `json:"surface"`
-	Backend         string                   `json:"backend"`
-	Provider        string                   `json:"provider"`
-	Model           string                   `json:"model"`
-	Title           string                   `json:"title,omitempty"`
-	ReasoningPolicy provider.ReasoningPolicy `json:"reasoning_policy"`
-	CWD             string                   `json:"cwd"`
-	Provenance      *Provenance              `json:"provenance,omitempty"`
-	Execution       string                   `json:"execution"`
-	Invocation      Invocation               `json:"invocation"`
-	Process         *Process                 `json:"process"`
-	HTTP            *HTTP                    `json:"http,omitempty"`
-	Result          Result                   `json:"result"`
-	Capture         Capture                  `json:"capture"`
-	ProviderState   State                    `json:"provider_state"`
-	Archive         Archive                  `json:"archive"`
-	Warnings        []Warning                `json:"warnings"`
+	SchemaVersion     int                      `json:"schema_version"`
+	Writer            Writer                   `json:"writer"`
+	RunID             string                   `json:"run_id"`
+	CreatedAt         time.Time                `json:"created_at"`
+	UpdatedAt         time.Time                `json:"updated_at"`
+	Lifecycle         Lifecycle                `json:"lifecycle"`
+	Outcome           *Outcome                 `json:"outcome"`
+	Surface           string                   `json:"surface"`
+	Backend           string                   `json:"backend"`
+	Provider          string                   `json:"provider"`
+	Model             string                   `json:"model"`
+	Title             string                   `json:"title,omitempty"`
+	ReasoningPolicy   provider.ReasoningPolicy `json:"reasoning_policy"`
+	CWD               string                   `json:"cwd"`
+	Provenance        *Provenance              `json:"provenance,omitempty"`
+	Execution         string                   `json:"execution"`
+	Invocation        Invocation               `json:"invocation"`
+	Process           *Process                 `json:"process"`
+	HTTP              *HTTP                    `json:"http,omitempty"`
+	Result            Result                   `json:"result"`
+	Capture           Capture                  `json:"capture"`
+	ProviderState     State                    `json:"provider_state"`
+	Archive           Archive                  `json:"archive"`
+	Warnings          []Warning                `json:"warnings"`
+	CollectedPayloads []CollectedPayload       `json:"collected_payloads,omitempty"`
+}
+
+// CollectedPayload records an intentional removal without changing the original evidence index.
+type CollectedPayload struct {
+	Path           string `json:"path"`
+	EvidenceSHA256 string `json:"evidence_sha256"`
 }
 
 type Writer struct {

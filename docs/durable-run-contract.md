@@ -624,9 +624,13 @@ hatch runs gc [--apply] [--json]
   adjustment and replacement are explicit. Continuation arguments preserve
   scope, filters and page position. A result read reports its run outcome and
   complete/partial/absent answer state, not a review approval.
-- `gc` removes only classified provider runtime/config/cache material that was
-  never canonical evidence. It is a dry run unless `--apply` is explicit and
-  skips nonterminal and `.hatch-pin` runs.
+- `gc` removes classified provider runtime/config/cache material and aged
+  provider payloads. It is a dry run unless `--apply` is explicit and skips
+  nonterminal and `.hatch-pin` runs.
+- After 14 days, `gc` may also remove `provider/opencode-snapshot` and
+  `provider/cursor` from terminal, unpinned runs. It preserves the original
+  evidence index and records a digest-bound removal in `manifest.json` so audit
+  verifies all retained evidence while recognizing intentionally retired payloads.
 - `inspect` reads metadata and nonterminal process observations without traversing
   provider snapshots. `--files` opts into a bounded file inventory, capped at
   10,000 directory entries. `walk_truncated` marks incomplete enumeration.

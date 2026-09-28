@@ -87,13 +87,16 @@ func runRuns(args []string, stdout, stderr io.Writer, stdoutTTY bool) int {
 				mode = "applied"
 			}
 			fmt.Fprintf(stdout, "Hatch run garbage collection (%s): scanned=%d nonterminal-skipped=%d pinned-skipped=%d\n", mode, report.RunsScanned, report.RunsSkippedNonterminal, report.RunsSkippedPinned)
-			for _, className := range []string{runner.GarbageOpenCodeConfig, runner.GarbageOpenCodeCache, runner.GarbageProviderState} {
+			for _, className := range []string{runner.GarbageOpenCodeConfig, runner.GarbageOpenCodeCache, runner.GarbageProviderState, runner.GarbageProviderPayload} {
 				class := report.Classes[className]
 				fmt.Fprintf(stdout, "  %s: paths=%d files=%d logical-bytes=%d\n", className, class.Paths, class.Files, class.LogicalBytes)
 			}
 			fmt.Fprintf(stdout, "  total: paths=%d files=%d logical-bytes=%d removed-logical-bytes=%d\n", report.TotalPaths, report.TotalFiles, report.TotalLogicalBytes, report.RemovedLogicalBytes)
+			for _, candidate := range report.Candidates {
+				fmt.Fprintf(stdout, "  %s: %s files=%d logical-bytes=%d\n", candidate.Class, candidate.Path, candidate.Files, candidate.LogicalBytes)
+			}
 			if !apply && report.TotalPaths > 0 {
-				fmt.Fprintln(stdout, "Dry run only. Re-run with --apply to remove these derived provider directories.")
+				fmt.Fprintln(stdout, "Dry run only. Re-run with --apply to remove these provider directories.")
 			}
 			for _, message := range report.Errors {
 				fmt.Fprintf(stderr, "  error: %s\n", message)

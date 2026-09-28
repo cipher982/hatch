@@ -5,13 +5,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const (
-	GarbageOpenCodeConfig = "opencode_config_runtime"
-	GarbageOpenCodeCache  = "opencode_cache"
-	GarbageProviderState  = "ephemeral_provider_state"
+	GarbageOpenCodeConfig  = "opencode_config_runtime"
+	GarbageOpenCodeCache   = "opencode_cache"
+	GarbageProviderState   = "ephemeral_provider_state"
+	GarbageProviderPayload = "aged_provider_payload"
 )
+
+type GarbageCandidate struct {
+	Class        string `json:"class"`
+	Path         string `json:"path"`
+	Files        int64  `json:"files"`
+	LogicalBytes int64  `json:"logical_bytes"`
+}
 
 type GarbageClassReport struct {
 	Paths        int   `json:"paths"`
@@ -26,6 +35,7 @@ type GarbageReport struct {
 	RunsSkippedNonterminal int                           `json:"runs_skipped_nonterminal"`
 	RunsSkippedPinned      int                           `json:"runs_skipped_pinned"`
 	Classes                map[string]GarbageClassReport `json:"classes"`
+	Candidates             []GarbageCandidate            `json:"candidates"`
 	TotalPaths             int                           `json:"total_paths"`
 	TotalFiles             int64                         `json:"total_files"`
 	TotalLogicalBytes      int64                         `json:"total_logical_bytes"`
@@ -33,9 +43,8 @@ type GarbageReport struct {
 	Errors                 []string                      `json:"errors"`
 }
 
-// CollectGarbage removes only provider-created runtime material that is never
-// included in the evidence manifest. Canonical run evidence and native state
-// snapshots are deliberately outside this command's scope.
+// CollectGarbage removes derived runtime material and, after 14 days, provider
+// payloads whose original evidence index remains bound to a removal record.
 func CollectGarbage(root string, apply bool) (GarbageReport, error) {
 	report := GarbageReport{Root: root, Applied: apply, Classes: map[string]GarbageClassReport{}, Errors: []string{}}
 	rootInfo, err := os.Lstat(root)
@@ -78,6 +87,11 @@ func CollectGarbage(root string, apply bool) (GarbageReport, error) {
 			{GarbageProviderState, filepath.Join(runPath, "provider", "pi")},
 			{GarbageProviderState, filepath.Join(runPath, "provider", "omp")},
 		}
+		if !manifest.CreatedAt.IsZero() && manifest.CreatedAt.Before(time.Now().UTC().Add(-14*24*time.Hour)) {
+			for _, name := range []string{"opencode-snapshot", "cursor"} {
+				targets = append(targets, struct{ class, path string }{GarbageProviderPayload, filepath.Join(runPath, "provider", name)})
+			}
+		}
 		for _, target := range targets {
 			files, bytes, exists, err := measureGarbageTree(target.path)
 			if err != nil {
@@ -91,11 +105,28 @@ func CollectGarbage(root string, apply bool) (GarbageReport, error) {
 			class.Paths++
 			class.Files += files
 			class.LogicalBytes += bytes
+			report.Candidates = append(report.Candidates, GarbageCandidate{Class: target.class, Path: target.path, Files: files, LogicalBytes: bytes})
 			report.Classes[target.class] = class
 			report.TotalPaths++
 			report.TotalFiles += files
 			report.TotalLogicalBytes += bytes
 			if apply {
+				if target.class == GarbageProviderPayload {
+					if manifest.Capture.EvidenceSHA256 == nil || !validSHA256(*manifest.Capture.EvidenceSHA256) {
+						report.Errors = append(report.Errors, fmt.Sprintf("%s: missing evidence digest", target.path))
+						continue
+					}
+					if err := verifyClosedEvidence(runPath, manifest); err != nil && !(filepath.Base(target.path) == "cursor" && err.Error() == "artifact contains undeclared evidence") {
+						report.Errors = append(report.Errors, fmt.Sprintf("%s: evidence verification: %v", target.path, err))
+						continue
+					}
+					manifest.CollectedPayloads = append(manifest.CollectedPayloads, CollectedPayload{Path: filepath.ToSlash(filepath.Join("provider", filepath.Base(target.path))), EvidenceSHA256: *manifest.Capture.EvidenceSHA256})
+					artifact := &Artifact{Path: runPath, Manifest: manifest}
+					if err := (Store{}).writeManifest(artifact); err != nil {
+						report.Errors = append(report.Errors, fmt.Sprintf("%s: record removal: %v", target.path, err))
+						continue
+					}
+				}
 				if err := os.RemoveAll(target.path); err != nil {
 					report.Errors = append(report.Errors, fmt.Sprintf("%s: %v", target.path, err))
 					continue
