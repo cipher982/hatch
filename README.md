@@ -158,11 +158,13 @@ The Bedrock aliases have no bare shorthand, so `hatch opus` can never reach the
 employer account by accident. Bedrock never falls back to the subscription, and
 the subscription route never falls back to Bedrock.
 
-`astra` targets OpenAI `gpt-6-astra`; `sol` targets `gpt-6-sol`; and `luna`
-targets `gpt-6-luna`. The legacy `terra` alias is rejected, and GPT-5.6 Sol,
-Terra, and Luna are no longer surfaced by Hatch. Astra defaults to `medium`
-reasoning and supports `low|medium|high|xhigh|max` (not `none`); Sol and Luna
-support all documented efforts, including `none` and `max`.
+`astra` targets OpenAI `gpt-6-astra`; `sol` targets `gpt-6.1-sol` (released
+2026-09-29: near-Astra coding quality at one-fifth of Astra's price; it replaced
+`gpt-6-sol`, which Hatch no longer surfaces); and `luna` targets `gpt-6-luna`.
+The legacy `terra` alias is rejected, and GPT-5.6 Sol, Terra, and Luna are no
+longer surfaced by Hatch. Astra and Sol default to `medium` reasoning and
+support `low|medium|high|xhigh|max` (not `none`); Luna supports all documented
+efforts, including `none` and `max`.
 
 ### Select the coding harness
 

@@ -17,7 +17,9 @@ func TestResolveReasoningPolicy(t *testing.T) {
 		{name: "codex default", backend: "opencode", model: "openai/gpt-6-astra", want: ReasoningPolicy{Effort: "medium", Source: "default", Support: "native"}},
 		{name: "codex explicit max", backend: "opencode", model: "openai/gpt-6-astra", requested: "max", want: ReasoningPolicy{Effort: "max", Source: "explicit", Support: "native"}},
 		{name: "astra requires reasoning", backend: "opencode", model: "openai/gpt-6-astra", requested: "none", wantErr: true},
-		{name: "sol supports no reasoning", backend: "opencode", model: "openai/gpt-6-sol", requested: "none", want: ReasoningPolicy{Effort: "none", Source: "explicit", Support: "native"}},
+		{name: "sol requires reasoning", backend: "opencode", model: "openai/gpt-6.1-sol", requested: "none", wantErr: true},
+		{name: "sol supports max", backend: "opencode", model: "openai/gpt-6.1-sol", requested: "max", want: ReasoningPolicy{Effort: "max", Source: "explicit", Support: "native"}},
+		{name: "retired GPT-6 Sol requires an explicit choice", backend: "opencode", model: "openai/gpt-6-sol", wantErr: true},
 		{name: "luna supports no reasoning", backend: "opencode", model: "openai/gpt-6-luna", requested: "none", want: ReasoningPolicy{Effort: "none", Source: "explicit", Support: "native"}},
 		{name: "retired GPT-5.6 model requires an explicit choice", backend: "opencode", model: "openai/gpt-5.6-sol", wantErr: true},
 		{name: "codex model without max", backend: "opencode", model: "openai/gpt-5.5", requested: "max", wantErr: true},
@@ -36,7 +38,7 @@ func TestResolveReasoningPolicy(t *testing.T) {
 		{name: "bedrock surface explicit effort", backend: "omp", model: "amazon-bedrock/global.anthropic.claude-opus-5-5", requested: "xhigh", want: ReasoningPolicy{Effort: "xhigh", Source: "explicit", Support: "native"}},
 		{name: "bedrock surface rejects none", backend: "opencode", model: "amazon-bedrock/global.anthropic.claude-opus-5-5", requested: "none", wantErr: true},
 		{name: "unsurfaced bedrock model stays unsupported", backend: "opencode", model: "amazon-bedrock/global.anthropic.claude-haiku-4-5-20251001-v1:0", want: ReasoningPolicy{Source: "unsupported", Support: "unsupported"}},
-		{name: "raw codex default", backend: "codex", model: "gpt-6-sol", want: ReasoningPolicy{Effort: "medium", Source: "default", Support: "native"}},
+		{name: "raw codex default", backend: "codex", model: "gpt-6.1-sol", want: ReasoningPolicy{Effort: "medium", Source: "default", Support: "native"}},
 		{name: "raw astra requires reasoning", backend: "codex", model: "gpt-6-astra", requested: "none", wantErr: true},
 		{name: "raw codex known model without max", backend: "codex", model: "gpt-5.5", requested: "max", wantErr: true},
 		{name: "raw codex unknown model requires explicit choice", backend: "codex", model: "gpt-test", wantErr: true},
@@ -63,7 +65,7 @@ func TestResolveReasoningPolicy(t *testing.T) {
 }
 
 func TestResolveReasoningRejectsInvalidEffort(t *testing.T) {
-	if _, err := ResolveReasoning("codex", "gpt-6-sol", "unexpected"); err == nil {
+	if _, err := ResolveReasoning("codex", "gpt-6.1-sol", "unexpected"); err == nil {
 		t.Fatal("invalid effort accepted")
 	}
 }

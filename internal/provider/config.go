@@ -236,7 +236,7 @@ func redactInvocation(invocation Invocation, promptIndices ...int) Invocation {
 // the priority processing queue.
 const openAIPriorityServiceTier = "priority"
 
-// OpenCodeCatalogConfigJSON adds explicit GPT-6 Sol and Luna entries to
+// OpenCodeCatalogConfigJSON adds explicit GPT-6.1 Sol and GPT-6 Luna entries to
 // OpenCode's built-in OpenAI catalog. The same model definitions are injected
 // per run and into doctor probes.
 func OpenCodeCatalogConfigJSON() []byte {
@@ -250,13 +250,15 @@ func OpenCodeCatalogConfigJSON() []byte {
 }
 
 var openAIGPT6Models = map[string]map[string]any{
-	"gpt-6-sol":  openAIGPT6Model("GPT-6 Sol"),
-	"gpt-6-luna": openAIGPT6Model("GPT-6 Luna"),
+	"gpt-6.1-sol": openAIGPT6Model("GPT-6.1 Sol", "low", "medium", "high", "xhigh", "max"),
+	"gpt-6-luna":  openAIGPT6Model("GPT-6 Luna", "none", "low", "medium", "high", "xhigh", "max"),
 }
 
-func openAIGPT6Model(name string) map[string]any {
-	variants := make(map[string]any, 6)
-	for _, effort := range []string{"none", "low", "medium", "high", "xhigh", "max"} {
+// openAIGPT6Model declares a model with one OpenCode variant per reasoning
+// effort the API accepts for it (GPT-6.1 Sol rejects "none").
+func openAIGPT6Model(name string, efforts ...string) map[string]any {
+	variants := make(map[string]any, len(efforts))
+	for _, effort := range efforts {
 		variants[effort] = map[string]any{
 			"reasoningEffort":  effort,
 			"reasoningSummary": "auto",

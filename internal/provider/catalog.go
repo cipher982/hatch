@@ -45,7 +45,7 @@ type ModelSpec struct {
 var ModelRegistry = []ModelSpec{
 	// Codex
 	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "opencode"},
-	{Surface: "codex", Alias: "sol", Model: "openai/gpt-6-sol", Backend: "opencode", Deprecated: []string{"terra"}},
+	{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol", Backend: "opencode", Deprecated: []string{"terra"}},
 	{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna", Backend: "opencode", PriorityEfforts: []string{"xhigh"}},
 	{Surface: "codex", Alias: "nano", Model: "openai/gpt-5.4-nano", Backend: "opencode"},
 	{Surface: "codex", Alias: "mini", Model: "openai/gpt-5.4-mini", Backend: "opencode"},

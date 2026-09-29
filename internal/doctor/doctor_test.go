@@ -17,8 +17,8 @@ func TestParseCursorModelIDs(t *testing.T) {
 }
 
 func TestParseOpenCodeModelIDs(t *testing.T) {
-	got := ParseOpenCodeModelIDs("openai/gpt-6-sol\nopenai/gpt-6-luna\n")
-	if _, ok := got["openai/gpt-6-sol"]; !ok || len(got) != 2 {
+	got := ParseOpenCodeModelIDs("openai/gpt-6.1-sol\nopenai/gpt-6-luna\n")
+	if _, ok := got["openai/gpt-6.1-sol"]; !ok || len(got) != 2 {
 		t.Fatalf("models = %#v", got)
 	}
 }
@@ -28,9 +28,9 @@ func TestCheckOpenAIGPT6ModelsAreInjectedIntoCatalogProbe(t *testing.T) {
 	binary := filepath.Join(directory, "opencode")
 	script := `#!/bin/sh
 [ "$OPENAI_API_KEY" = expected-secret ] || exit 9
-case "$OPENCODE_CONFIG_CONTENT" in *gpt-6-sol* ) ;; *) exit 8 ;; esac
+case "$OPENCODE_CONFIG_CONTENT" in *gpt-6.1-sol* ) ;; *) exit 8 ;; esac
 case "$OPENCODE_CONFIG_CONTENT" in *gpt-6-luna* ) ;; *) exit 8 ;; esac
-printf '%s\n' 'openai/gpt-6-astra' 'openai/gpt-6-sol' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5'
+printf '%s\n' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5'
 `
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
