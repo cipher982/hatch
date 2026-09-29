@@ -17,7 +17,7 @@ import (
 func ReadOnlyMechanism(backend string) (string, error) {
 	switch backend {
 	case "opencode":
-		return "OpenCode permission policy: everything denied except reads, search and a read-only git/gh/rg/ls allowlist for bash, redirects denied (explicit denies hold under auto-approve)", nil
+		return "OpenCode permission policy: everything denied except reads, search and a read-only git/gh/rg/ls allowlist for bash, file redirects denied (explicit denies hold under auto-approve)", nil
 	case "claude":
 		return "Claude Code tool allowlist (Read, Grep, Glob; no Bash or edit tools) with dontAsk permissions and no MCP servers", nil
 	case "pi":
@@ -73,8 +73,10 @@ var openCodeReadOnlyGit = []string{
 //
 // Command substitution needs no rule: OpenCode checks the commands inside
 // $(...), backticks and <(...) as commands of their own (live-probed).
-// Known limit: OpenCode checks a redirected pipeline (`a | b > f`) command by
-// command without the redirect, so that form is not caught; the policy stops
+// Known limits: a `>` glued to `-`, `=`, `*` or `?` (`echo x->f`) is not caught,
+// because those predecessors are what rg patterns like `->` and `=>` contain or
+// what a pattern cannot express; and OpenCode checks a redirected pipeline
+// (`a | b > f`) command by command without the redirect. The policy stops
 // builds, tests and other programs, not every possible file write.
 func openCodeReadOnlyBashGuards() rules {
 	guards := redirectDenials(false, "")
