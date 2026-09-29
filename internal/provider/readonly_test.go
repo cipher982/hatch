@@ -66,12 +66,17 @@ func TestReadOnlyOpenCodePermissionPolicy(t *testing.T) {
 		t.Fatalf("flag denies must follow the allowlist: %s", bash)
 	}
 	// A redirect turns any allowed command into a file write, and OpenCode
-	// matches the allow rules without it; the catch-all redirect deny must
-	// come after every allow.
-	for _, redirect := range []string{`"* >*":"deny"`, `"*>>*":"deny"`, `"*2>*":"deny"`} {
-		if strings.LastIndex(bash, redirect) < strings.LastIndex(bash, `"allow"`) {
-			t.Fatalf("redirect deny %s must follow the allowlist: %s", redirect, bash)
+	// matches the allow rules without it. Order is the policy: `2>` denied, the
+	// two harmless stderr forms allowed back, then every stdout redirect denied
+	// after them, so `cat x > y 2>/dev/null` still fails.
+	order := []string{`"*2>*":"deny"`, `"*2>/dev/null*":"allow"`, `"*2>&1*":"allow"`, `"* >*":"deny"`, `"*>>*":"deny"`, `"*&>*":"deny"`, `"*1>*":"deny"`}
+	last := strings.LastIndex(bash, `"cat *":"allow"`)
+	for _, want := range order {
+		at := strings.Index(bash, want)
+		if at < 0 || at < last {
+			t.Fatalf("redirect rule %s missing or before the allowlist: %s", want, bash)
 		}
+		last = at
 	}
 	if strings.Contains(bash, `"*>*"`) {
 		t.Fatalf("a bare *>* deny would refuse rg patterns containing -> and =>: %s", bash)

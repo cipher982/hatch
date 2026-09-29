@@ -59,18 +59,24 @@ var openCodeReadOnlyGit = []string{
 	"merge-base", "cat-file", "describe", "shortlog", "ls-tree", "diff-tree", "show-ref",
 }
 
-// openCodeReadOnlyBashDeny carves out of the allowlist what turns an
-// inspection command into one that writes a file or runs a program: redirects
-// (OpenCode matches the allow rules on the command text, so `cat x > y` would
-// otherwise pass as `cat`; the patterns avoid `->` and `=>`, which rg patterns
-// in Rust code contain), and the flags that make rg or git execute something.
-// Rules are last-match-wins, so these follow the allows. Known limit: OpenCode
-// checks a redirected pipeline (`a | b > f`) command by command without the
-// redirect, so that form is not caught; the policy stops builds, tests and
-// other programs, not every possible file write.
-var openCodeReadOnlyBashDeny = []string{
-	"* >*", "*>>*", "*&>*", "*1>*", "*2>*",
-	"rg *--pre*", "git *--output*", "git *--ext-diff*", "git *--open-files-in-pager*", "git grep *-O*",
+// openCodeReadOnlyBashGuards follow the allowlist and carve out of it what turns
+// an inspection command into one that writes a file or runs a program. Rules are
+// last-match-wins, so their order is the policy:
+//   - redirects: OpenCode matches the allow rules on the command text, so
+//     `cat x > y` would otherwise pass as `cat`. Any `2>` is denied, then the two
+//     harmless stderr forms are allowed back, then every stdout redirect is
+//     denied last so `cat x > y 2>/dev/null` still fails. The patterns avoid
+//     `->` and `=>`, which rg patterns in Rust code contain.
+//   - flags that make rg or git execute something.
+//
+// Known limit: OpenCode checks a redirected pipeline (`a | b > f`) command by
+// command without the redirect, so that form is not caught; the policy stops
+// builds, tests and other programs, not every possible file write.
+var openCodeReadOnlyBashGuards = rules{
+	{"*2>*", "deny"}, {"*2>/dev/null*", "allow"}, {"*2>&1*", "allow"},
+	{"* >*", "deny"}, {"*>>*", "deny"}, {"*&>*", "deny"}, {"*1>*", "deny"},
+	{"rg *--pre*", "deny"}, {"git *--output*", "deny"}, {"git *--ext-diff*", "deny"},
+	{"git *--open-files-in-pager*", "deny"}, {"git grep *-O*", "deny"},
 }
 
 // rule is one ordered entry of an OpenCode permission object. OpenCode
@@ -120,9 +126,7 @@ func openCodeReadOnlyPermission() rules {
 			rule{"git " + sub, "allow"}, rule{"git " + sub + " *", "allow"},
 			rule{"git -C * " + sub, "allow"}, rule{"git -C * " + sub + " *", "allow"})
 	}
-	for _, pattern := range openCodeReadOnlyBashDeny {
-		bash = append(bash, rule{pattern, "deny"})
-	}
+	bash = append(bash, openCodeReadOnlyBashGuards...)
 	return rules{
 		{"*", "deny"},
 		// Keep OpenCode's own default that .env files are never read.
