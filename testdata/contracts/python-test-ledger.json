@@ -1858,9 +1858,9 @@
     },
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[raw_bedrock_success]",
-      "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/raw_bedrock_success",
-      "reason": null
+      "disposition": "intentional_change",
+      "proof": "internal/contracts.TestContractLegacyParity/bedrock_success",
+      "reason": "Raw -b bedrock backend (Claude Code on Bedrock, tools disabled, Sonnet 4.6) retired. Bedrock is now the surfaced `hatch bedrock <opus|sonnet>` running Claude 5.5 through a coding harness."
     },
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[raw_codex_success]",

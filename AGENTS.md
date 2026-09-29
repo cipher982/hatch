@@ -22,16 +22,17 @@ explicit emergency rollback.
 CLI surface (also covered in the global `~/git/me/AGENTS.md`; the status quo
 here is authoritative when they differ):
 
-- `hatch claude <haiku|sonnet|opus|fable|fable-5.1>` → Claude via the official local Claude Code CLI OAuth/subscription path (`opus` = Opus 5.5, current default; `opus-5` is deprecated; `fable`/`fable-5.1` = Claude Fable 5.1)
+- `hatch claude <haiku|sonnet|opus|fable|fable-5.1>` → Claude via the official local Claude Code CLI OAuth/subscription path — **personal work only** (`opus` = Opus 5.5, `sonnet` = Sonnet 5.5, `haiku` = Haiku 4.5; `opus-5` is deprecated; `fable`/`fable-5.1` = Claude Fable 5.1)
+- `hatch bedrock <opus|sonnet>` → Claude Opus/Sonnet 5.5 on Zeta's AWS Bedrock (`amazon-bedrock/global.anthropic.claude-{opus,sonnet}-5-5`, profile `zh-ml-mlengineer`, `us-east-1`) via OpenCode by default, or `--harness pi|omp` — **Zeta/employer work only**. No bare `hatch opus` shorthand reaches it, and effort is `low|medium|high|xhigh|max` (default `low`)
 - `hatch codex <astra|sol|luna>` → OpenAI (`astra` = GPT-6 Astra; `sol` = GPT-6 Sol; `luna` = GPT-6 Luna; `nano|mini|max` remain compatibility aliases; `terra` is deprecated)
 - `hatch cursor <grok|kimi-k3>` → Grok 4.7 High (`grok-4.7-high`) and Kimi K3 via local Cursor Agent CLI
 - `hatch gemini [flash|3.8|gemini-3.8-flash-low]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.8-flash-low`, current default)
 - `hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash>` → OpenRouter models via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - `hatch review [MODEL ...]` → execs external `hatch-review` (review-hub in `~/git/me`): two-phase independent review of base..HEAD. Review policy (git range, requester intent, CI) lives there, not in Hatch; it takes no prompt by design
-- Raw `-b bedrock` / `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches
+- Raw `-b codex` / `-b gemini` / `-b cursor` still invoke the underlying CLIs directly as escape hatches (the raw `-b bedrock` Claude Code backend is retired; use `hatch bedrock`)
 
-Default tiers: `opus` (Claude Opus 5.5) for Claude (supersedes `sonnet`/`fable` for most work as of 2026-09-22), `astra` for Codex; `sol` is the cost-balanced coding choice and `luna` is high-volume. GPT-6 Astra defaults to `medium` and supports `low|medium|high|xhigh|max`; GPT-6 Sol and Luna also accept `none`. `fable` only when always-on adaptive thinking is wanted.
+Default tiers: `opus` (Claude Opus 5.5) for Claude (supersedes `sonnet`/`fable` for most work as of 2026-09-22), `astra` for Codex; `sol` is the cost-balanced coding choice and `luna` is high-volume. GPT-6 Astra defaults to `medium` and supports `low|medium|high|xhigh|max`; GPT-6 Sol and Luna also accept `none`. `fable` only when always-on adaptive thinking is wanted. **Anthropic routing is by who pays:** personal repos (Zerg, Longhouse, personal infra) → `hatch opus|sonnet` (Max subscription); Zeta/employer repos → `hatch bedrock opus|sonnet` (AWS SSO). Neither route falls back to the other.
 `openrouter deepseek-v4.1-flash` and `openrouter glm-5.3-flash` are the default non-OpenAI/non-Anthropic choices.
 
 Agent runs target a concise result within ~15 minutes and have a default 30
@@ -90,7 +91,7 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
                     raw evidence + result + terminal manifest
 ```
 
-**Active backends:** `claude`, `cursor`, `bedrock`, `codex`, `gemini`, `opencode`
+**Active backends:** `claude`, `cursor`, `codex`, `gemini`, `opencode`, `pi`, `omp`
 
 `zai` / GLM-5.1 is intentionally disabled until the z.ai coding plan/resource
 package is active again. Bare `hatch "prompt"` has no default model; use an
@@ -119,12 +120,12 @@ explicit surfaced provider.
 
 ## Gotchas
 
-1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, `hatch cursor grok`, or `hatch openrouter ...`; direct z.ai API is disabled for now (use `hatch openrouter glm-5.3-flash`)
+1. **No implicit default model** - use `hatch codex ...`, `hatch claude ...`, `hatch bedrock ...`, `hatch cursor grok`, or `hatch openrouter ...`; direct z.ai API is disabled for now (use `hatch openrouter glm-5.3-flash`)
 2. **All production execution uses the coordinator** - adapters interpret evidence; they do not launch processes, own persistence, or invent retries
 3. **Python is retired** - preserve the migration ledger, language-neutral fixtures, and `python-v0.1.0-final` tag; do not restore Python production code
 4. **Credential authority stays external** - do not embed Infisical or another secret manager in the Go binary, and never put prompt or credential values in manifest argv
 5. **Surfaced `claude` must not use OpenRouter implicitly** - `hatch claude` uses local Claude Code OAuth/subscription and strips `OPENROUTER_API_KEY`; OpenRouter Claude requires an explicit OpenRouter surface if ever re-added
-6. **Provider aliases drift** - run `hatch doctor` after Cursor or OpenCode upgrades. It verifies Cursor aliases, Codex tiers, and OpenRouter aliases. Kimi K3 routes through Cursor's native `kimi-k3` model ID.
+6. **Provider aliases drift** - run `hatch doctor` after Cursor or OpenCode upgrades. It verifies Cursor aliases, Bedrock/Codex tiers, and OpenRouter aliases. Kimi K3 routes through Cursor's native `kimi-k3` model ID. A stale AWS SSO session is caught by a pre-launch `aws sts get-caller-identity` and reported with the `aws sso login` command.
 7. **Artifact publication is ordered** - `result.json` precedes the terminal manifest. A terminal manifest is the commit point; never rewrite an existing run artifact or infer loss from a collapsed caller transcript.
 
 ## Learnings
@@ -160,3 +161,4 @@ explicit surfaced provider.
 - (2026-09-02) [models] Gemini 3.8 Flash Low (`google-antigravity/gemini-3.8-flash-low`) swapped in for `flash`, `3.8`, and `gemini-3.8-flash-low` aliases; Gemini 3.7 (`3.7`, `gemini-3.7-flash-tiered`) deprecated.
 - (2026-09-10) [models] DeepSeek updated to OpenRouter `deepseek/deepseek-v4.1-flash` (`deepseek-v4.1-flash`), pinned strictly to the DeepSeek provider without fallbacks; DeepSeek Pro (`deepseek-v4-pro`) and `deepseek-v4-flash` deprecated.
 - (2026-09-11) [routing] `luna` at `xhigh` requests OpenAI priority processing. The pair is declared in `ModelRegistry.PriorityEfforts`; OpenCode receives it as `provider.openai.models.<model>.options.serviceTier` inside the per-run `OPENCODE_CONFIG_CONTENT` (same mechanism as the OpenRouter provider pins), and Oh My Pi receives `--service-tier priority`. Wire-verified through real Hatch runs: the OpenCode request body carried `service_tier: "priority"` with `reasoning.effort: "xhigh"` against a mock `/v1/responses` endpoint, and a live luna xhigh run succeeded, so the account accepts the tier. Priority bills above standard rates, so it stays opt-in per model/effort rather than a blanket default, and — like the OpenRouter pins — it is not recorded in the run manifest. Pi and the raw `-b codex` escape hatch have no wired equivalent.
+- (2026-09-29) [bedrock] `hatch bedrock opus|sonnet` is the Zeta route for Claude 5.5, replacing the raw `-b bedrock` Claude Code backend (Sonnet 4.6, tools disabled; its contract case is now `bedrock_success`). It is an OpenCode/Pi/Omp model id with the `global.` inference-profile prefix (`us.` has no Sonnet 5.5), smoke-tested on all three harnesses. `NoShorthand` in `ModelRegistry` keeps `opus`/`sonnet` bare aliases on the personal `claude` surface. `claude sonnet` is now pinned to `claude-sonnet-5-5` (the CLI alias already resolved to it).

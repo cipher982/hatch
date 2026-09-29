@@ -100,43 +100,6 @@ func Build(req Request) (Invocation, error) {
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "ANTHROPIC_MODEL",
 			},
 		}), nil
-	case "bedrock":
-		model := req.Model
-		if model == "" {
-			model = "us.anthropic.claude-sonnet-4-6"
-		}
-		outputFormat := req.OutputFormat
-		if outputFormat == "" || outputFormat == "text" {
-			outputFormat = "stream-json"
-		}
-		argv := []string{"claude"}
-		if outputFormat == "stream-json" {
-			argv = append(argv, "--verbose")
-		}
-		argv = append(argv, "--print", "-", "--output-format", outputFormat,
-			"--dangerously-skip-permissions", "--setting-sources", "local",
-			"--no-session-persistence", "--tools", "", "--effort", "low")
-		if req.IncludePartialMessages || req.OutputFormat == "" || req.OutputFormat == "text" {
-			argv = append(argv, "--include-partial-messages")
-		}
-		if req.Resume != "" {
-			argv = append(argv, "--resume", req.Resume)
-		}
-		adapter, streamFormat := "raw", "text"
-		if outputFormat == "stream-json" && !req.RawStructuredOutput {
-			adapter, streamFormat = "claude", "jsonl"
-		} else if outputFormat == "stream-json" {
-			streamFormat = "jsonl"
-		}
-		return redactInvocation(Invocation{
-			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
-			ReasoningPolicy: policy,
-			SetEnv: map[string]string{
-				"CLAUDE_CODE_USE_BEDROCK": "1", "AWS_PROFILE": "zh-ml-mlengineer",
-				"AWS_REGION": "us-east-1", "ANTHROPIC_MODEL": model,
-			},
-			UnsetEnv: []string{"AWS_DEFAULT_REGION", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"},
-		}), nil
 	case "cursor":
 		model := req.Model
 		if model == "" {
@@ -188,8 +151,8 @@ func Build(req Request) (Invocation, error) {
 		}
 		invocation.OpenCodeConfigJSON = openCodeConfigJSON(req.Model, policy.Effort)
 		if strings.HasPrefix(req.Model, "amazon-bedrock/") {
-			invocation.SetEnv["AWS_PROFILE"] = "zh-ml-mlengineer"
-			invocation.SetEnv["AWS_REGION"] = "us-east-1"
+			invocation.SetEnv["AWS_PROFILE"] = BedrockAWSProfile
+			invocation.SetEnv["AWS_REGION"] = BedrockAWSRegion
 		}
 		return redactInvocation(invocation, len(invocation.Argv)-1), nil
 	case "pi", "omp":

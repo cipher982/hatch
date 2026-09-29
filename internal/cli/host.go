@@ -92,7 +92,7 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 		return nil
 	}
 	switch backend {
-	case "claude", "bedrock":
+	case "claude":
 		settings, err := json.Marshal(map[string]any{
 			"hooks": map[string]any{"PreToolUse": []any{map[string]any{
 				"matcher": "Bash", "hooks": []any{map[string]any{"type": "command", "command": binary}},

@@ -48,6 +48,7 @@ func Run(options Options) []Check {
 		checkHarness("harness.pi", "pi"),
 		checkHarness("harness.omp", "omp"),
 		checkCursorModel(options.Cursor),
+		checkOpenCodeModels("bedrock.catalog", "amazon-bedrock", "", Credential{}, modelValues(provider.BedrockSurfaceModels)),
 		checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", options.OpenAI, modelValues(provider.CodexSurfaceModels)),
 		checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels)),
 		checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", options.OpenRouter, modelValues(provider.OpenRouterSurfaceModels)),
@@ -98,16 +99,20 @@ func ParseOpenCodeModelIDs(output string) map[string]struct{} {
 }
 
 func checkOpenCodeModels(name, providerName, credentialName string, credential Credential, required []string) Check {
-	if credential.ResolutionError != nil {
-		return Check{Name: name, Detail: "credential resolver failed for catalog probe: " + credential.ResolutionError.Error()}
-	}
-	if strings.TrimSpace(credential.Value) == "" {
-		return Check{Name: name, Detail: credentialName + " is unavailable for catalog probe"}
+	if credentialName != "" {
+		if credential.ResolutionError != nil {
+			return Check{Name: name, Detail: "credential resolver failed for catalog probe: " + credential.ResolutionError.Error()}
+		}
+		if strings.TrimSpace(credential.Value) == "" {
+			return Check{Name: name, Detail: credentialName + " is unavailable for catalog probe"}
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "opencode", "models", providerName)
-	cmd.Env = replaceEnvironment(os.Environ(), credentialName, credential.Value)
+	if credentialName != "" {
+		cmd.Env = replaceEnvironment(os.Environ(), credentialName, credential.Value)
+	}
 	if providerName == "openai" {
 		cmd.Env = replaceEnvironment(cmd.Env, "OPENCODE_CONFIG_CONTENT", string(provider.OpenCodeCatalogConfigJSON()))
 	}

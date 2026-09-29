@@ -74,15 +74,15 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	}
 	if request.Harness != "" {
 		if !oneOf(request.Backend, "opencode", "pi", "omp") {
-			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for codex, gemini, or openrouter surfaces"))
+			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for bedrock, codex, gemini, or openrouter surfaces"))
 		}
 		request.Backend = request.Harness
 	}
 	if request.Backend == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("No default model is configured; choose an explicit provider"))
 	}
-	if !oneOf(request.Backend, "claude", "cursor", "bedrock", "codex", "gemini", "opencode", "pi", "omp") {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, bedrock, codex, gemini, opencode, pi, omp", request.Backend))
+	if !oneOf(request.Backend, "claude", "cursor", "codex", "gemini", "opencode", "pi", "omp") {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, codex, gemini, opencode, pi, omp", request.Backend))
 	}
 	if request.CWD != "" {
 		info, statErr := os.Stat(request.CWD)
@@ -170,7 +170,7 @@ func progressLabel(surface string) string {
 	case strings.HasPrefix(surface, "claude."):
 		return "Claude"
 	case strings.HasPrefix(surface, "bedrock."):
-		return "Claude"
+		return "Bedrock"
 	case strings.HasPrefix(surface, "cursor."):
 		return "Cursor"
 	case strings.HasPrefix(surface, "openrouter."):
@@ -278,6 +278,11 @@ func identity(backend, model string) (string, string) {
 	case "gemini":
 		return "gemini.raw", "google"
 	case "opencode", "pi", "omp":
+		for alias, configured := range surfaces["bedrock"].models {
+			if configured == model {
+				return "bedrock." + alias, "bedrock"
+			}
+		}
 		for alias, configured := range surfaces["openrouter"].models {
 			if configured == model {
 				return "openrouter." + alias, "openrouter"
@@ -292,6 +297,9 @@ func identity(backend, model string) (string, string) {
 			if configured == model {
 				return "gemini." + alias, "google"
 			}
+		}
+		if strings.HasPrefix(model, "amazon-bedrock/") {
+			return "bedrock.raw", "bedrock"
 		}
 		if strings.HasPrefix(model, "openrouter/") {
 			return "openrouter.raw", "openrouter"
@@ -308,6 +316,7 @@ func identity(backend, model string) (string, string) {
 
 const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
+       hatch bedrock <opus|sonnet> [OPTIONS] "prompt"
        hatch codex <astra|sol|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
        hatch gemini [flash|3.8|gemini-3.8-flash-low] [OPTIONS] "prompt"
@@ -316,15 +325,16 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch runs <list|inspect|read|audit|gc> [OPTIONS]
        hatch review [MODEL ...] [--reasoning-effort LEVEL] [--base REF]   (two-phase independent review; no prompt)
 
-One headless CLI for Claude, Codex, Cursor, Gemini, OpenRouter, and expert calls
+One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenRouter, and expert calls
 
 Coding harness selection:
-  --harness opencode     Use OpenCode (default for codex and openrouter)
+  --harness opencode     Use OpenCode (default for bedrock, codex, and openrouter)
   --harness pi           Use Pi
   --harness omp          Use Oh My Pi (default for gemini)
 
 Model-first aliases:
-  Claude: haiku, sonnet, opus, fable, fable-5.1
+  Claude (personal subscription): haiku, sonnet, opus, fable, fable-5.1
+  Bedrock (Zeta work, no bare alias): hatch bedrock opus|sonnet
   OpenAI coding models: astra, sol, luna, nano, mini, max
   Cursor: grok, kimi-k3
   Gemini: flash, 3.8, gemini-3.8-flash-low
@@ -348,7 +358,7 @@ Common options:
   --caller-request ID  Group runs from one request (or HATCH_CALLER_REQUEST_ID)
   --max-output-bytes N  Inline answer preview, 256..32768 bytes (default: 8192)
   -t, --timeout SEC    Hard timeout (default: 1800)
-  --harness NAME       Select opencode, pi, or omp for codex/openrouter
+  --harness NAME       Select opencode, pi, or omp for bedrock/codex/openrouter
   --reasoning-effort LEVEL  none|low|medium|high|xhigh|max
   --json               Emit exactly one JSON document on stdout
   --advanced-help      Show raw/backend-specific flags

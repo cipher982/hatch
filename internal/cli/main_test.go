@@ -209,7 +209,7 @@ func TestMainDoctorJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'openai/gpt-6-astra' 'openai/gpt-6-sol' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4.1-flash' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
+	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$2\" = amazon-bedrock ] || [ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'amazon-bedrock/global.anthropic.claude-opus-5-5' 'amazon-bedrock/global.anthropic.claude-sonnet-5-5' 'openai/gpt-6-astra' 'openai/gpt-6-sol' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4.1-flash' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	piBinary := filepath.Join(directory, "pi")
@@ -246,7 +246,7 @@ printf '%s\n' '{"models":[{"id":"gemini-3.8-flash-low","selector":"google-antigr
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || len(result.Checks) != 7 {
+	if !result.OK || len(result.Checks) != 8 {
 		t.Fatalf("doctor = %#v", result)
 	}
 	for _, check := range result.Checks {

@@ -11,11 +11,11 @@ import (
 	"github.com/cipher982/hatch/internal/provider"
 )
 
-const defaultAWSProfile = "zh-ml-mlengineer"
-const defaultAWSRegion = "us-east-1"
+const defaultAWSProfile = provider.BedrockAWSProfile
+const defaultAWSRegion = provider.BedrockAWSRegion
 
 func preflightBedrock(model string, invocation provider.Invocation) error {
-	usesBedrock := strings.HasPrefix(model, "amazon-bedrock/") || invocation.SetEnv["CLAUDE_CODE_USE_BEDROCK"] == "1"
+	usesBedrock := strings.HasPrefix(model, "amazon-bedrock/")
 	if !usesBedrock {
 		return nil
 	}

@@ -120,6 +120,7 @@ The explicit provider forms remain valid when they make a call easier to read:
 
 ```bash
 hatch claude opus "Review this diff"
+hatch bedrock opus "Review this diff"
 hatch codex astra --harness omp "Review this branch"
 hatch openrouter deepseek-v4.1-flash "Fix the failing tests"
 hatch openrouter glm-5.3-flash "Fix the failing tests"
@@ -127,7 +128,8 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 
 | Command | What it uses |
 | --- | --- |
-| `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login |
+| `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login (David's personal subscription) |
+| `hatch bedrock <opus\|sonnet>` | Claude 5.5 on Zeta's AWS Bedrock account via the selected harness |
 | `hatch codex <astra\|sol\|luna>` | OpenAI coding model via the selected harness |
 | `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
 | `hatch openrouter <deepseek-v4.1-flash\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |
@@ -137,7 +139,24 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.
 `opus` targets Claude Opus 5.5 through the local Claude Code CLI; the retired
-`opus-5` alias is rejected.
+`opus-5` alias is rejected. `sonnet` targets Claude Sonnet 5.5 the same way.
+
+### Personal versus Zeta Anthropic calls
+
+Anthropic models have two routes, chosen by who pays:
+
+- **Personal work** (Zerg, Longhouse, personal infrastructure): `hatch opus` /
+  `hatch claude <alias>`. This uses the local Claude Code login on David's Max
+  subscription and strips Bedrock, API-key and OpenRouter environment.
+- **Zeta or other employer work**: `hatch bedrock opus` / `hatch bedrock sonnet`.
+  This runs `amazon-bedrock/global.anthropic.claude-{opus,sonnet}-5-5` through
+  OpenCode (default), Pi, or Oh My Pi on AWS SSO profile `zh-ml-mlengineer`
+  (`us-east-1`). Hatch checks `aws sts get-caller-identity` first and prints the
+  `aws sso login --profile zh-ml-mlengineer` command when the session expired.
+
+The Bedrock aliases have no bare shorthand, so `hatch opus` can never reach the
+employer account by accident. Bedrock never falls back to the subscription, and
+the subscription route never falls back to Bedrock.
 
 `astra` targets OpenAI `gpt-6-astra`; `sol` targets `gpt-6-sol`; and `luna`
 targets `gpt-6-luna`. The legacy `terra` alias is rejected, and GPT-5.6 Sol,
@@ -147,13 +166,14 @@ support all documented efforts, including `none` and `max`.
 
 ### Select the coding harness
 
-Codex and OpenRouter surfaces default to OpenCode, but callers can choose the
+Bedrock, Codex and OpenRouter surfaces default to OpenCode, but callers can choose the
 harness explicitly:
 
 ```bash
 hatch codex astra --harness opencode "Review this branch"
 hatch codex astra --harness pi "Review this branch"
 hatch codex astra --harness omp "Review this branch"
+hatch bedrock sonnet --harness pi "Review this branch"
 hatch openrouter deepseek-v4.1-flash --harness omp "Fix the failing tests"
 ```
 
@@ -185,8 +205,9 @@ Known Codex/OpenAI surfaces default to `medium`; pass
 `--reasoning-effort high` or another supported level to choose explicitly.
 Hatch records the effort, whether it came from the default or the user, and
 whether the provider supports it in both the run manifest and JSON result.
-Claude and Bedrock use a fixed `low` policy. OpenRouter, Cursor, and Gemini
-report reasoning as unsupported instead of accepting a misleading override.
+Claude and Bedrock (Opus/Sonnet 5.5) default to `low` and accept
+`low|medium|high|xhigh|max`. OpenRouter and Cursor report reasoning as
+unsupported instead of accepting a misleading override.
 Unknown OpenAI models require an explicit effort before Hatch launches them.
 
 `luna` at `xhigh` is the one model/effort pair that opts into OpenAI Fast mode

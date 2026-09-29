@@ -56,8 +56,8 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 		invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
 	}
 	if strings.HasPrefix(req.Model, "amazon-bedrock/") {
-		invocation.SetEnv["AWS_PROFILE"] = "zh-ml-mlengineer"
-		invocation.SetEnv["AWS_REGION"] = "us-east-1"
+		invocation.SetEnv["AWS_PROFILE"] = BedrockAWSProfile
+		invocation.SetEnv["AWS_REGION"] = BedrockAWSRegion
 	}
 	return redactInvocation(invocation, len(invocation.Argv)-1), nil
 }

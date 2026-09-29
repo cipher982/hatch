@@ -37,6 +37,7 @@ var surfaces = map[string]struct {
 	backend string
 	models  map[string]string
 }{
+	"bedrock":    {provider.SurfaceBackend("bedrock"), provider.BedrockSurfaceModels},
 	"claude":     {provider.SurfaceBackend("claude"), provider.ClaudeSurfaceModels},
 	"cursor":     {provider.SurfaceBackend("cursor"), provider.CursorSurfaceModels},
 	"codex":      {provider.SurfaceBackend("codex"), provider.CodexSurfaceModels},

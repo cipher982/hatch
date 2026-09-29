@@ -30,6 +30,10 @@ type ModelSpec struct {
 	Backend    string         `json:"backend"`
 	Deprecated []string       `json:"deprecated,omitempty"`
 	Routing    *RoutingPolicy `json:"routing,omitempty"`
+	// NoShorthand keeps the alias reachable only through its surface
+	// (`hatch bedrock opus`), so it cannot shadow another surface's bare alias
+	// (`hatch opus`).
+	NoShorthand bool `json:"no_shorthand,omitempty"`
 	// PriorityEfforts lists the reasoning efforts that request the provider's
 	// priority processing tier. Priority is billed above standard rates, so it
 	// stays opt-in per model and effort instead of a blanket default.
@@ -49,10 +53,15 @@ var ModelRegistry = []ModelSpec{
 
 	// Claude
 	{Surface: "claude", Alias: "haiku", Model: "haiku", Backend: "claude"},
-	{Surface: "claude", Alias: "sonnet", Model: "sonnet", Backend: "claude"},
+	{Surface: "claude", Alias: "sonnet", Model: "claude-sonnet-5-5", Backend: "claude"},
 	{Surface: "claude", Alias: "opus", Model: "claude-opus-5-5", Backend: "claude", Deprecated: []string{"opus-5"}},
 	{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1", Backend: "claude", Deprecated: []string{"fable-5"}},
 	{Surface: "claude", Alias: "fable-5.1", Model: "claude-fable-5-1", Backend: "claude"},
+
+	// Bedrock: Zeta work. Anthropic models on the employer AWS account, run
+	// through a coding harness. Personal work uses the claude surface instead.
+	{Surface: "bedrock", Alias: "opus", Model: "amazon-bedrock/global.anthropic.claude-opus-5-5", Backend: "opencode", NoShorthand: true},
+	{Surface: "bedrock", Alias: "sonnet", Model: "amazon-bedrock/global.anthropic.claude-sonnet-5-5", Backend: "opencode", NoShorthand: true},
 
 	// Cursor
 	{Surface: "cursor", Alias: "grok", Model: "grok-4.7-high", Backend: "cursor"},
@@ -91,6 +100,7 @@ var ModelRegistry = []ModelSpec{
 
 // Surface model maps generated from ModelRegistry for backward compatibility.
 var (
+	BedrockSurfaceModels    = map[string]string{}
 	ClaudeSurfaceModels     = map[string]string{}
 	CodexSurfaceModels      = map[string]string{}
 	CursorSurfaceModels     = map[string]string{}
@@ -108,6 +118,8 @@ var (
 func init() {
 	for _, spec := range ModelRegistry {
 		switch spec.Surface {
+		case "bedrock":
+			BedrockSurfaceModels[spec.Alias] = spec.Model
 		case "claude":
 			ClaudeSurfaceModels[spec.Alias] = spec.Model
 		case "codex":
@@ -120,7 +132,9 @@ func init() {
 			OpenRouterSurfaceModels[spec.Alias] = spec.Model
 		}
 
-		shorthandMap[spec.Alias] = spec.Surface
+		if !spec.NoShorthand {
+			shorthandMap[spec.Alias] = spec.Surface
+		}
 		for _, dep := range spec.Deprecated {
 			shorthandMap[dep] = spec.Surface
 			deprecatedAliasMap[dep] = spec.Surface
@@ -186,8 +200,12 @@ func RequestsPriorityTier(model, effort string) bool {
 // PublicModelOrder returns the documented public alias order across all surfaces.
 func PublicModelOrder() []string {
 	order := make([]string, 0, len(ModelRegistry))
+	seen := make(map[string]bool, len(ModelRegistry))
 	for _, m := range ModelRegistry {
-		order = append(order, m.Alias)
+		if !seen[m.Alias] {
+			seen[m.Alias] = true
+			order = append(order, m.Alias)
+		}
 	}
 	return order
 }
@@ -199,6 +217,7 @@ func SurfaceCatalog() []CatalogEntry {
 		surface string
 		models  map[string]string
 	}{
+		{"bedrock", BedrockSurfaceModels},
 		{"claude", ClaudeSurfaceModels},
 		{"codex", CodexSurfaceModels},
 		{"cursor", CursorSurfaceModels},

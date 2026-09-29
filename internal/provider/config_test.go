@@ -26,15 +26,18 @@ func TestModelRegistryInvariants(t *testing.T) {
 		if spec.Surface == "" || spec.Alias == "" || spec.Model == "" || spec.Backend == "" {
 			t.Fatalf("incomplete ModelSpec: %#v", spec)
 		}
-		if seenAliases[spec.Alias] {
-			t.Fatalf("duplicate model alias %q", spec.Alias)
+		key := spec.Surface + "." + spec.Alias
+		if seenAliases[key] {
+			t.Fatalf("duplicate model alias %q", key)
 		}
-		seenAliases[spec.Alias] = true
+		seenAliases[key] = true
 		if backend := SurfaceBackend(spec.Surface); backend != spec.Backend {
 			t.Fatalf("SurfaceBackend(%q) = %q, want %q", spec.Surface, backend, spec.Backend)
 		}
-		if shorthand := ShorthandSurface(spec.Alias); shorthand != spec.Surface {
+		if shorthand := ShorthandSurface(spec.Alias); !spec.NoShorthand && shorthand != spec.Surface {
 			t.Fatalf("ShorthandSurface(%q) = %q, want %q", spec.Alias, shorthand, spec.Surface)
+		} else if spec.NoShorthand && shorthand == spec.Surface {
+			t.Fatalf("NoShorthand alias %q still resolves to %q", spec.Alias, spec.Surface)
 		}
 		for _, dep := range spec.Deprecated {
 			if !IsDeprecatedAlias(spec.Surface, dep) {
@@ -438,14 +441,31 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 		}
 	})
 
-	t.Run("bedrock defaults", func(t *testing.T) {
-		got, err := Build(Request{Backend: "bedrock", Prompt: "p", OutputFormat: "text"})
-		if err != nil {
-			t.Fatal(err)
+	t.Run("bedrock surface runs Claude 5.5 on the Zeta AWS profile", func(t *testing.T) {
+		for _, backend := range []string{"opencode", "pi", "omp"} {
+			got, err := Build(Request{Backend: backend, Model: BedrockSurfaceModels["opus"], Prompt: "p"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.SetEnv["AWS_PROFILE"] != "zh-ml-mlengineer" || got.SetEnv["AWS_REGION"] != "us-east-1" {
+				t.Fatalf("%s bedrock env = %#v", backend, got.SetEnv)
+			}
+			if got.ReasoningPolicy != (ReasoningPolicy{Effort: "low", Source: "default", Support: "native"}) {
+				t.Fatalf("%s bedrock reasoning = %#v", backend, got.ReasoningPolicy)
+			}
+			flag := "--variant"
+			if backend != "opencode" {
+				flag = "--thinking"
+			}
+			if !slices.Contains(got.Argv, flag) {
+				t.Fatalf("%s argv lacks %s: %#v", backend, flag, got.Argv)
+			}
 		}
-		if got.SetEnv["AWS_PROFILE"] != "zh-ml-mlengineer" || got.SetEnv["AWS_REGION"] != "us-east-1" ||
-			got.SetEnv["ANTHROPIC_MODEL"] != "us.anthropic.claude-sonnet-4-6" || got.Adapter != "claude" {
-			t.Fatalf("bedrock invocation = %#v", got)
+	})
+
+	t.Run("retired raw bedrock backend is rejected", func(t *testing.T) {
+		if _, err := Build(Request{Backend: "bedrock", Prompt: "p"}); err == nil {
+			t.Fatal("raw bedrock backend must no longer build")
 		}
 	})
 }

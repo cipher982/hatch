@@ -23,8 +23,8 @@ func TestPreflightBedrockSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	invocation := provider.Invocation{SetEnv: map[string]string{"CLAUDE_CODE_USE_BEDROCK": "1"}}
-	if err := preflightBedrock("", invocation); err != nil {
+	invocation := provider.Invocation{SetEnv: map[string]string{}}
+	if err := preflightBedrock("amazon-bedrock/model", invocation); err != nil {
 		t.Fatal(err)
 	}
 }

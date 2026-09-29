@@ -8,6 +8,9 @@ func TestParseSurfacedCommands(t *testing.T) {
 		backend, model string
 	}{
 		{[]string{"claude", "haiku", "--json", "-"}, "claude", "haiku"},
+		{[]string{"claude", "sonnet", "--json", "-"}, "claude", "claude-sonnet-5-5"},
+		{[]string{"bedrock", "opus", "--json", "-"}, "opencode", "amazon-bedrock/global.anthropic.claude-opus-5-5"},
+		{[]string{"bedrock", "sonnet", "--json", "-"}, "opencode", "amazon-bedrock/global.anthropic.claude-sonnet-5-5"},
 		{[]string{"claude", "fable", "--json", "-"}, "claude", "claude-fable-5-1"},
 		{[]string{"claude", "fable-5.1", "--json", "-"}, "claude", "claude-fable-5-1"},
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "grok-4.7-high"},
@@ -74,6 +77,7 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		alias, backend, model string
 	}{
 		{"opus", "claude", "claude-opus-5-5"},
+		{"sonnet", "claude", "claude-sonnet-5-5"},
 		{"fable", "claude", "claude-fable-5-1"},
 		{"fable-5.1", "claude", "claude-fable-5-1"},
 		{"astra", "opencode", "openai/gpt-6-astra"},

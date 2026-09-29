@@ -7,6 +7,21 @@ import (
 
 const DefaultReasoningEffort = "medium"
 
+// Zeta's Bedrock access: the AWS SSO profile and region every Bedrock run uses.
+const (
+	BedrockAWSProfile = "zh-ml-mlengineer"
+	BedrockAWSRegion  = "us-east-1"
+)
+
+func isBedrockSurfaceModel(model string) bool {
+	for _, configured := range BedrockSurfaceModels {
+		if configured == model {
+			return true
+		}
+	}
+	return false
+}
+
 // Keep existing Claude calls at their established cost profile unless callers
 // explicitly request a higher effort.
 const defaultClaudeReasoningEffort = "low"
@@ -54,11 +69,6 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 	switch backend {
 	case "claude":
 		return resolveClaudeReasoning(requested)
-	case "bedrock":
-		if requested != "" {
-			return ReasoningPolicy{}, fmt.Errorf("Bedrock reasoning-effort overrides are not supported")
-		}
-		return ReasoningPolicy{Effort: "low", Source: "fixed", Support: "fixed"}, nil
 	case "codex":
 		return resolveNativeReasoning("Codex", requested, model)
 	case "expert":
@@ -66,6 +76,9 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 	case "opencode":
 		if model == "" {
 			return ReasoningPolicy{}, fmt.Errorf("OpenCode backend requires an explicit model")
+		}
+		if isBedrockSurfaceModel(model) {
+			return resolveClaudeReasoning(requested)
 		}
 		if strings.HasPrefix(model, "openai/") {
 			return resolveOpenCodeOpenAIReasoning(model, requested)
@@ -95,6 +108,9 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 func resolvePiLikeReasoning(backend, model, requested string) (ReasoningPolicy, error) {
 	if model == "" {
 		return ReasoningPolicy{}, fmt.Errorf("%s backend requires an explicit model", backend)
+	}
+	if isBedrockSurfaceModel(model) {
+		return resolveClaudeReasoning(requested)
 	}
 	if strings.HasPrefix(model, "openai/") {
 		return resolveOpenCodeOpenAIReasoning(model, requested)
