@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Read-only runs (--read-only) cannot edit files and cannot run builds, tests
@@ -63,20 +64,45 @@ var openCodeReadOnlyGit = []string{
 // an inspection command into one that writes a file or runs a program. Rules are
 // last-match-wins, so their order is the policy:
 //   - redirects: OpenCode matches the allow rules on the command text, so
-//     `cat x > y` would otherwise pass as `cat`. Any `2>` is denied, then the two
-//     harmless stderr forms are allowed back, then every stdout redirect is
-//     denied last so `cat x > y 2>/dev/null` still fails. The patterns avoid
-//     `->` and `=>`, which rg patterns in Rust code contain.
+//     `cat x > y` (or `cat x>y`) would otherwise pass as `cat`. Every character
+//     before a `>` is denied except `-` and `=`, so `->` and `=>`, which rg
+//     patterns in Rust code contain, still pass. The two harmless stderr forms
+//     `2>/dev/null` and `2>&1` are allowed back after the first denial, and the
+//     denial repeats (without `2`) so a real redirect next to them still fails.
 //   - flags that make rg or git execute something.
 //
+// Command substitution needs no rule: OpenCode checks the commands inside
+// $(...), backticks and <(...) as commands of their own (live-probed).
 // Known limit: OpenCode checks a redirected pipeline (`a | b > f`) command by
 // command without the redirect, so that form is not caught; the policy stops
 // builds, tests and other programs, not every possible file write.
-var openCodeReadOnlyBashGuards = rules{
-	{"*2>*", "deny"}, {"*2>/dev/null*", "allow"}, {"*2>&1*", "allow"},
-	{"* >*", "deny"}, {"*>>*", "deny"}, {"*&>*", "deny"}, {"*1>*", "deny"},
-	{"rg *--pre*", "deny"}, {"git *--output*", "deny"}, {"git *--ext-diff*", "deny"},
-	{"git *--open-files-in-pager*", "deny"}, {"git grep *-O*", "deny"},
+func openCodeReadOnlyBashGuards() rules {
+	guards := redirectDenials(false, "")
+	guards = append(guards, rule{"*2>/dev/null*", "allow"}, rule{"*2>&1*", "allow"})
+	guards = append(guards, redirectDenials(true, "2")...)
+	return append(guards,
+		rule{"rg *--pre*", "deny"}, rule{"git *--output*", "deny"}, rule{"git *--ext-diff*", "deny"},
+		rule{"git *--open-files-in-pager*", "deny"}, rule{"git grep *-O*", "deny"})
+}
+
+// redirectDenials denies a `>` after any printable character other than `-`,
+// `=` and the pattern wildcards, after a space, and at the start of a command.
+// `skip` names characters left out. The denials appear twice and a JSON object
+// cannot repeat a key, so the second copy (`again`) ends in `**`, which matches
+// the same text as `*`.
+func redirectDenials(again bool, skip string) rules {
+	tail := "*"
+	if again {
+		tail = "**"
+	}
+	denials := rules{{">" + tail, "deny"}, {"*>>" + tail, "deny"}}
+	for c := '!'; c <= '~'; c++ {
+		if strings.ContainsRune("-=*?>"+skip, c) {
+			continue
+		}
+		denials = append(denials, rule{"*" + string(c) + ">" + tail, "deny"})
+	}
+	return append(denials, rule{"* >" + tail, "deny"})
 }
 
 // rule is one ordered entry of an OpenCode permission object. OpenCode
@@ -92,7 +118,14 @@ type rules []rule
 func (r rules) MarshalJSON() ([]byte, error) {
 	var out bytes.Buffer
 	out.WriteByte('{')
+	seen := make(map[string]bool, len(r))
 	for i, entry := range r {
+		// A repeated key would collapse when OpenCode parses the object, keeping
+		// the last value at the FIRST position, and silently reorder the policy.
+		if seen[entry.key] {
+			return nil, fmt.Errorf("duplicate permission pattern %q", entry.key)
+		}
+		seen[entry.key] = true
 		if i > 0 {
 			out.WriteByte(',')
 		}
@@ -126,7 +159,7 @@ func openCodeReadOnlyPermission() rules {
 			rule{"git " + sub, "allow"}, rule{"git " + sub + " *", "allow"},
 			rule{"git -C * " + sub, "allow"}, rule{"git -C * " + sub + " *", "allow"})
 	}
-	bash = append(bash, openCodeReadOnlyBashGuards...)
+	bash = append(bash, openCodeReadOnlyBashGuards()...)
 	return rules{
 		{"*", "deny"},
 		// Keep OpenCode's own default that .env files are never read.

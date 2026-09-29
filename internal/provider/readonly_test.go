@@ -65,22 +65,6 @@ func TestReadOnlyOpenCodePermissionPolicy(t *testing.T) {
 	if strings.LastIndex(bash, `"git *--output*":"deny"`) < strings.LastIndex(bash, `"allow"`) {
 		t.Fatalf("flag denies must follow the allowlist: %s", bash)
 	}
-	// A redirect turns any allowed command into a file write, and OpenCode
-	// matches the allow rules without it. Order is the policy: `2>` denied, the
-	// two harmless stderr forms allowed back, then every stdout redirect denied
-	// after them, so `cat x > y 2>/dev/null` still fails.
-	order := []string{`"*2>*":"deny"`, `"*2>/dev/null*":"allow"`, `"*2>&1*":"allow"`, `"* >*":"deny"`, `"*>>*":"deny"`, `"*&>*":"deny"`, `"*1>*":"deny"`}
-	last := strings.LastIndex(bash, `"cat *":"allow"`)
-	for _, want := range order {
-		at := strings.Index(bash, want)
-		if at < 0 || at < last {
-			t.Fatalf("redirect rule %s missing or before the allowlist: %s", want, bash)
-		}
-		last = at
-	}
-	if strings.Contains(bash, `"*>*"`) {
-		t.Fatalf("a bare *>* deny would refuse rg patterns containing -> and =>: %s", bash)
-	}
 	if !strings.Contains(bash, `"git -C * log *":"allow"`) {
 		t.Fatalf("git -C form missing: %s", bash)
 	}
@@ -173,5 +157,69 @@ func TestReadOnlyRefusedWhereNoMechanismExists(t *testing.T) {
 	_, err := Build(Request{Backend: "gemini", Model: "gemini-3-pro-preview", Prompt: "prompt", ReadOnly: true})
 	if err == nil || !strings.Contains(err.Error(), "--read-only is not supported") {
 		t.Fatalf("raw gemini must refuse read-only rather than run unrestricted: %v", err)
+	}
+}
+
+// evaluate is OpenCode's rule engine as documented: patterns are anchored
+// wildcards (`*` any run, `?` one character) and the last matching rule wins.
+func evaluate(policy rules, text string) string {
+	verdict := "deny"
+	for _, r := range policy {
+		action, _ := r.value.(string)
+		if globMatch(r.key, text) {
+			verdict = action
+		}
+	}
+	return verdict
+}
+
+func globMatch(pattern, text string) bool {
+	if pattern == "" {
+		return text == ""
+	}
+	switch pattern[0] {
+	case '*':
+		for i := 0; i <= len(text); i++ {
+			if globMatch(pattern[1:], text[i:]) {
+				return true
+			}
+		}
+		return false
+	case '?':
+		return text != "" && globMatch(pattern[1:], text[1:])
+	default:
+		return text != "" && text[0] == pattern[0] && globMatch(pattern[1:], text[1:])
+	}
+}
+
+func TestReadOnlyBashPolicyVerdicts(t *testing.T) {
+	var bash rules
+	for _, r := range openCodeReadOnlyPermission() {
+		if r.key == "bash" {
+			bash = r.value.(rules)
+		}
+	}
+	allowed := []string{
+		"git diff HEAD~1", "git -C /some/worktree log --oneline -3", "git show abc:path/to/file.rs", "git status",
+		`rg -n "fn .*->" engine/src`, `rg -n "=> " engine/src`, "cat go.mod", "head -20 file.rs", "tail -n +50 file.rs",
+		"cat go.mod 2>/dev/null", "ls 2>&1", "rg foo 2>/dev/null", "git grep -n foo 2>&1", "cd /some/dir", "echo ---",
+		"gh run view 123", `echo "$(git log --oneline -1)"`,
+	}
+	for _, command := range allowed {
+		if got := evaluate(bash, command); got != "allow" {
+			t.Errorf("%q = %s, want allow", command, got)
+		}
+	}
+	denied := []string{
+		"cargo test", "make test", "python3 script.py", "uv run pytest", "npm test", "go test ./...", "find . -delete", "touch f",
+		"sed -i s/a/b/ f", "bash -c 'cargo test'", "xargs rm", "tee f",
+		"cat x > y", "cat x>y", "echo hi>/tmp/f", "ls >f", "ls > f", "cat x >> y", "cat x>>y", "cat x &> y", "ls 2> f", "ls 2>f",
+		"cat x > y 2>/dev/null", "cat x>y 2>/dev/null", "cat x 2>/dev/null > y", "cat x 2>/dev/null>y", "ls 2>&1 >f", "ls 2>&1>f", "ls >f 2>&1",
+		"cat x 1>y", "cat x 1> y", "git log --output=f", "git diff --output f --stat", "git log --ext-diff", "rg --pre=sh foo", "git grep -O foo",
+	}
+	for _, command := range denied {
+		if got := evaluate(bash, command); got != "deny" {
+			t.Errorf("%q = %s, want deny", command, got)
+		}
 	}
 }
