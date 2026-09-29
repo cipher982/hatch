@@ -127,7 +127,7 @@ func TestCheckOMPModels(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "omp")
 	script := `#!/bin/sh
-printf '%s\n' '{"models":[{"id":"gemini-3.8-flash-low","selector":"google-antigravity/gemini-3.8-flash-low"}]}'
+printf '%s\n' '{"models":[{"id":"gemini-3.8-flash","selector":"google-antigravity/gemini-3.8-flash"}]}'
 `
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
@@ -136,5 +136,33 @@ printf '%s\n' '{"models":[{"id":"gemini-3.8-flash-low","selector":"google-antigr
 	check := checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels))
 	if !check.OK || check.Name != "gemini.catalog" {
 		t.Fatalf("check = %#v", check)
+	}
+}
+
+func TestCheckCursorModelProbesUnlistedAliases(t *testing.T) {
+	directory := t.TempDir()
+	script := `#!/bin/sh
+if [ "$1" = "models" ]; then printf '%s\n' 'grok-4.7-high - Grok'; exit 0; fi
+while [ "$1" != "--model" ]; do shift; done
+case "$2" in
+  kimi-k3) echo "ActionRequiredError: You've reached your monthly usage limit"; exit 1 ;;
+  *) echo "Cannot use this model: $2. Available models: auto"; exit 1 ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(directory, "cursor-agent"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory)
+	check := checkCursorModel(Credential{})
+	if !check.OK || !strings.Contains(check.Detail, "1 accepted by Cursor but not listed") {
+		t.Fatalf("unlisted-but-valid alias must pass: %#v", check)
+	}
+
+	original := provider.CursorSurfaceModels["kimi-k3"]
+	provider.CursorSurfaceModels["kimi-k3"] = "retired-model"
+	defer func() { provider.CursorSurfaceModels["kimi-k3"] = original }()
+	check = checkCursorModel(Credential{})
+	if check.OK || !strings.Contains(check.Detail, "retired-model") {
+		t.Fatalf("rejected alias must fail: %#v", check)
 	}
 }

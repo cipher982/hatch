@@ -186,15 +186,41 @@ func checkCursorModel(credential Credential) Check {
 	}
 	available := ParseCursorModelIDs(string(stdout))
 	missing := []string{}
+	hidden := 0
 	for _, model := range modelValues(provider.CursorSurfaceModels) {
-		if _, ok := available[model]; !ok {
+		if _, ok := available[model]; ok {
+			continue
+		}
+		// `cursor-agent models` omits some valid IDs (for example grok-4.7-high),
+		// so an unlisted alias is only stale when Cursor rejects it outright.
+		if cursorRejectsModel(model, credential) {
 			missing = append(missing, model)
+		} else {
+			hidden++
 		}
 	}
 	if len(missing) > 0 {
 		return Check{Name: "cursor.catalog", Detail: fmt.Sprintf("configured models unavailable: %s; run `cursor-agent models` and update Hatch aliases", strings.Join(missing, ", "))}
 	}
-	return Check{Name: "cursor.catalog", OK: true, Detail: fmt.Sprintf("%d configured models are available", len(provider.CursorSurfaceModels))}
+	detail := fmt.Sprintf("%d configured models are available", len(provider.CursorSurfaceModels))
+	if hidden > 0 {
+		detail += fmt.Sprintf(" (%d accepted by Cursor but not listed)", hidden)
+	}
+	return Check{Name: "cursor.catalog", OK: true, Detail: detail}
+}
+
+// cursorRejectsModel reports whether cursor-agent refuses the model ID before
+// sending a request. Any other outcome (success, usage limit, auth) means the
+// ID itself is valid.
+func cursorRejectsModel(model string, credential Credential) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "cursor-agent", "--print", "--trust", "--model", model, "--output-format", "text", "Reply exactly: ok")
+	if strings.TrimSpace(credential.Value) != "" {
+		cmd.Env = replaceEnvironment(os.Environ(), "CURSOR_API_KEY", credential.Value)
+	}
+	output, _ := cmd.CombinedOutput()
+	return strings.Contains(string(output), "Cannot use this model")
 }
 
 type ompModelEntry struct {

@@ -67,9 +67,9 @@ var ModelRegistry = []ModelSpec{
 	{Surface: "cursor", Alias: "grok", Model: "grok-4.7-high", Backend: "cursor"},
 
 	// Gemini
-	{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash-low", Backend: "omp", Deprecated: []string{"pro", "3.7", "gemini-3.7-flash-tiered"}},
-	{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash-low", Backend: "omp"},
-	{Surface: "gemini", Alias: "gemini-3.8-flash-low", Model: "google-antigravity/gemini-3.8-flash-low", Backend: "omp"},
+	{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash", Backend: "omp", Deprecated: []string{"pro", "3.7", "gemini-3.7-flash-tiered"}},
+	{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash", Backend: "omp"},
+	{Surface: "gemini", Alias: "gemini-3.8-flash-low", Model: "google-antigravity/gemini-3.8-flash", Backend: "omp"},
 
 	// OpenRouter
 	{

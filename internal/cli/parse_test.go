@@ -16,9 +16,9 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "grok-4.7-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"codex", "astra", "--json", "-"}, "opencode", "openai/gpt-6-astra"},
-		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
-		{[]string{"gemini", "flash", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
-		{[]string{"gemini", "3.8", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash-low"},
+		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash"},
+		{[]string{"gemini", "flash", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash"},
+		{[]string{"gemini", "3.8", "--json", "-"}, "omp", "google-antigravity/gemini-3.8-flash"},
 		{[]string{"openrouter", "deepseek-v4.1-flash", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4.1-flash"},
 		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
@@ -83,9 +83,9 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"astra", "opencode", "openai/gpt-6-astra"},
 		{"grok", "cursor", "grok-4.7-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
-		{"flash", "omp", "google-antigravity/gemini-3.8-flash-low"},
-		{"3.8", "omp", "google-antigravity/gemini-3.8-flash-low"},
-		{"gemini-3.8-flash-low", "omp", "google-antigravity/gemini-3.8-flash-low"},
+		{"flash", "omp", "google-antigravity/gemini-3.8-flash"},
+		{"3.8", "omp", "google-antigravity/gemini-3.8-flash"},
+		{"gemini-3.8-flash-low", "omp", "google-antigravity/gemini-3.8-flash"},
 		{"deepseek-v4.1-flash", "opencode", "openrouter/deepseek/deepseek-v4.1-flash"},
 		{"glm-5.3-flash", "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
@@ -119,8 +119,8 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"double dash", []string{"--", "claude", "review"}, []string{"--", "claude", "review"}},
 		{"surface help", []string{"codex", "--help"}, []string{"codex", "--help"}},
 		{"surface advanced help", []string{"claude", "--advanced-help"}, []string{"claude", "--advanced-help"}},
-		{"gemini default prompt", []string{"gemini", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.8-flash-low", "review"}},
-		{"gemini shorthand", []string{"flash", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.8-flash-low", "review"}},
+		{"gemini default prompt", []string{"gemini", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.8-flash", "review"}},
+		{"gemini shorthand", []string{"flash", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-3.8-flash", "review"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

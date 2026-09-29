@@ -219,7 +219,7 @@ func TestMainDoctorJSON(t *testing.T) {
 	ompBinary := filepath.Join(directory, "omp")
 	ompScript := `#!/bin/sh
 if [ "$1" = "--version" ]; then printf '%s\n' 'omp test'; exit 0; fi
-printf '%s\n' '{"models":[{"id":"gemini-3.8-flash-low","selector":"google-antigravity/gemini-3.8-flash-low"}]}'
+printf '%s\n' '{"models":[{"id":"gemini-3.8-flash","selector":"google-antigravity/gemini-3.8-flash"}]}'
 `
 	if err := os.WriteFile(ompBinary, []byte(ompScript), 0o700); err != nil {
 		t.Fatal(err)
@@ -268,9 +268,9 @@ func TestMainCatalogJSON(t *testing.T) {
 	if !slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "opus", Model: "claude-opus-5-5"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable-5.1", Model: "claude-fable-5-1"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash-low"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash-low"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "gemini-3.8-flash-low", Model: "google-antigravity/gemini-3.8-flash-low"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "gemini-3.8-flash-low", Model: "google-antigravity/gemini-3.8-flash"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "sol", Model: "openai/gpt-6-sol"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4.1-flash", Model: "openrouter/deepseek/deepseek-v4.1-flash"}) ||

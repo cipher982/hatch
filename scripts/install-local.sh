@@ -55,3 +55,9 @@ atomic_link "$go_dir/current" "$current"
 
 "$current" --version >/dev/null
 printf 'installed Go Hatch at %s\n' "$current"
+
+# Each install adds a digest-named directory; keep the newest three (current
+# and two rollbacks) instead of accumulating one per build.
+for stale in $(cd "$go_dir" && ls -1t | grep -E '^[0-9a-f]{64}$' | tail -n +4); do
+  [ "$go_dir/$stale" = "$version_dir" ] || rm -rf "${go_dir:?}/$stale"
+done

@@ -2,7 +2,7 @@
 set -eu
 
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-version=${VERSION:-0.1.0-go-preview}
+version=${VERSION:-$(tr -d '[:space:]' < "$repo_dir/VERSION")}
 commit=${COMMIT:-$(git -C "$repo_dir" rev-parse HEAD)}
 dirty=false
 if git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -12,6 +12,8 @@ if git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 go_version=$(go version | awk '{print $3}')
 dist_dir=${DIST_DIR:-"$repo_dir/dist"}
+# Build output is reproducible; keep only the release being built.
+rm -rf "$dist_dir"/hatch_*
 mkdir -p "$dist_dir"
 
 ldflags="-s -w -X github.com/cipher982/hatch/internal/cli.Version=$version -X github.com/cipher982/hatch/internal/cli.Commit=$commit -X github.com/cipher982/hatch/internal/cli.Dirty=$dirty -X github.com/cipher982/hatch/internal/cli.BuildGoVersion=$go_version"

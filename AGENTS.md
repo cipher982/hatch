@@ -8,12 +8,14 @@ OpenRouter, and expert calls.
 ## Install
 
 ```bash
-VERSION=0.2.0 ./scripts/build-release.sh
+./scripts/build-release.sh   # version comes from VERSION; replaces dist/hatch_*
 ./scripts/install-local.sh \
-  --go-binary ./dist/hatch_0.2.0_darwin_arm64/hatch
+  --go-binary ./dist/hatch_$(tr -d '[:space:]' < VERSION)_darwin_arm64/hatch
 ```
 
-The installer is Go-only and never falls back per invocation. The retired
+The installer is Go-only and never falls back per invocation, and keeps only the
+three newest installed builds (current plus two rollbacks). Bump `VERSION` when
+the binary's behavior changes. The retired
 Python 0.1.0 source remains available from tag `python-v0.1.0-final` for an
 explicit emergency rollback.
 
@@ -25,8 +27,8 @@ here is authoritative when they differ):
 - `hatch claude <haiku|sonnet|opus|fable|fable-5.1>` → Claude via the official local Claude Code CLI OAuth/subscription path — **personal work only** (`opus` = Opus 5.5, `sonnet` = Sonnet 5.5, `haiku` = Haiku 4.5; `opus-5` is deprecated; `fable`/`fable-5.1` = Claude Fable 5.1)
 - `hatch bedrock <opus|sonnet>` → Claude Opus/Sonnet 5.5 on Zeta's AWS Bedrock (`amazon-bedrock/global.anthropic.claude-{opus,sonnet}-5-5`, profile `zh-ml-mlengineer`, `us-east-1`) via OpenCode by default, or `--harness pi|omp` — **Zeta/employer work only**. No bare `hatch opus` shorthand reaches it, and effort is `low|medium|high|xhigh|max` (default `low`)
 - `hatch codex <astra|sol|luna>` → OpenAI (`astra` = GPT-6 Astra; `sol` = GPT-6 Sol; `luna` = GPT-6 Luna; `nano|mini|max` remain compatibility aliases; `terra` is deprecated)
-- `hatch cursor <grok|kimi-k3>` → Grok 4.7 High (`grok-4.7-high`) and Kimi K3 via local Cursor Agent CLI
-- `hatch gemini [flash|3.8|gemini-3.8-flash-low]` → Gemini via OMP using Google Antigravity (`flash` = `gemini-3.8-flash-low`, current default)
+- `hatch cursor <grok|kimi-k3>` → Grok 4.7 High (`grok-4.7-high`) and Kimi K3 via local Cursor Agent CLI. Both IDs are valid but absent from `cursor-agent models`; `hatch doctor` probes unlisted aliases and only fails on "Cannot use this model". A Cursor "monthly usage limit" error is an account limit, not alias drift
+- `hatch gemini [flash|3.8|gemini-3.8-flash-low]` → Gemini via OMP using Google Antigravity; all three aliases pin `google-antigravity/gemini-3.8-flash` (the ID `omp models` lists), and reasoning comes from Hatch's `--thinking` policy (default `medium`)
 - `hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash>` → OpenRouter models via OpenCode
 - `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
 - `hatch review [MODEL ...]` → execs external `hatch-review` (review-hub in `~/git/me`): two-phase independent review of base..HEAD. Review policy (git range, requester intent, CI) lives there, not in Hatch; it takes no prompt by design
@@ -162,3 +164,4 @@ explicit surfaced provider.
 - (2026-09-10) [models] DeepSeek updated to OpenRouter `deepseek/deepseek-v4.1-flash` (`deepseek-v4.1-flash`), pinned strictly to the DeepSeek provider without fallbacks; DeepSeek Pro (`deepseek-v4-pro`) and `deepseek-v4-flash` deprecated.
 - (2026-09-11) [routing] `luna` at `xhigh` requests OpenAI priority processing. The pair is declared in `ModelRegistry.PriorityEfforts`; OpenCode receives it as `provider.openai.models.<model>.options.serviceTier` inside the per-run `OPENCODE_CONFIG_CONTENT` (same mechanism as the OpenRouter provider pins), and Oh My Pi receives `--service-tier priority`. Wire-verified through real Hatch runs: the OpenCode request body carried `service_tier: "priority"` with `reasoning.effort: "xhigh"` against a mock `/v1/responses` endpoint, and a live luna xhigh run succeeded, so the account accepts the tier. Priority bills above standard rates, so it stays opt-in per model/effort rather than a blanket default, and — like the OpenRouter pins — it is not recorded in the run manifest. Pi and the raw `-b codex` escape hatch have no wired equivalent.
 - (2026-09-29) [bedrock] `hatch bedrock opus|sonnet` is the Zeta route for Claude 5.5, replacing the raw `-b bedrock` Claude Code backend (Sonnet 4.6, tools disabled; its contract case is now `bedrock_success`). It is an OpenCode/Pi/Omp model id with the `global.` inference-profile prefix (`us.` has no Sonnet 5.5), smoke-tested on all three harnesses. `NoShorthand` in `ModelRegistry` keeps `opus`/`sonnet` bare aliases on the personal `claude` surface. `claude sonnet` is now pinned to `claude-sonnet-5-5` (the CLI alias already resolved to it).
+- (2026-09-29) [cleanup] Gemini aliases now pin the listed `gemini-3.8-flash` (runs of the old `-low` ID actually executed `gemini-3.8-flash`, and `omp models` never listed `-low`, so `doctor` could not pass). Cursor doctor probes unlisted IDs. `dist/` is rebuilt per release (`VERSION` file), installs keep three builds, and the orphaned Python-era `~/.local/share/hatch/mcp-runtime` (6.2 GB of OpenCode snapshots) was deleted.
