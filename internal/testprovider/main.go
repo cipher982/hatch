@@ -141,6 +141,16 @@ func main() {
 		time.Sleep(10 * time.Second)
 	case "detached_child":
 		time.Sleep(10 * time.Second)
+	case "hang_with_detached_sentinel_child":
+		startDetachedSentinelChild()
+		fmt.Fprintln(os.Stdout, "partial output")
+		time.Sleep(10 * time.Second)
+	case "exit_with_detached_sentinel_child":
+		startDetachedSentinelChild()
+		fmt.Fprintln(os.Stdout, "answer")
+	case "detached_sentinel_child":
+		time.Sleep(1500 * time.Millisecond)
+		_ = os.WriteFile(os.Getenv("HATCH_CHILD_SENTINEL"), []byte("survived"), 0o600)
 	case "invalid_utf8":
 		_, _ = os.Stdout.Write([]byte{'o', 'k', ':', 0xff, 0xfe, '\n'})
 	case "large_answer":
@@ -159,6 +169,19 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "testprovider: unknown scenario %q\n", os.Getenv("HATCH_TEST_SCENARIO"))
 		os.Exit(96)
+	}
+}
+
+// startDetachedSentinelChild starts a child in its own session (as OpenCode does
+// for each bash command) that writes HATCH_CHILD_SENTINEL if it is left alive.
+// It has no pipes to the parent, so it cannot be reaped through them.
+func startDetachedSentinelChild() {
+	child := exec.Command(os.Args[0])
+	child.Env = append(os.Environ(), "HATCH_TEST_SCENARIO=detached_sentinel_child")
+	child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := child.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(92)
 	}
 }
 

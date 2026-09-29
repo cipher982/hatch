@@ -84,6 +84,9 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		}
 		req.Progress(receipt)
 		req.Progress(fmt.Sprintf("[hatch] reasoning effort=%s source=%s support=%s", displayReasoningEffort(req.Invocation.ReasoningPolicy), req.Invocation.ReasoningPolicy.Source, req.Invocation.ReasoningPolicy.Support))
+		if req.Invocation.ReadOnlyMechanism != "" {
+			req.Progress("[hatch] read-only: " + req.Invocation.ReadOnlyMechanism)
+		}
 		if req.ProgressLabel != "" && (req.Invocation.Adapter == "" || req.Invocation.Adapter == "raw") {
 			req.Progress(fmt.Sprintf("[hatch] %s started", req.ProgressLabel))
 		}
@@ -168,6 +171,8 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	timedOut := false
 	cancelled := false
 	cleanupSignal := ""
+	runID := artifact.Manifest.RunID
+	killed := 0
 	if req.Timeout > 0 {
 		timer := time.NewTimer(req.Timeout)
 		select {
@@ -175,12 +180,12 @@ func (c Coordinator) Execute(req Request) PublicResult {
 			timer.Stop()
 		case <-timer.C:
 			timedOut = true
-			cleanupSignal, _ = killProcessGroup(cmd)
+			cleanupSignal, killed, _ = killRunProcesses(cmd, runID)
 			waitErr = <-waited
 		case <-ctx.Done():
 			timer.Stop()
 			cancelled = true
-			cleanupSignal, _ = killProcessGroup(cmd)
+			cleanupSignal, killed, _ = killRunProcesses(cmd, runID)
 			waitErr = <-waited
 		}
 	} else {
@@ -188,9 +193,17 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		case waitErr = <-waited:
 		case <-ctx.Done():
 			cancelled = true
-			cleanupSignal, _ = killProcessGroup(cmd)
+			cleanupSignal, killed, _ = killRunProcesses(cmd, runID)
 			waitErr = <-waited
 		}
+	}
+	if !timedOut && !cancelled {
+		// The provider exited on its own; a child it left running (a hung test
+		// suite, a dev server) is a leak, not part of the answer.
+		killed = sweepRunProcesses(runID)
+	}
+	if killed > 0 && req.Progress != nil {
+		req.Progress(fmt.Sprintf("[hatch] killed %d process(es) started by this run that outlived the provider", killed))
 	}
 	if timedOut || cancelled {
 		cleanup := &TimeoutCleanup{

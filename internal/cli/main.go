@@ -129,7 +129,7 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 		ReasoningEffort: request.ReasoningEffort, OutputFormat: request.OutputFormat, APIKey: apiKey,
 		RawStructuredOutput: request.OutputFormatExplicit && request.OutputFormat == "stream-json",
 		Resume:              request.Resume, SkipGitRepoCheck: request.SkipGitRepoCheck,
-		IncludePartialMessages: request.IncludePartialMessages,
+		IncludePartialMessages: request.IncludePartialMessages, ReadOnly: request.ReadOnly,
 	})
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
@@ -323,7 +323,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|read|audit|gc> [OPTIONS]
-       hatch review [MODEL ...] [--reasoning-effort LEVEL] [--base REF]   (two-phase independent review; no prompt)
+       hatch review [MODEL ...] [--reasoning-effort LEVEL] [--base REF] [--pass-timeout SEC]   (two-phase, read-only review; no prompt)
 
 One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenRouter, and expert calls
 
@@ -375,6 +375,8 @@ Other commands:
 
 const AdvancedHelp = Help + `
 Advanced raw/backend options:
+  --read-only          No file edits and no builds, tests or other programs, enforced by the
+                       backend's own permission/tool/sandbox mechanism (refused where none exists)
   -b, --backend NAME
   --model MODEL
   --skip-git-repo-check

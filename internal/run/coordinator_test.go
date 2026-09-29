@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -675,6 +676,48 @@ func TestCoordinatorTimeoutKillsDescendants(t *testing.T) {
 	time.Sleep(2200 * time.Millisecond)
 	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
 		t.Fatalf("descendant survived process-group timeout: %v", err)
+	}
+}
+
+func TestCoordinatorTimeoutKillsDetachedDescendants(t *testing.T) {
+	fake := buildTestProvider(t)
+	sentinel := filepath.Join(t.TempDir(), "child-survived")
+	var progress []string
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 300 * time.Millisecond,
+		Progress:   func(line string) { progress = append(progress, line) },
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang_with_detached_sentinel_child", "HATCH_CHILD_SENTINEL": sentinel}},
+	})
+	if result.Status != "timeout" || result.Output != "partial output\n" {
+		t.Fatalf("result = %#v", result)
+	}
+	time.Sleep(2500 * time.Millisecond)
+	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+		t.Fatalf("detached descendant (own session) survived the timeout: %v", err)
+	}
+	if !slices.ContainsFunc(progress, func(line string) bool { return strings.Contains(line, "[hatch] killed ") }) {
+		t.Fatalf("killed survivors not reported: %q", progress)
+	}
+}
+
+func TestCoordinatorKillsDescendantsLeftAfterProviderExits(t *testing.T) {
+	fake := buildTestProvider(t)
+	sentinel := filepath.Join(t.TempDir(), "child-survived")
+	var progress []string
+	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
+		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 10 * time.Second,
+		Progress:   func(line string) { progress = append(progress, line) },
+		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "exit_with_detached_sentinel_child", "HATCH_CHILD_SENTINEL": sentinel}},
+	})
+	if !result.OK || result.Output != "answer\n" {
+		t.Fatalf("result = %#v", result)
+	}
+	time.Sleep(2500 * time.Millisecond)
+	if _, err := os.Stat(sentinel); !os.IsNotExist(err) {
+		t.Fatalf("child left running after the provider exited survived: %v", err)
+	}
+	if !slices.ContainsFunc(progress, func(line string) bool { return strings.Contains(line, "[hatch] killed 1 process") }) {
+		t.Fatalf("killed survivor not reported: %q", progress)
 	}
 }
 

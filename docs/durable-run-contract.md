@@ -691,8 +691,9 @@ depend on Longhouse internals, private endpoints, or a running daemon.
 | Provider binary missing | terminal `launch_failed`; request and manifest remain |
 | Caller/wrapper disconnects | subprocess continues according to existing process ownership; artifact streams remain authoritative; caller can inspect by announced run ID |
 | Hatch is killed | raw files written so far remain; inspection reports the nonterminal record and process evidence without guessing an outcome |
-| Timeout | signal the recorded process group when safely established; preserve streams/state and survivor observations; terminal `timed_out` |
-| Caller cancellation or SIGINT/SIGTERM | signal the recorded process group when safely established; preserve streams/state; terminal `cancelled`; CLI exits 130 |
+| Timeout | signal the recorded process group when safely established, then every descendant read from the process table before the kill and every survivor still carrying the run's `HATCH_RUN_ID` (a provider that detaches each shell command into its own session, as OpenCode does, otherwise leaves a hung `cargo test` behind); preserve streams/state and survivor observations; terminal `timed_out` |
+| Caller cancellation or SIGINT/SIGTERM | same process kill as timeout; preserve streams/state; terminal `cancelled`; CLI exits 130 |
+| Provider exits with a child still running | the same `HATCH_RUN_ID` sweep kills it after the provider returns; a `[hatch] killed N process(es)...` progress line on stderr reports it (no manifest warning: V1 warning codes are frozen) |
 | Nonzero exit | terminal `failed`; preserve exit code and both streams |
 | Structured provider error with no result | terminal `failed`; keep structured error plus raw evidence |
 | Intermediate provider error followed by final result | `succeeded_with_warnings`; result remains final |

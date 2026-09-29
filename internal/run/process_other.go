@@ -6,12 +6,14 @@ import "os/exec"
 
 func configureProcess(cmd *exec.Cmd) {}
 
-func killProcessGroup(cmd *exec.Cmd) (string, error) {
+func killRunProcesses(cmd *exec.Cmd, runID string) (string, int, error) {
 	if cmd.Process == nil {
-		return "", nil
+		return "", 0, nil
 	}
-	return "KILL", cmd.Process.Kill()
+	return "KILL", 0, cmd.Process.Kill()
 }
+
+func sweepRunProcesses(string) int { return 0 }
 
 func processStartIdentity(int) string { return "" }
 func processAlive(int) (bool, bool)   { return false, false }

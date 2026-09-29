@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -28,6 +27,10 @@ type Request struct {
 	Resume                 string
 	SkipGitRepoCheck       bool
 	IncludePartialMessages bool
+	// ReadOnly restricts the run to reading: no file edits, no builds, tests or
+	// other programs. Each backend enforces it with its own permission, tool
+	// or sandbox mechanism (see readonly.go); a backend with none refuses.
+	ReadOnly bool
 }
 
 type Invocation struct {
@@ -45,6 +48,9 @@ type Invocation struct {
 	// example an OpenRouter provider order that keeps prefix caching warm);
 	// never contains credentials.
 	OpenCodeConfigJSON []byte
+	// ReadOnlyMechanism names how a ReadOnly request is enforced; empty
+	// when the run is not read-only.
+	ReadOnlyMechanism string
 }
 
 func PreparePrompt(prompt string) string {
@@ -59,6 +65,18 @@ func Build(req Request) (Invocation, error) {
 	if err != nil {
 		return Invocation{}, err
 	}
+	readOnlyMechanism := ""
+	if req.ReadOnly {
+		if readOnlyMechanism, err = ReadOnlyMechanism(req.Backend); err != nil {
+			return Invocation{}, err
+		}
+	}
+	invocation, err := buildInvocation(req, policy)
+	invocation.ReadOnlyMechanism = readOnlyMechanism
+	return invocation, err
+}
+
+func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 	prompt := PreparePrompt(req.Prompt)
 	switch req.Backend {
 	case "claude":
@@ -74,10 +92,15 @@ func Build(req Request) (Invocation, error) {
 		if outputFormat == "stream-json" {
 			argv = append(argv, "--verbose")
 		}
+		permissionFlags, tools := []string{"--dangerously-skip-permissions"}, "default"
+		if req.ReadOnly {
+			permissionFlags, tools = claudeReadOnlyPermissionFlags, claudeReadOnlyTools
+		}
+		argv = append(argv, "--print", "-", "--output-format", outputFormat, "--model", model)
+		argv = append(argv, permissionFlags...)
 		argv = append(argv,
-			"--print", "-", "--output-format", outputFormat,
-			"--model", model, "--dangerously-skip-permissions", "--setting-sources", "local",
-			"--no-session-persistence", "--tools", "default", "--effort", policy.Effort,
+			"--setting-sources", "local",
+			"--no-session-persistence", "--tools", tools, "--effort", policy.Effort,
 		)
 		if req.IncludePartialMessages || req.OutputFormat == "" || req.OutputFormat == "text" {
 			argv = append(argv, "--include-partial-messages")
@@ -105,11 +128,14 @@ func Build(req Request) (Invocation, error) {
 		if model == "" {
 			model = CursorSurfaceModels["grok"]
 		}
+		argv := []string{"cursor-agent", "--print", "--trust", "--model", model, "--output-format", "stream-json"}
+		if req.ReadOnly {
+			argv = append(argv, cursorReadOnlyFlags...)
+		} else {
+			argv = append(argv, "--force")
+		}
 		invocation := Invocation{
-			Argv: []string{
-				"cursor-agent", "--print", "--trust", "--model", model,
-				"--output-format", "stream-json", "--force", prompt,
-			}, StreamFormat: "jsonl", Adapter: "cursor", ReasoningPolicy: policy, SetEnv: map[string]string{},
+			Argv: append(argv, prompt), StreamFormat: "jsonl", Adapter: "cursor", ReasoningPolicy: policy, SetEnv: map[string]string{},
 			UnsetEnv: []string{
 				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
 				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
@@ -149,7 +175,7 @@ func Build(req Request) (Invocation, error) {
 		if strings.HasPrefix(req.Model, "openrouter/") && req.APIKey != "" {
 			invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
 		}
-		invocation.OpenCodeConfigJSON = openCodeConfigJSON(req.Model, policy.Effort)
+		invocation.OpenCodeConfigJSON = openCodeConfigJSON(req.Model, policy.Effort, req.ReadOnly)
 		if strings.HasPrefix(req.Model, "amazon-bedrock/") {
 			invocation.SetEnv["AWS_PROFILE"] = BedrockAWSProfile
 			invocation.SetEnv["AWS_REGION"] = BedrockAWSRegion
@@ -161,7 +187,12 @@ func Build(req Request) (Invocation, error) {
 		if req.APIKey == "" {
 			return Invocation{}, fmt.Errorf("OPENAI_API_KEY not set and no api_key provided")
 		}
-		argv := []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral"}
+		sandboxFlags := []string{"--dangerously-bypass-approvals-and-sandbox"}
+		if req.ReadOnly {
+			sandboxFlags = codexReadOnlyFlags
+		}
+		argv := append([]string{"codex", "exec"}, sandboxFlags...)
+		argv = append(argv, "--ignore-user-config", "--ephemeral")
 		if req.Model != "" {
 			argv = append(argv, "-m", req.Model)
 		}
@@ -213,9 +244,9 @@ func OpenCodeCatalogConfigJSON() []byte {
 	for id, definition := range openAIGPT6Models {
 		models[id] = definition
 	}
-	return encodeOpenCodeConfig(map[string]any{
+	return encodeOpenCodeConfig(map[string]any{"provider": map[string]any{
 		"openai": map[string]any{"models": models},
-	})
+	}})
 }
 
 var openAIGPT6Models = map[string]map[string]any{
@@ -253,7 +284,7 @@ func openAIGPT6Model(name string) map[string]any {
 // openCodeConfigJSON returns the per-run OpenCode configuration for one model:
 // custom GPT-6 catalog entries, aggregator routing pins, and priority processing
 // when the model and reasoning effort call for it.
-func openCodeConfigJSON(model, effort string) []byte {
+func openCodeConfigJSON(model, effort string, readOnly bool) []byte {
 	providers := map[string]any{}
 	if strings.HasPrefix(model, "openrouter/") {
 		if routing := FindRoutingPolicy(model); routing != nil {
@@ -285,14 +316,21 @@ func openCodeConfigJSON(model, effort string) []byte {
 			"models": map[string]any{modelID: modelConfig},
 		}
 	}
-	if len(providers) == 0 {
+	if len(providers) == 0 && !readOnly {
 		return nil
 	}
-	return encodeOpenCodeConfig(providers)
+	config := map[string]any{}
+	if len(providers) > 0 {
+		config["provider"] = providers
+	}
+	if readOnly {
+		config["permission"] = openCodeReadOnlyPermission()
+	}
+	return encodeOpenCodeConfig(config)
 }
 
-func encodeOpenCodeConfig(providers map[string]any) []byte {
-	encoded, err := json.Marshal(map[string]any{"provider": providers})
+func encodeOpenCodeConfig(config map[string]any) []byte {
+	encoded, err := marshalPlain(config)
 	if err != nil {
 		panic("static opencode config cannot fail to marshal")
 	}
