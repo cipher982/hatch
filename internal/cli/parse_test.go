@@ -7,7 +7,7 @@ func TestParseSurfacedCommands(t *testing.T) {
 		args           []string
 		backend, model string
 	}{
-		{[]string{"claude", "haiku", "--json", "-"}, "claude", "haiku"},
+		{[]string{"claude", "haiku", "--json", "-"}, "claude", "claude-haiku-5-5"},
 		{[]string{"claude", "sonnet", "--json", "-"}, "claude", "claude-sonnet-5-5"},
 		{[]string{"bedrock", "opus", "--json", "-"}, "opencode", "amazon-bedrock/global.anthropic.claude-opus-5-5"},
 		{[]string{"bedrock", "sonnet", "--json", "-"}, "opencode", "amazon-bedrock/global.anthropic.claude-sonnet-5-5"},

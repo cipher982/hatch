@@ -52,7 +52,7 @@ var ModelRegistry = []ModelSpec{
 	{Surface: "codex", Alias: "max", Model: "openai/gpt-5.5", Backend: "opencode"},
 
 	// Claude
-	{Surface: "claude", Alias: "haiku", Model: "haiku", Backend: "claude"},
+	{Surface: "claude", Alias: "haiku", Model: "claude-haiku-5-5", Backend: "claude"},
 	{Surface: "claude", Alias: "sonnet", Model: "claude-sonnet-5-5", Backend: "claude"},
 	{Surface: "claude", Alias: "opus", Model: "claude-opus-5-5", Backend: "claude", Deprecated: []string{"opus-5"}},
 	{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1", Backend: "claude", Deprecated: []string{"fable-5"}},
