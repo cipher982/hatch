@@ -323,7 +323,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|read|audit|gc> [OPTIONS]
-       hatch review [MODEL ...] [--reasoning-effort LEVEL] [--base REF] [--pass-timeout SEC]   (two-phase, read-only review; no prompt)
+       hatch review MODEL... [--reasoning-effort LEVEL] [--base REF] [--pass-timeout SEC]   (explicit model; two-phase, read-only review; no prompt)
 
 One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenRouter, and expert calls
 

@@ -134,7 +134,7 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
 | `hatch openrouter <deepseek-v4.1-flash\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
-| `hatch review` | Two-phase independent code review; execs `hatch-review` (review-hub in `~/git/me`), takes no prompt |
+| `hatch review <MODEL ...>` | Explicitly requested two-phase independent code review; execs `hatch-review` (review-hub in `~/git/me`), requires a model, takes no prompt; receipts are optional audit data, not shipping gates |
 
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.
