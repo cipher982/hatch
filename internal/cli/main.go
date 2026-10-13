@@ -349,7 +349,7 @@ Start here:
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch cursor kimi-k3 "Review this branch"
-  hatch gemini "Review this branch"
+  hatch gemini argon "Summarize this code"
   hatch expert "Is this refactor direction sound?"
 
 Common options:
