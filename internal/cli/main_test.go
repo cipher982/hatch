@@ -136,12 +136,13 @@ func buildTestProviderForCLI(t *testing.T, root string) string {
 
 func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 	for model, want := range map[string]string{
-		"openai/gpt-6-astra":  "codex.astra",
-		"openai/gpt-5.4-nano": "codex.nano",
-		"kimi-k3":             "cursor.kimi-k3",
+		"openai/gpt-6-astra":       "codex.astra",
+		"openai/gpt-5.4-nano":      "codex.nano",
+		"kimi-k3":                  "cursor.kimi-k3",
+		"gemini-4-argon-medium":    "cursor.gemini-4-argon",
 	} {
 		backend := "opencode"
-		if model == "kimi-k3" {
+		if model == "kimi-k3" || model == "gemini-4-argon-medium" {
 			backend = "cursor"
 		}
 		if got, _ := identity(backend, model); got != want {
@@ -205,7 +206,7 @@ func TestMainFailsClosedBeforeProviderWhenArtifactRootUnavailable(t *testing.T) 
 func TestMainDoctorJSON(t *testing.T) {
 	directory := t.TempDir()
 	cursorBinary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3'\n"), 0o700); err != nil {
+	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3' 'gemini-4-argon-medium - Gemini 4 Argon Medium'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
@@ -274,7 +275,8 @@ func TestMainCatalogJSON(t *testing.T) {
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4.1-flash", Model: "openrouter/deepseek/deepseek-v4.1-flash"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) {
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium"}) {
 		t.Fatalf("catalog = %#v", catalog)
 	}
 }

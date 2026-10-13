@@ -318,7 +318,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
        hatch bedrock <opus|sonnet> [OPTIONS] "prompt"
        hatch codex <astra|sol|luna> [OPTIONS] "prompt"
-       hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
+       hatch cursor <grok|kimi-k3|gemini-4-argon> [OPTIONS] "prompt"
        hatch gemini [flash|3.8|gemini-3.8-flash-low] [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
@@ -336,7 +336,7 @@ Model-first aliases:
   Claude (personal subscription): haiku, sonnet, opus, fable, fable-5.1
   Bedrock (Zeta work, no bare alias): hatch bedrock opus|sonnet
   OpenAI coding models: astra, sol, luna, nano, mini, max
-  Cursor: grok, kimi-k3
+  Cursor: grok, kimi-k3, gemini-4-argon
   Gemini: flash, 3.8, gemini-3.8-flash-low
   OpenRouter: deepseek-v4.1-flash, glm-5.3-flash
 Start here:
@@ -349,6 +349,7 @@ Start here:
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch cursor kimi-k3 "Review this branch"
+  hatch cursor gemini-4-argon "Summarize this code"
   hatch expert "Is this refactor direction sound?"
 
 Common options:

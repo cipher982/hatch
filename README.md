@@ -122,6 +122,7 @@ The explicit provider forms remain valid when they make a call easier to read:
 hatch claude opus "Review this diff"
 hatch bedrock opus "Review this diff"
 hatch codex astra --harness omp "Review this branch"
+hatch cursor gemini-4-argon "Summarize this code"
 hatch openrouter deepseek-v4.1-flash "Fix the failing tests"
 hatch openrouter glm-5.3-flash "Fix the failing tests"
 ```
@@ -131,13 +132,16 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login (David's personal subscription) |
 | `hatch bedrock <opus\|sonnet>` | Claude 5.5 on Zeta's AWS Bedrock account via the selected harness |
 | `hatch codex <astra\|sol\|luna>` | OpenAI coding model via the selected harness |
-| `hatch cursor <grok\|kimi-k3>` | Local Cursor Agent CLI login |
+| `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login; `gemini-4-argon` selects the medium reasoning variant |
 | `hatch openrouter <deepseek-v4.1-flash\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 | `hatch review <MODEL ...>` | Explicitly requested two-phase independent code review; execs `hatch-review` (review-hub in `~/git/me`), requires a model, takes no prompt; receipts are optional audit data, not shipping gates |
 
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.
+`gemini-4-argon` pins Cursor's `gemini-4-argon-medium`; pass a raw Cursor
+model ID with `--model` to select another supported variant.
+
 `opus` targets Claude Opus 5.5 through the local Claude Code CLI; the retired
 `opus-5` alias is rejected. `sonnet` targets Claude Sonnet 5.5 the same way.
 

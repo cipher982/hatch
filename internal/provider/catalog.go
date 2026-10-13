@@ -65,6 +65,7 @@ var ModelRegistry = []ModelSpec{
 
 	// Cursor
 	{Surface: "cursor", Alias: "grok", Model: "grok-4.7-high", Backend: "cursor"},
+	{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium", Backend: "cursor"},
 
 	// Gemini
 	{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash", Backend: "omp", Deprecated: []string{"pro", "3.7", "gemini-3.7-flash-tiered"}},

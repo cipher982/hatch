@@ -92,7 +92,7 @@ func TestCodexDoctorCoversEverySurfaceAlias(t *testing.T) {
 func TestCheckCursorModel(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3' 'gemini-4-argon-medium - Gemini 4 Argon Medium'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
@@ -142,7 +142,7 @@ printf '%s\n' '{"models":[{"id":"gemini-3.8-flash","selector":"google-antigravit
 func TestCheckCursorModelProbesUnlistedAliases(t *testing.T) {
 	directory := t.TempDir()
 	script := `#!/bin/sh
-if [ "$1" = "models" ]; then printf '%s\n' 'grok-4.7-high - Grok'; exit 0; fi
+if [ "$1" = "models" ]; then printf '%s\n' 'grok-4.7-high - Grok' 'gemini-4-argon-medium - Gemini 4 Argon Medium'; exit 0; fi
 while [ "$1" != "--model" ]; do shift; done
 case "$2" in
   kimi-k3) echo "ActionRequiredError: You've reached your monthly usage limit"; exit 1 ;;
