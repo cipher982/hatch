@@ -65,12 +65,10 @@ var ModelRegistry = []ModelSpec{
 
 	// Cursor
 	{Surface: "cursor", Alias: "grok", Model: "grok-4.7-high", Backend: "cursor"},
-	{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium", Backend: "cursor"},
 
 	// Gemini
-	{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash", Backend: "omp", Deprecated: []string{"pro", "3.7", "gemini-3.7-flash-tiered"}},
-	{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash", Backend: "omp"},
-	{Surface: "gemini", Alias: "gemini-3.8-flash-low", Model: "google-antigravity/gemini-3.8-flash", Backend: "omp"},
+	// Gemini 4 Argon runs through Cursor's subscription-backed agent CLI.
+	{Surface: "gemini", Alias: "argon", Model: "gemini-4-argon-medium", Backend: "cursor"},
 
 	// OpenRouter
 	{

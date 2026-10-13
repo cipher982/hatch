@@ -274,6 +274,11 @@ func identity(backend, model string) (string, string) {
 				return "cursor." + alias, "cursor"
 			}
 		}
+		for alias, configured := range surfaces["gemini"].models {
+			if configured == model {
+				return "gemini." + alias, "cursor"
+			}
+		}
 		return "cursor.raw", "cursor"
 	case "gemini":
 		return "gemini.raw", "google"
@@ -291,11 +296,6 @@ func identity(backend, model string) (string, string) {
 		for alias, configured := range surfaces["codex"].models {
 			if configured == model {
 				return "codex." + alias, "openai"
-			}
-		}
-		for alias, configured := range surfaces["gemini"].models {
-			if configured == model {
-				return "gemini." + alias, "google"
 			}
 		}
 		if strings.HasPrefix(model, "amazon-bedrock/") {
@@ -318,8 +318,8 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
        hatch bedrock <opus|sonnet> [OPTIONS] "prompt"
        hatch codex <astra|sol|luna> [OPTIONS] "prompt"
-       hatch cursor <grok|kimi-k3|gemini-4-argon> [OPTIONS] "prompt"
-       hatch gemini [flash|3.8|gemini-3.8-flash-low] [OPTIONS] "prompt"
+       hatch cursor <grok|kimi-k3> [OPTIONS] "prompt"
+       hatch gemini [argon] [OPTIONS] "prompt"
        hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|read|audit|gc> [OPTIONS]
@@ -330,14 +330,14 @@ One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenRouter, and exp
 Coding harness selection:
   --harness opencode     Use OpenCode (default for bedrock, codex, and openrouter)
   --harness pi           Use Pi
-  --harness omp          Use Oh My Pi (default for gemini)
+  --harness omp         Use Oh My Pi
 
 Model-first aliases:
   Claude (personal subscription): haiku, sonnet, opus, fable, fable-5.1
   Bedrock (Zeta work, no bare alias): hatch bedrock opus|sonnet
   OpenAI coding models: astra, sol, luna, nano, mini, max
-  Cursor: grok, kimi-k3, gemini-4-argon
-  Gemini: flash, 3.8, gemini-3.8-flash-low
+  Cursor: grok, kimi-k3
+  Gemini: argon (Cursor subscription)
   OpenRouter: deepseek-v4.1-flash, glm-5.3-flash
 Start here:
   hatch opus "Review this diff"
@@ -349,7 +349,7 @@ Start here:
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch cursor kimi-k3 "Review this branch"
-  hatch cursor gemini-4-argon "Summarize this code"
+  hatch gemini "Review this branch"
   hatch expert "Is this refactor direction sound?"
 
 Common options:

@@ -97,7 +97,7 @@ func TestCheckCursorModel(t *testing.T) {
 	}
 	t.Setenv("PATH", directory)
 	check := checkCursorModel(Credential{})
-	if !check.OK || check.Name != "cursor.catalog" {
+	if !check.OK || check.Name != "cursor.catalog" || check.Detail != "3 configured models are available" {
 		t.Fatalf("check = %#v", check)
 	}
 }
@@ -119,22 +119,6 @@ func TestCheckHarness(t *testing.T) {
 	t.Setenv("PATH", directory)
 	check := checkHarness("harness.omp", "omp")
 	if !check.OK || check.Name != "harness.omp" || check.Detail != "omp v17.2.10" {
-		t.Fatalf("check = %#v", check)
-	}
-}
-
-func TestCheckOMPModels(t *testing.T) {
-	directory := t.TempDir()
-	binary := filepath.Join(directory, "omp")
-	script := `#!/bin/sh
-printf '%s\n' '{"models":[{"id":"gemini-3.8-flash","selector":"google-antigravity/gemini-3.8-flash"}]}'
-`
-	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", directory)
-	check := checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels))
-	if !check.OK || check.Name != "gemini.catalog" {
 		t.Fatalf("check = %#v", check)
 	}
 }

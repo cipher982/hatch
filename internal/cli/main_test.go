@@ -136,10 +136,10 @@ func buildTestProviderForCLI(t *testing.T, root string) string {
 
 func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 	for model, want := range map[string]string{
-		"openai/gpt-6-astra":       "codex.astra",
-		"openai/gpt-5.4-nano":      "codex.nano",
-		"kimi-k3":                  "cursor.kimi-k3",
-		"gemini-4-argon-medium":    "cursor.gemini-4-argon",
+		"openai/gpt-6-astra":    "codex.astra",
+		"openai/gpt-5.4-nano":   "codex.nano",
+		"kimi-k3":               "cursor.kimi-k3",
+		"gemini-4-argon-medium": "gemini.argon",
 	} {
 		backend := "opencode"
 		if model == "kimi-k3" || model == "gemini-4-argon-medium" {
@@ -220,7 +220,7 @@ func TestMainDoctorJSON(t *testing.T) {
 	ompBinary := filepath.Join(directory, "omp")
 	ompScript := `#!/bin/sh
 if [ "$1" = "--version" ]; then printf '%s\n' 'omp test'; exit 0; fi
-printf '%s\n' '{"models":[{"id":"gemini-3.8-flash","selector":"google-antigravity/gemini-3.8-flash"}]}'
+exit 0
 `
 	if err := os.WriteFile(ompBinary, []byte(ompScript), 0o700); err != nil {
 		t.Fatal(err)
@@ -247,7 +247,7 @@ printf '%s\n' '{"models":[{"id":"gemini-3.8-flash","selector":"google-antigravit
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || len(result.Checks) != 8 {
+	if !result.OK || len(result.Checks) != 7 {
 		t.Fatalf("doctor = %#v", result)
 	}
 	for _, check := range result.Checks {
@@ -269,15 +269,21 @@ func TestMainCatalogJSON(t *testing.T) {
 	if !slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "opus", Model: "claude-opus-5-5"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable-5.1", Model: "claude-fable-5-1"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "flash", Model: "google-antigravity/gemini-3.8-flash"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "3.8", Model: "google-antigravity/gemini-3.8-flash"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "gemini-3.8-flash-low", Model: "google-antigravity/gemini-3.8-flash"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "argon", Model: "gemini-4-argon-medium"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4.1-flash", Model: "openrouter/deepseek/deepseek-v4.1-flash"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium"}) {
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) {
 		t.Fatalf("catalog = %#v", catalog)
+	}
+	geminiModels := 0
+	for _, entry := range catalog {
+		if entry.Surface == "gemini" {
+			geminiModels++
+		}
+	}
+	if geminiModels != 1 {
+		t.Fatalf("catalog contains %d Gemini models, want one: %#v", geminiModels, catalog)
 	}
 }
 
