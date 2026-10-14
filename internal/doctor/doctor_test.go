@@ -123,6 +123,22 @@ func TestCheckHarness(t *testing.T) {
 	}
 }
 
+func TestCheckOMPModels(t *testing.T) {
+	directory := t.TempDir()
+	binary := filepath.Join(directory, "omp")
+	script := `#!/bin/sh
+printf '%s\n' '{"models":[{"id":"gemini-4-argon","selector":"google-antigravity/gemini-4-argon"}]}'
+`
+	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory)
+	check := checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels))
+	if !check.OK || check.Name != "gemini.catalog" {
+		t.Fatalf("check = %#v", check)
+	}
+}
+
 func TestCheckCursorModelProbesUnlistedAliases(t *testing.T) {
 	directory := t.TempDir()
 	script := `#!/bin/sh

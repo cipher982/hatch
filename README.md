@@ -123,6 +123,7 @@ hatch claude opus "Review this diff"
 hatch bedrock opus "Review this diff"
 hatch codex astra --harness omp "Review this branch"
 hatch gemini "Summarize this code"
+hatch cursor gemini-4-argon "Summarize this code"
 hatch openrouter deepseek-v4.1-flash "Fix the failing tests"
 hatch openrouter glm-5.3-flash "Fix the failing tests"
 ```
@@ -132,17 +133,18 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login (David's personal subscription) |
 | `hatch bedrock <opus\|sonnet>` | Claude 5.5 on Zeta's AWS Bedrock account via the selected harness |
 | `hatch codex <astra\|sol\|luna>` | OpenAI coding model via the selected harness |
-| `hatch cursor <grok|kimi-k3>` | Local Cursor Agent CLI login for Grok and Kimi |
-| `hatch gemini [argon]` | Cursor Agent CLI login; defaults to Gemini 4 Argon Medium (`gemini-4-argon-medium`) |
+| `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
+| `hatch gemini [argon]` | Oh My Pi with `google-antigravity/gemini-4-argon` on the personal Google AI Ultra subscription |
 | `hatch openrouter <deepseek-v4.1-flash\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 | `hatch review <MODEL ...>` | Explicitly requested two-phase independent code review; execs `hatch-review` (review-hub in `~/git/me`), requires a model, takes no prompt; receipts are optional audit data, not shipping gates |
 
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.
-`hatch gemini` selects Cursor's `gemini-4-argon-medium`; `hatch gemini argon`
-selects it explicitly. Pass another raw Cursor model ID with `--model` to
-choose a different supported variant.
+`hatch gemini` selects the personal Google AI Ultra route; `hatch gemini
+argon` selects it explicitly. Zeta Gemini work uses `hatch cursor
+gemini-4-argon`, which has no bare shorthand; pass another raw Cursor model ID
+with `--model` to choose a different supported Cursor variant.
 
 `opus` targets Claude Opus 5.5 through the local Claude Code CLI; the retired
 `opus-5` alias is rejected. `sonnet` targets Claude Sonnet 5.5 the same way.
@@ -163,6 +165,21 @@ Anthropic models have two routes, chosen by who pays:
 The Bedrock aliases have no bare shorthand, so `hatch opus` can never reach the
 employer account by accident. Bedrock never falls back to the subscription, and
 the subscription route never falls back to Bedrock.
+
+### Personal versus Zeta Gemini calls
+
+Gemini 4 Argon has two routes, chosen by who pays:
+
+- **Personal work** (Zerg, Longhouse, personal infrastructure): `hatch gemini`
+  (alias `argon`). This runs `google-antigravity/gemini-4-argon` through Oh My
+  Pi on David's personal Google AI Ultra subscription, at Hatch's default
+  `medium` reasoning.
+- **Zeta or other employer work**: `hatch cursor gemini-4-argon`. This runs
+  Cursor's `gemini-4-argon-medium` through the local Cursor Agent CLI on the
+  Zeta-account Cursor subscription.
+
+The Cursor alias has no bare shorthand, so `hatch gemini` can never reach the
+employer account by accident. Neither route falls back to the other.
 
 `astra` targets OpenAI `gpt-6-astra`; `sol` targets `gpt-6.1-sol` (released
 2026-09-29: near-Astra coding quality at one-fifth of Astra's price; it replaced

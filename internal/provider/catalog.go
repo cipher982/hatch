@@ -63,12 +63,16 @@ var ModelRegistry = []ModelSpec{
 	{Surface: "bedrock", Alias: "opus", Model: "amazon-bedrock/global.anthropic.claude-opus-5-5", Backend: "opencode", NoShorthand: true},
 	{Surface: "bedrock", Alias: "sonnet", Model: "amazon-bedrock/global.anthropic.claude-sonnet-5-5", Backend: "opencode", NoShorthand: true},
 
-	// Cursor
+	// Cursor: Zeta work. Runs on the Cursor subscription (cursor-agent login
+	// drose@zetaglobal.com). gemini-4-argon carries no bare shorthand so a
+	// personal caller cannot silently bill the employer account.
 	{Surface: "cursor", Alias: "grok", Model: "grok-4.7-high", Backend: "cursor"},
+	{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium", Backend: "cursor", NoShorthand: true},
 
-	// Gemini
-	// Gemini 4 Argon runs through Cursor's subscription-backed agent CLI.
-	{Surface: "gemini", Alias: "argon", Model: "gemini-4-argon-medium", Backend: "cursor"},
+	// Gemini: personal work. Gemini 4 Argon runs through Oh My Pi on the
+	// personal Google AI Ultra subscription; Zeta Gemini work uses the
+	// explicit `hatch cursor gemini-4-argon` route instead.
+	{Surface: "gemini", Alias: "argon", Model: "google-antigravity/gemini-4-argon", Backend: "omp"},
 
 	// OpenRouter
 	{
