@@ -112,7 +112,7 @@ The preferred form is model-first. Hatch infers the provider from the alias:
 hatch opus "Review this diff"
 hatch astra --harness omp "Review this branch"
 hatch grok "Review this branch"
-hatch deepseek-v4.1-flash "Fix the failing tests"
+hatch deepseek "Fix the failing tests"
 hatch glm-5.3-flash "Fix the failing tests"
 ```
 
@@ -124,7 +124,7 @@ hatch bedrock opus "Review this diff"
 hatch codex astra --harness omp "Review this branch"
 hatch gemini "Summarize this code"
 hatch cursor gemini-4-argon "Summarize this code"
-hatch openrouter deepseek-v4.1-flash "Fix the failing tests"
+hatch openrouter deepseek "Fix the failing tests"
 hatch openrouter glm-5.3-flash "Fix the failing tests"
 ```
 
@@ -135,7 +135,7 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch codex <astra\|sol\|luna>` | OpenAI coding model via the selected harness |
 | `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
 | `hatch gemini [argon]` | Oh My Pi with `google-antigravity/gemini-4-argon` on the personal Google AI Ultra subscription |
-| `hatch openrouter <deepseek-v4.1-flash\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias |
+| `hatch openrouter <deepseek\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias (`deepseek` = V4.1 Flash 1017, pinned to the DeepSeek upstream) |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 | `hatch review <MODEL ...>` | Explicitly requested two-phase independent code review; execs `hatch-review` (review-hub in `~/git/me`), requires a model, takes no prompt; receipts are optional audit data, not shipping gates |
 
@@ -199,7 +199,7 @@ hatch codex astra --harness opencode "Review this branch"
 hatch codex astra --harness pi "Review this branch"
 hatch codex astra --harness omp "Review this branch"
 hatch bedrock sonnet --harness pi "Review this branch"
-hatch openrouter deepseek-v4.1-flash --harness omp "Fix the failing tests"
+hatch openrouter deepseek --harness omp "Fix the failing tests"
 ```
 
 The common Codex tier shorthand is also accepted:

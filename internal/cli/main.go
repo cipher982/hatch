@@ -320,7 +320,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch codex <astra|sol|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3|gemini-4-argon> [OPTIONS] "prompt"
        hatch gemini [argon] [OPTIONS] "prompt"
-       hatch openrouter <deepseek-v4.1-flash|glm-5.3-flash> [OPTIONS] "prompt"
+       hatch openrouter <deepseek|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|read|audit|gc> [OPTIONS]
        hatch review MODEL... [--reasoning-effort LEVEL] [--base REF] [--pass-timeout SEC]   (explicit model; two-phase, read-only review; no prompt)
@@ -338,13 +338,13 @@ Model-first aliases:
   OpenAI coding models: astra, sol, luna, nano, mini, max
   Cursor (Zeta work): grok, kimi-k3, gemini-4-argon
   Gemini (personal Google AI Ultra via Oh My Pi): argon
-  OpenRouter: deepseek-v4.1-flash, glm-5.3-flash
+  OpenRouter: deepseek (V4.1 Flash 1017), glm-5.3-flash
 Start here:
   hatch opus "Review this diff"
   hatch gemini "Review this branch"
   hatch astra --harness omp "Review this branch"
   hatch grok "Review this branch"
-  hatch deepseek-v4.1-flash "Fix the failing tests"
+  hatch deepseek "Fix the failing tests"
   hatch glm-5.3-flash "Fix the failing tests"
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"

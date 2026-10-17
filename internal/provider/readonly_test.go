@@ -28,7 +28,7 @@ func argvValue(argv []string, flag string) string {
 }
 
 func TestReadOnlyOpenCodePermissionPolicy(t *testing.T) {
-	invocation := readOnlyBuild(t, "opencode", "openrouter/deepseek/deepseek-v4.1-flash")
+	invocation := readOnlyBuild(t, "opencode", "openrouter/deepseek/deepseek-v4.1-flash-1017")
 	var config struct {
 		Provider   map[string]any             `json:"provider"`
 		Permission map[string]json.RawMessage `json:"permission"`
@@ -79,7 +79,7 @@ func TestReadOnlyOpenCodePermissionPolicy(t *testing.T) {
 }
 
 func TestOpenCodeWithoutReadOnlyCarriesNoPermissionPolicy(t *testing.T) {
-	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,11 +119,11 @@ func TestReadOnlyClaudeHasNoShellOrEditTools(t *testing.T) {
 }
 
 func TestReadOnlyPiAndOmpAllowlistTools(t *testing.T) {
-	pi := readOnlyBuild(t, "pi", "openrouter/deepseek/deepseek-v4.1-flash")
+	pi := readOnlyBuild(t, "pi", "openrouter/deepseek/deepseek-v4.1-flash-1017")
 	if got := argvValue(pi.Argv, "--tools"); got != "read,grep,find,ls" {
 		t.Fatalf("pi --tools = %q", got)
 	}
-	omp := readOnlyBuild(t, "omp", "openrouter/deepseek/deepseek-v4.1-flash")
+	omp := readOnlyBuild(t, "omp", "openrouter/deepseek/deepseek-v4.1-flash-1017")
 	if got := argvValue(omp.Argv, "--tools"); got != "read,grep,glob" {
 		t.Fatalf("omp --tools = %q", got)
 	}

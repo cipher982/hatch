@@ -10,12 +10,12 @@ import (
 
 func TestSurfaceCatalogIncludesCurrentOpenRouterSurfaces(t *testing.T) {
 	entries := SurfaceCatalog()
-	if !slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4.1-flash", Model: "openrouter/deepseek/deepseek-v4.1-flash"}) ||
+	if !slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "deepseek", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017"}) ||
 		!slices.Contains(entries, CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) {
 		t.Fatalf("catalog = %#v", entries)
 	}
 	for _, entry := range entries {
-		if entry.Surface == "openrouter" && (entry.Alias == "deepseek-v4-pro" || entry.Alias == "deepseek-v4-flash") {
+		if entry.Surface == "openrouter" && (entry.Alias == "deepseek-v4.1-flash" || entry.Alias == "deepseek-v4-pro" || entry.Alias == "deepseek-v4-flash") {
 			t.Fatalf("catalog must not contain deprecated alias %q: %#v", entry.Alias, entries)
 		}
 	}
@@ -59,14 +59,20 @@ func TestModelRegistryInvariants(t *testing.T) {
 }
 
 func TestFindRoutingPolicyDeterministicLongestPrefix(t *testing.T) {
-	policy := FindRoutingPolicy("openrouter/deepseek/deepseek-v4.1-flash")
+	policy := FindRoutingPolicy("openrouter/deepseek/deepseek-v4.1-flash-1017")
 	if policy == nil || len(policy.ProviderOrder) != 1 || policy.ProviderOrder[0] != "DeepSeek" || policy.AllowFallbacks {
-		t.Fatalf("unexpected policy for deepseek-v4.1-flash: %#v", policy)
+		t.Fatalf("unexpected policy for deepseek-v4.1-flash-1017: %#v", policy)
 	}
-	// Snapshot suffix match
-	policySnapshot := FindRoutingPolicy("openrouter/deepseek/deepseek-v4.1-flash-0910")
-	if policySnapshot == nil || len(policySnapshot.ProviderOrder) != 1 || policySnapshot.ProviderOrder[0] != "DeepSeek" {
-		t.Fatalf("unexpected policy for snapshot: %#v", policySnapshot)
+	// The family prefix keeps the pin for the undated alias and future snapshots.
+	for _, model := range []string{
+		"openrouter/deepseek/deepseek-v4.1-flash",
+		"openrouter/deepseek/deepseek-v4.1-flash-0910",
+		"openrouter/deepseek/deepseek-v4.1-flash-1031",
+	} {
+		policySnapshot := FindRoutingPolicy(model)
+		if policySnapshot == nil || len(policySnapshot.ProviderOrder) != 1 || policySnapshot.ProviderOrder[0] != "DeepSeek" {
+			t.Fatalf("unexpected policy for %s: %#v", model, policySnapshot)
+		}
 	}
 	if plain := FindRoutingPolicy("openai/gpt-6-astra"); plain != nil {
 		t.Fatalf("unrouted model returned routing policy: %#v", plain)
@@ -74,7 +80,7 @@ func TestFindRoutingPolicyDeterministicLongestPrefix(t *testing.T) {
 }
 
 func TestBuildOpenCodeDeepSeekRoutingConfig(t *testing.T) {
-	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash", Prompt: "prompt", APIKey: "fake"})
+	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +104,7 @@ func TestBuildOpenCodeDeepSeekRoutingConfig(t *testing.T) {
 	if err := json.Unmarshal(invocation.OpenCodeConfigJSON, &config); err != nil {
 		t.Fatalf("routing config is not valid JSON: %v", err)
 	}
-	model := config.Provider.OpenRouter.Models["deepseek/deepseek-v4.1-flash"]
+	model := config.Provider.OpenRouter.Models["deepseek/deepseek-v4.1-flash-1017"]
 	if model.Options.Provider.AllowFallbacks || len(model.Options.Provider.Order) != 1 || model.Options.Provider.Order[0] != "DeepSeek" {
 		t.Fatalf("routing config = %s", invocation.OpenCodeConfigJSON)
 	}

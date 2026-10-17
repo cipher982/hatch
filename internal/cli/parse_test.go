@@ -19,7 +19,7 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-4-argon"},
 		{[]string{"gemini", "argon", "--json", "-"}, "omp", "google-antigravity/gemini-4-argon"},
 		{[]string{"codex", "astra", "--json", "-"}, "opencode", "openai/gpt-6-astra"},
-		{[]string{"openrouter", "deepseek-v4.1-flash", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4.1-flash"},
+		{[]string{"openrouter", "deepseek", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
 		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
@@ -84,7 +84,7 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"grok", "cursor", "grok-4.7-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
 		{"argon", "omp", "google-antigravity/gemini-4-argon"},
-		{"deepseek-v4.1-flash", "opencode", "openrouter/deepseek/deepseek-v4.1-flash"},
+		{"deepseek", "opencode", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
 		{"glm-5.3-flash", "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
@@ -161,13 +161,13 @@ func TestParseRejectsDeprecatedOpus5Alias(t *testing.T) {
 	}
 }
 func TestParseRejectsDeprecatedDeepSeekAliases(t *testing.T) {
-	for _, alias := range []string{"deepseek-v4-flash", "deepseek-v4-pro"} {
+	for _, alias := range []string{"deepseek-v4.1-flash", "deepseek-v4-flash", "deepseek-v4-pro"} {
 		_, err := Parse([]string{"openrouter", alias, "review"}, true)
-		if err == nil || err.Error() != `invalid openrouter model "`+alias+`". Choose one of: deepseek-v4.1-flash, glm-5.3-flash` {
+		if err == nil || err.Error() != `invalid openrouter model "`+alias+`". Choose one of: deepseek, glm-5.3-flash` {
 			t.Fatalf("Parse deprecated OpenRouter alias %q error = %v", alias, err)
 		}
 		_, err = Parse([]string{alias, "review"}, true)
-		if err == nil || err.Error() != `invalid openrouter model "`+alias+`". Choose one of: deepseek-v4.1-flash, glm-5.3-flash` {
+		if err == nil || err.Error() != `invalid openrouter model "`+alias+`". Choose one of: deepseek, glm-5.3-flash` {
 			t.Fatalf("Parse deprecated OpenRouter alias shorthand %q error = %v", alias, err)
 		}
 	}
@@ -215,14 +215,14 @@ func TestParseSurfaceHelpDoesNotRequireModel(t *testing.T) {
 }
 
 func TestParseReadOnlyFlag(t *testing.T) {
-	req, err := Parse([]string{"openrouter", "deepseek-v4.1-flash", "--read-only", "--timeout", "300", "prompt"}, false)
+	req, err := Parse([]string{"openrouter", "deepseek", "--read-only", "--timeout", "300", "prompt"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !req.ReadOnly || req.TimeoutSeconds != 300 || req.Backend != "opencode" || len(req.PromptArgs) != 1 {
 		t.Fatalf("request = %#v", req)
 	}
-	if plain, err := Parse([]string{"openrouter", "deepseek-v4.1-flash", "prompt"}, false); err != nil || plain.ReadOnly {
+	if plain, err := Parse([]string{"openrouter", "deepseek", "prompt"}, false); err != nil || plain.ReadOnly {
 		t.Fatalf("read-only must be opt-in: %#v %v", plain, err)
 	}
 }

@@ -30,6 +30,10 @@ type ModelSpec struct {
 	Backend    string         `json:"backend"`
 	Deprecated []string       `json:"deprecated,omitempty"`
 	Routing    *RoutingPolicy `json:"routing,omitempty"`
+	// RoutingPrefix registers Routing under a model-family prefix instead of the
+	// exact Model, so later dated snapshots (deepseek-v4.1-flash-1031) keep the
+	// same upstream pin without a catalog edit.
+	RoutingPrefix string `json:"routing_prefix,omitempty"`
 	// NoShorthand keeps the alias reachable only through its surface
 	// (`hatch bedrock opus`), so it cannot shadow another surface's bare alias
 	// (`hatch opus`).
@@ -77,10 +81,13 @@ var ModelRegistry = []ModelSpec{
 	// OpenRouter
 	{
 		Surface:    "openrouter",
-		Alias:      "deepseek-v4.1-flash",
-		Model:      "openrouter/deepseek/deepseek-v4.1-flash",
+		Alias:      "deepseek",
+		Model:      "openrouter/deepseek/deepseek-v4.1-flash-1017",
 		Backend:    "opencode",
-		Deprecated: []string{"deepseek-v4-flash", "deepseek-v4-pro"},
+		Deprecated: []string{"deepseek-v4.1-flash", "deepseek-v4-flash", "deepseek-v4-pro"},
+		// The September alias resolved to the 20260910 snapshot; 1017 is the
+		// October 17 checkpoint. Pin the family so future snapshots inherit it.
+		RoutingPrefix: "openrouter/deepseek/deepseek-v4.1-flash",
 		Routing: &RoutingPolicy{
 			ProviderOrder:  []string{"DeepSeek"},
 			AllowFallbacks: false,
@@ -145,7 +152,11 @@ func init() {
 		surfaceBackendMap[spec.Surface] = spec.Backend
 
 		if spec.Routing != nil {
-			routingPolicyMap[spec.Model] = spec.Routing
+			key := spec.Model
+			if spec.RoutingPrefix != "" {
+				key = spec.RoutingPrefix
+			}
+			routingPolicyMap[key] = spec.Routing
 		}
 		if len(spec.PriorityEfforts) > 0 {
 			efforts := make(map[string]bool, len(spec.PriorityEfforts))

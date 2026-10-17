@@ -45,7 +45,7 @@ printf '%s\n' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6-luna' 'ope
 func TestCheckOpenCodeModels(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4.1-flash' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4.1-flash-1017' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)

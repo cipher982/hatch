@@ -240,7 +240,7 @@ func TestMainDoctorJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$2\" = amazon-bedrock ] || [ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'amazon-bedrock/global.anthropic.claude-opus-5-5' 'amazon-bedrock/global.anthropic.claude-sonnet-5-5' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4.1-flash' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
+	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$2\" = amazon-bedrock ] || [ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'amazon-bedrock/global.anthropic.claude-opus-5-5' 'amazon-bedrock/global.anthropic.claude-sonnet-5-5' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4.1-flash-1017' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	piBinary := filepath.Join(directory, "pi")
@@ -303,7 +303,7 @@ func TestMainCatalogJSON(t *testing.T) {
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "argon", Model: "google-antigravity/gemini-4-argon"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek-v4.1-flash", Model: "openrouter/deepseek/deepseek-v4.1-flash"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "glm-5.3-flash", Model: "openrouter/z-ai/glm-5.3-flash"}) {
 		t.Fatalf("catalog = %#v", catalog)
 	}
