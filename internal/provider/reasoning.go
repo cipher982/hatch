@@ -22,6 +22,13 @@ func isBedrockSurfaceModel(model string) bool {
 	return false
 }
 
+// isBedrockOpenAIModel reports whether a Bedrock model id carries an OpenAI
+// model (amazon-bedrock/global.openai.gpt-6.1-terra). Those keep OpenAI
+// reasoning semantics instead of the Claude cost profile.
+func isBedrockOpenAIModel(model string) bool {
+	return strings.HasPrefix(model, "amazon-bedrock/") && strings.Contains(model, "openai.")
+}
+
 // Keep existing Claude calls at their established cost profile unless callers
 // explicitly request a higher effort.
 const defaultClaudeReasoningEffort = "low"
@@ -77,6 +84,9 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 		if model == "" {
 			return ReasoningPolicy{}, fmt.Errorf("OpenCode backend requires an explicit model")
 		}
+		if isBedrockOpenAIModel(model) {
+			return resolveOpenCodeOpenAIReasoning(model, requested)
+		}
 		if isBedrockSurfaceModel(model) {
 			return resolveClaudeReasoning(requested)
 		}
@@ -108,6 +118,9 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 func resolvePiLikeReasoning(backend, model, requested string) (ReasoningPolicy, error) {
 	if model == "" {
 		return ReasoningPolicy{}, fmt.Errorf("%s backend requires an explicit model", backend)
+	}
+	if isBedrockOpenAIModel(model) {
+		return resolveOpenCodeOpenAIReasoning(model, requested)
 	}
 	if isBedrockSurfaceModel(model) {
 		return resolveClaudeReasoning(requested)
@@ -184,7 +197,12 @@ func resolveOpenCodeGLMReasoning(model, requested string) (ReasoningPolicy, erro
 }
 
 func knownOpenAIModel(model string) (known, supportsNone, supportsMax bool) {
-	name := strings.TrimPrefix(model, "openai/")
+	name := model
+	for _, prefix := range []string{"openai/", "openai."} {
+		if index := strings.LastIndex(name, prefix); index >= 0 {
+			name = name[index+len(prefix):]
+		}
+	}
 	for _, suffix := range []string{"-fast", "-pro"} {
 		name = strings.TrimSuffix(name, suffix)
 	}
@@ -193,6 +211,8 @@ func knownOpenAIModel(model string) (known, supportsNone, supportsMax bool) {
 		return true, false, true
 	case "gpt-6.1-sol":
 		return true, false, true
+	case "gpt-6.1-terra":
+		return true, true, true
 	case "gpt-6-luna":
 		return true, true, true
 	case "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano":

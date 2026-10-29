@@ -19,6 +19,9 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-4-argon"},
 		{[]string{"gemini", "argon", "--json", "-"}, "omp", "google-antigravity/gemini-4-argon"},
 		{[]string{"codex", "astra", "--json", "-"}, "opencode", "openai/gpt-6-astra"},
+		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-6.1-sol"},
+		{[]string{"codex", "terra", "--json", "-"}, "opencode", "openai/gpt-6.1-terra"},
+		{[]string{"codex", "luna", "--json", "-"}, "opencode", "openai/gpt-6-luna"},
 		{[]string{"openrouter", "deepseek", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
 		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "opencode", "openrouter/z-ai/glm-5.3-flash"},
 	}
@@ -67,7 +70,7 @@ func TestParseCodexTierShorthand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "openai/gpt-6-astra" || len(got.PromptArgs) != 1 || got.PromptArgs[0] != "prompt" {
+	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "amazon-bedrock/global.openai.gpt-6-astra" || len(got.PromptArgs) != 1 || got.PromptArgs[0] != "prompt" {
 		t.Fatalf("parsed shorthand = %#v", got)
 	}
 }
@@ -80,7 +83,10 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"sonnet", "claude", "claude-sonnet-5-5"},
 		{"fable", "claude", "claude-fable-5-1"},
 		{"fable-5.1", "claude", "claude-fable-5-1"},
-		{"astra", "opencode", "openai/gpt-6-astra"},
+		{"astra", "opencode", "amazon-bedrock/global.openai.gpt-6-astra"},
+		{"sol", "opencode", "amazon-bedrock/global.openai.gpt-6.1-sol"},
+		{"terra", "opencode", "amazon-bedrock/global.openai.gpt-6.1-terra"},
+		{"luna", "opencode", "amazon-bedrock/global.openai.gpt-6-luna"},
 		{"grok", "cursor", "grok-4.7-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
 		{"argon", "omp", "google-antigravity/gemini-4-argon"},
@@ -109,7 +115,7 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"explicit backend equals wins", []string{"--backend=gemini", "claude", "review"}, []string{"--backend=gemini", "claude", "review"}},
 		{"explicit model wins", []string{"codex", "--model", "openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-5.4", "review"}},
 		{"explicit model equals routes", []string{"--model=openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model=openai/gpt-5.4", "review"}},
-		{"model shorthand", []string{"astra", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-6-astra", "review"}},
+		{"model shorthand", []string{"astra", "review"}, []string{"--backend", "opencode", "--model", "amazon-bedrock/global.openai.gpt-6-astra", "review"}},
 		{"cursor raw override", []string{"cursor", "grok", "--model", "cursor-grok-4.5-low", "review"}, []string{"--backend", "cursor", "--model", "cursor-grok-4.5-low", "review"}},
 		{"option value provider", []string{"--cwd", "claude", "review"}, []string{"--cwd", "claude", "review"}},
 		{"option equals provider", []string{"--cwd=claude", "review"}, []string{"--cwd=claude", "review"}},
@@ -172,13 +178,22 @@ func TestParseRejectsDeprecatedDeepSeekAliases(t *testing.T) {
 		}
 	}
 }
-func TestParseRejectsDeprecatedTerraAlias(t *testing.T) {
-	for _, args := range [][]string{
-		{"codex", "terra", "review"},
-		{"terra", "review"},
-	} {
-		if _, err := Parse(args, true); err == nil {
-			t.Fatalf("Parse(%v) accepted deprecated terra alias", args)
+func TestParseTerraRoutesToBedrockByDefault(t *testing.T) {
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"terra", "review"}, "amazon-bedrock/global.openai.gpt-6.1-terra"},
+		{[]string{"bedrock", "terra", "review"}, "amazon-bedrock/global.openai.gpt-6.1-terra"},
+		{[]string{"codex", "terra", "review"}, "openai/gpt-6.1-terra"},
+	}
+	for _, test := range tests {
+		got, err := Parse(test.args, true)
+		if err != nil {
+			t.Fatalf("Parse(%v) rejected terra: %v", test.args, err)
+		}
+		if got.Model != test.want || got.Backend != "opencode" {
+			t.Fatalf("Parse(%v) = %#v, want %s on opencode", test.args, got, test.want)
 		}
 	}
 }

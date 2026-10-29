@@ -178,8 +178,9 @@ func TestBuildOpenCodeGPT6CatalogModels(t *testing.T) {
 		} `json:"provider"`
 	}
 	wantEfforts := map[string][]string{
-		"gpt-6.1-sol": {"low", "medium", "high", "xhigh", "max"},
-		"gpt-6-luna":  {"none", "low", "medium", "high", "xhigh", "max"},
+		"gpt-6.1-sol":   {"low", "medium", "high", "xhigh", "max"},
+		"gpt-6.1-terra": {"none", "low", "medium", "high", "xhigh", "max"},
+		"gpt-6-luna":    {"none", "low", "medium", "high", "xhigh", "max"},
 	}
 	checkModels := func(encoded []byte, wantIDs ...string) {
 		t.Helper()
@@ -208,14 +209,14 @@ func TestBuildOpenCodeGPT6CatalogModels(t *testing.T) {
 		}
 	}
 
-	for _, model := range []string{"gpt-6.1-sol", "gpt-6-luna"} {
+	for _, model := range []string{"gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"} {
 		invocation, err := Build(Request{Backend: "opencode", Model: "openai/" + model, Prompt: "prompt", APIKey: "fake"})
 		if err != nil {
 			t.Fatal(err)
 		}
 		checkModels(invocation.OpenCodeConfigJSON, model)
 	}
-	checkModels(OpenCodeCatalogConfigJSON(), "gpt-6.1-sol", "gpt-6-luna")
+	checkModels(OpenCodeCatalogConfigJSON(), "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna")
 }
 
 func TestBuildOpenCodePriorityTierConfig(t *testing.T) {

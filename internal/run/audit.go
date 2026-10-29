@@ -469,7 +469,7 @@ func fieldSurface(surface string) (string, bool) {
 	if !ok || alias == "" || alias == "raw" {
 		return "", false
 	}
-	if s := provider.ShorthandSurface(alias); s == prefix {
+	if provider.IsSurfacedModel(prefix, alias) {
 		return prefix, true
 	}
 	return "", false

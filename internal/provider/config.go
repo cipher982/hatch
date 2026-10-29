@@ -250,12 +250,13 @@ func OpenCodeCatalogConfigJSON() []byte {
 }
 
 var openAIGPT6Models = map[string]map[string]any{
-	"gpt-6.1-sol": openAIGPT6Model("GPT-6.1 Sol", "low", "medium", "high", "xhigh", "max"),
-	"gpt-6-luna":  openAIGPT6Model("GPT-6 Luna", "none", "low", "medium", "high", "xhigh", "max"),
+	"gpt-6.1-sol":   openAIGPT6Model("GPT-6.1 Sol", "low", "medium", "high", "xhigh", "max"),
+	"gpt-6.1-terra": openAIGPT6Model("GPT-6.1 Terra", "none", "low", "medium", "high", "xhigh", "max"),
+	"gpt-6-luna":    openAIGPT6Model("GPT-6 Luna", "none", "low", "medium", "high", "xhigh", "max"),
 }
 
 // openAIGPT6Model declares a model with one OpenCode variant per reasoning
-// effort the API accepts for it (GPT-6.1 Sol rejects "none").
+// effort the API accepts for it (GPT-6 Astra and GPT-6.1 Sol reject "none").
 func openAIGPT6Model(name string, efforts ...string) map[string]any {
 	variants := make(map[string]any, len(efforts))
 	for _, effort := range efforts {

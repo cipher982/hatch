@@ -47,10 +47,13 @@ type ModelSpec struct {
 // ModelRegistry is the single source of truth for surfaced models in Hatch.
 // Order defines the stable public model preference used for help and choices.
 var ModelRegistry = []ModelSpec{
-	// Codex
-	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "opencode"},
-	{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol", Backend: "opencode", Deprecated: []string{"terra"}},
-	{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna", Backend: "opencode", PriorityEfforts: []string{"xhigh"}},
+	// Codex: the personal OpenAI account (ChatGPT/Codex subscription or an OpenAI
+	// API key). Explicit-only (`hatch codex <alias>`): bare OpenAI aliases
+	// resolve to the Bedrock surface below, which is the Zeta route.
+	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "opencode", NoShorthand: true},
+	{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol", Backend: "opencode", NoShorthand: true},
+	{Surface: "codex", Alias: "terra", Model: "openai/gpt-6.1-terra", Backend: "opencode", NoShorthand: true},
+	{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna", Backend: "opencode", NoShorthand: true, PriorityEfforts: []string{"xhigh"}},
 	{Surface: "codex", Alias: "nano", Model: "openai/gpt-5.4-nano", Backend: "opencode"},
 	{Surface: "codex", Alias: "mini", Model: "openai/gpt-5.4-mini", Backend: "opencode"},
 	{Surface: "codex", Alias: "max", Model: "openai/gpt-5.5", Backend: "opencode"},
@@ -62,10 +65,15 @@ var ModelRegistry = []ModelSpec{
 	{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1", Backend: "claude", Deprecated: []string{"fable-5"}},
 	{Surface: "claude", Alias: "fable-5.1", Model: "claude-fable-5-1", Backend: "claude"},
 
-	// Bedrock: Zeta work. Anthropic models on the employer AWS account, run
-	// through a coding harness. Personal work uses the claude surface instead.
+	// Bedrock: Zeta work. Runs on the employer AWS account through a coding
+	// harness and hosts both Anthropic Claude and OpenAI models. Bare OpenAI
+	// aliases resolve here; personal work uses the claude/gemini surfaces.
 	{Surface: "bedrock", Alias: "opus", Model: "amazon-bedrock/global.anthropic.claude-opus-5-5", Backend: "opencode", NoShorthand: true},
 	{Surface: "bedrock", Alias: "sonnet", Model: "amazon-bedrock/global.anthropic.claude-sonnet-5-5", Backend: "opencode", NoShorthand: true},
+	{Surface: "bedrock", Alias: "astra", Model: "amazon-bedrock/global.openai.gpt-6-astra", Backend: "opencode"},
+	{Surface: "bedrock", Alias: "sol", Model: "amazon-bedrock/global.openai.gpt-6.1-sol", Backend: "opencode"},
+	{Surface: "bedrock", Alias: "terra", Model: "amazon-bedrock/global.openai.gpt-6.1-terra", Backend: "opencode"},
+	{Surface: "bedrock", Alias: "luna", Model: "amazon-bedrock/global.openai.gpt-6-luna", Backend: "opencode"},
 
 	// Cursor: Zeta work. Runs on the Cursor subscription (cursor-agent login
 	// drose@zetaglobal.com). gemini-4-argon carries no bare shorthand so a
@@ -120,6 +128,7 @@ var (
 	shorthandMap       = map[string]string{}
 	deprecatedAliasMap = map[string]string{}
 	surfaceBackendMap  = map[string]string{}
+	surfacedPairMap    = map[string]bool{}
 	routingPolicyMap   = map[string]*RoutingPolicy{}
 	priorityEffortMap  = map[string]map[string]bool{}
 	routingPrefixes    = []string{}
@@ -150,6 +159,7 @@ func init() {
 			deprecatedAliasMap[dep] = spec.Surface
 		}
 		surfaceBackendMap[spec.Surface] = spec.Backend
+		surfacedPairMap[spec.Surface+"."+spec.Alias] = true
 
 		if spec.Routing != nil {
 			key := spec.Model
@@ -182,6 +192,13 @@ func ShorthandSurface(alias string) string {
 // IsDeprecatedAlias returns whether an alias is a retired alias for the given surface.
 func IsDeprecatedAlias(surface, alias string) bool {
 	return deprecatedAliasMap[alias] == surface
+}
+
+// IsSurfacedModel reports whether surface.alias is a model Hatch currently
+// surfaces. A NoShorthand alias is still surfaced on its own surface even when
+// a different surface owns the bare shorthand.
+func IsSurfacedModel(surface, alias string) bool {
+	return surfacedPairMap[surface+"."+alias]
 }
 
 // SurfaceBackend returns the default backend harness for a surfaced provider name.

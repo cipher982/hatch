@@ -100,25 +100,25 @@ func TestMainSelectsOMPForSurfacedCodexRun(t *testing.T) {
 	if !result.OK || result.Output != "fake success_omp output" || result.Run.Surface != "codex.astra" || result.Run.Backend != "omp" || result.Run.Model != "openai/gpt-6-astra" {
 		t.Fatalf("unexpected OMP result: %#v", result)
 	}
-	for _, test := range []struct{ alias, model string }{
-		{alias: "sol", model: "openai/gpt-6.1-sol"},
-		{alias: "luna", model: "openai/gpt-6-luna"},
+	for _, test := range []struct {
+		args           []string
+		surface, model string
+	}{
+		{[]string{"sol", "--harness", "omp", "--json", "prompt"}, "bedrock.sol", "amazon-bedrock/global.openai.gpt-6.1-sol"},
+		{[]string{"terra", "--harness", "omp", "--json", "prompt"}, "bedrock.terra", "amazon-bedrock/global.openai.gpt-6.1-terra"},
+		{[]string{"luna", "--harness", "omp", "--json", "prompt"}, "bedrock.luna", "amazon-bedrock/global.openai.gpt-6-luna"},
+		{[]string{"codex", "sol", "--harness", "omp", "--json", "prompt"}, "codex.sol", "openai/gpt-6.1-sol"},
 	} {
-		for _, args := range [][]string{
-			{test.alias, "--harness", "omp", "--json", "prompt"},
-			{"codex", test.alias, "--harness", "omp", "--json", "prompt"},
-		} {
-			stdout.Reset()
-			stderr.Reset()
-			if exit := Main(args, bytes.NewReader(nil), &stdout, &stderr, true); exit != 0 {
-				t.Fatalf("new %s alias %v exit=%d stdout=%s stderr=%s", test.alias, args, exit, stdout.String(), stderr.String())
-			}
-			if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-				t.Fatal(err)
-			}
-			if !result.OK || result.Run.Surface != "codex."+test.alias || result.Run.Backend != "omp" || result.Run.Model != test.model {
-				t.Fatalf("unexpected GPT-6 %s result: %#v", test.alias, result)
-			}
+		stdout.Reset()
+		stderr.Reset()
+		if exit := Main(test.args, bytes.NewReader(nil), &stdout, &stderr, true); exit != 0 {
+			t.Fatalf("%v exit=%d stdout=%s stderr=%s", test.args, exit, stdout.String(), stderr.String())
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		if !result.OK || result.Run.Surface != test.surface || result.Run.Backend != "omp" || result.Run.Model != test.model {
+			t.Fatalf("unexpected GPT-6 result for %v: %#v", test.args, result)
 		}
 	}
 }
@@ -240,7 +240,7 @@ func TestMainDoctorJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	opencodeBinary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$2\" = amazon-bedrock ] || [ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'amazon-bedrock/global.anthropic.claude-opus-5-5' 'amazon-bedrock/global.anthropic.claude-sonnet-5-5' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4.1-flash-1017' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
+	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$2\" = amazon-bedrock ] || [ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'amazon-bedrock/global.anthropic.claude-opus-5-5' 'amazon-bedrock/global.anthropic.claude-sonnet-5-5' 'amazon-bedrock/global.openai.gpt-6-astra' 'amazon-bedrock/global.openai.gpt-6.1-sol' 'amazon-bedrock/global.openai.gpt-6.1-terra' 'amazon-bedrock/global.openai.gpt-6-luna' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6.1-terra' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4.1-flash-1017' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	piBinary := filepath.Join(directory, "pi")

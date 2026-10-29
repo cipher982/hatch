@@ -131,8 +131,8 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | Command | What it uses |
 | --- | --- |
 | `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login (David's personal subscription) |
-| `hatch bedrock <opus\|sonnet>` | Claude 5.5 on Zeta's AWS Bedrock account via the selected harness |
-| `hatch codex <astra\|sol\|luna>` | OpenAI coding model via the selected harness |
+| `hatch bedrock <opus\|sonnet\|astra\|sol\|terra\|luna>` | Claude 5.5 and OpenAI GPT-6/6.1 on Zeta's AWS Bedrock account via the selected harness |
+| `hatch codex <astra\|sol\|terra\|luna>` | OpenAI coding models on the personal OpenAI account (ChatGPT/Codex subscription or API key); the Zeta route is `hatch bedrock` |
 | `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
 | `hatch gemini [argon]` | Oh My Pi with `google-antigravity/gemini-4-argon` on the personal Google AI Ultra subscription |
 | `hatch openrouter <deepseek\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias (`deepseek` = V4.1 Flash 1017, pinned to the DeepSeek upstream) |
@@ -181,12 +181,35 @@ Gemini 4 Argon has two routes, chosen by who pays:
 The Cursor alias has no bare shorthand, so `hatch gemini` can never reach the
 employer account by accident. Neither route falls back to the other.
 
-`astra` targets OpenAI `gpt-6-astra`; `sol` targets `gpt-6.1-sol` (released
-2026-09-29: near-Astra coding quality at one-fifth of Astra's price; it replaced
-`gpt-6-sol`, which Hatch no longer surfaces); and `luna` targets `gpt-6-luna`.
-The legacy `terra` alias is rejected, and GPT-5.6 Sol, Terra, and Luna are no
-longer surfaced by Hatch. Astra and Sol default to `medium` reasoning and
-support `low|medium|high|xhigh|max` (not `none`); Luna supports all documented
+### Where each model lives, and who pays
+
+Each surface bills a different account:
+
+| Surface | Account | Surfaced models |
+| --- | --- | --- |
+| `claude` | Personal Claude Max subscription (Claude Code login) | haiku, sonnet, opus, fable, fable-5.1 |
+| `bedrock` | Zeta AWS Bedrock, SSO profile `zh-ml-mlengineer` | Claude Opus/Sonnet 5.5 and OpenAI GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, GPT-6 Luna |
+| `codex` | Personal OpenAI account (ChatGPT/Codex subscription, or an OpenAI API key) | astra, sol, terra, luna (plus `nano`, `mini`, `max`) |
+| `cursor` | Zeta-account Cursor subscription | grok, kimi-k3, gemini-4-argon |
+| `gemini` | Personal Google AI Ultra subscription (Oh My Pi) | argon |
+| `openrouter` | OpenRouter balance | deepseek, glm-5.3-flash |
+
+Zeta's Bedrock account serves both Anthropic Claude and OpenAI models, so the
+bare OpenAI aliases resolve to `hatch bedrock`:
+
+```bash
+hatch terra "Review this branch"        # amazon-bedrock/global.openai.gpt-6.1-terra
+hatch bedrock terra "Review this branch"  # same route, explicit
+hatch codex terra "Review this branch"  # personal OpenAI account instead
+```
+
+`astra` targets GPT-6 Astra; `sol` targets `gpt-6.1-sol` (released 2026-09-29:
+near-Astra coding quality at one-fifth of Astra's price; it replaced
+`gpt-6-sol`, which Hatch no longer surfaces); `terra` targets `gpt-6.1-terra`
+(fast and efficient: visual reasoning, precise computer use, and writing); and
+`luna` targets `gpt-6-luna`. GPT-5.6 Sol, Terra, and Luna are no longer
+surfaced. Astra and Sol default to `medium` reasoning and support
+`low|medium|high|xhigh|max` (not `none`); Terra and Luna support all documented
 efforts, including `none` and `max`.
 
 ### Select the coding harness

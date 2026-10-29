@@ -29,8 +29,9 @@ func TestCheckOpenAIGPT6ModelsAreInjectedIntoCatalogProbe(t *testing.T) {
 	script := `#!/bin/sh
 [ "$OPENAI_API_KEY" = expected-secret ] || exit 9
 case "$OPENCODE_CONFIG_CONTENT" in *gpt-6.1-sol* ) ;; *) exit 8 ;; esac
+case "$OPENCODE_CONFIG_CONTENT" in *gpt-6.1-terra* ) ;; *) exit 8 ;; esac
 case "$OPENCODE_CONFIG_CONTENT" in *gpt-6-luna* ) ;; *) exit 8 ;; esac
-printf '%s\n' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5'
+printf '%s\n' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6.1-terra' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5'
 `
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
@@ -84,8 +85,8 @@ func TestCheckOpenCodeModelsReportsCredentialResolverFailure(t *testing.T) {
 
 func TestCodexDoctorCoversEverySurfaceAlias(t *testing.T) {
 	models := modelValues(provider.CodexSurfaceModels)
-	if len(models) != 6 {
-		t.Fatalf("doctor covers %d Codex models, want 6: %v", len(models), models)
+	if len(models) != 7 {
+		t.Fatalf("doctor covers %d Codex models, want 7: %v", len(models), models)
 	}
 }
 

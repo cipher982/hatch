@@ -316,8 +316,8 @@ func identity(backend, model string) (string, string) {
 
 const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
-       hatch bedrock <opus|sonnet> [OPTIONS] "prompt"
-       hatch codex <astra|sol|luna> [OPTIONS] "prompt"
+       hatch bedrock <opus|sonnet|astra|sol|terra|luna> [OPTIONS] "prompt"
+       hatch codex <astra|sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3|gemini-4-argon> [OPTIONS] "prompt"
        hatch gemini [argon] [OPTIONS] "prompt"
        hatch openrouter <deepseek|glm-5.3-flash> [OPTIONS] "prompt"
@@ -332,17 +332,25 @@ Coding harness selection:
   --harness pi           Use Pi
   --harness omp          Use Oh My Pi (default for gemini)
 
-Model-first aliases:
-  Claude (personal subscription): haiku, sonnet, opus, fable, fable-5.1
-  Bedrock (Zeta work, no bare alias): hatch bedrock opus|sonnet
-  OpenAI coding models: astra, sol, luna, nano, mini, max
-  Cursor (Zeta work): grok, kimi-k3, gemini-4-argon
-  Gemini (personal Google AI Ultra via Oh My Pi): argon
-  OpenRouter: deepseek (V4.1 Flash 1017), glm-5.3-flash
+Model-first aliases (each surface bills a different account):
+  Claude (personal Max subscription):   haiku, sonnet, opus, fable, fable-5.1
+  Bedrock (Zeta AWS, Claude + OpenAI):  opus, sonnet (Claude 5.5);
+                                        astra, sol, terra, luna (GPT-6 / GPT-6.1)
+  Codex (personal OpenAI, explicit):    hatch codex <astra|sol|terra|luna>
+  Cursor (Zeta Cursor subscription):    grok, kimi-k3, gemini-4-argon
+  Gemini (personal Google AI Ultra):    argon
+  OpenRouter (OpenRouter balance):      deepseek, glm-5.3-flash
+
+  OpenAI models are served by Bedrock on the Zeta AWS account, so the bare
+  astra/sol/terra/luna aliases resolve to "hatch bedrock" (astra = GPT-6 Astra,
+  sol = GPT-6.1 Sol, terra = GPT-6.1 Terra, luna = GPT-6 Luna). Use
+  "hatch codex <alias>" only for the personal OpenAI account. Bedrock's Claude
+  aliases stay explicit-only, so bare opus/sonnet remain the personal Claude route.
 Start here:
   hatch opus "Review this diff"
   hatch gemini "Review this branch"
   hatch astra --harness omp "Review this branch"
+  hatch terra "Review this branch"
   hatch grok "Review this branch"
   hatch deepseek "Fix the failing tests"
   hatch glm-5.3-flash "Fix the failing tests"
