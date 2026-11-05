@@ -50,7 +50,7 @@ func TestApplyHostContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	invocation := provider.Invocation{}
-	if err := applyHostContext(&invocation, "opencode", ExecutionContext{Home: home, HomeWritable: true}); err != nil {
+	if err := applyHostContext(&invocation, "pi", ExecutionContext{Home: home, HomeWritable: true}); err != nil {
 		t.Fatal(err)
 	}
 	if invocation.SetEnv["NODE_EXTRA_CA_CERTS"] != ca || invocation.SetEnv["CODEX_CA_CERTIFICATE"] != ca {
@@ -91,47 +91,24 @@ func TestApplyDCGClaudeOverlay(t *testing.T) {
 	}
 }
 
-func TestApplyDCGOpenCodeIsolation(t *testing.T) {
+func TestApplyDCGLoadsGuardExtensionIntoPi(t *testing.T) {
 	home := t.TempDir()
 	binary := filepath.Join(home, ".local", "bin", "dcg")
-	source := filepath.Join(home, "git", "me", "config", "dcg", "opencode-plugin.js")
-	root := filepath.Join(home, ".config", "hatch", "dcg")
-	plugin := filepath.Join(root, "opencode", "plugins", "dcg-guard.js")
-	isolatedBinary := filepath.Join(root, "bin", "dcg")
-	for _, directory := range []string{filepath.Dir(binary), filepath.Dir(source), filepath.Dir(plugin), filepath.Dir(isolatedBinary)} {
-		if err := os.MkdirAll(directory, 0o700); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.MkdirAll(filepath.Dir(binary), 0o700); err != nil {
+		t.Fatal(err)
 	}
 	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(source, []byte("export const DcgGuard = true;\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(source, plugin); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(binary, isolatedBinary); err != nil {
-		t.Fatal(err)
-	}
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6.1-sol", Prompt: "p", APIKey: "key"})
+	invocation, err := provider.Build(provider.Request{Backend: "pi", Model: "openai/gpt-6.1-sol", Prompt: "p", APIKey: "key"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := applyDCG(&invocation, "opencode", ExecutionContext{Home: home, HomeWritable: true}); err != nil {
+	if err := applyDCG(&invocation, "pi", ExecutionContext{Home: home, HomeWritable: true}); err != nil {
 		t.Fatal(err)
 	}
-	if flagValueIndex(invocation.Argv, "--pure") >= 0 || invocation.SetEnv["OPENCODE_CONFIG_DIR"] != filepath.Join(root, "opencode") {
-		t.Fatalf("OpenCode invocation = %#v", invocation)
-	}
-	for _, name := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME"} {
-		if invocation.SetEnv[name] != "" {
-			t.Fatalf("DCG should not own per-run %s: %#v", name, invocation.SetEnv)
-		}
-	}
-	if len(invocation.RedactedArgv) != len(invocation.Argv) || invocation.RedactedArgv[len(invocation.RedactedArgv)-1] != "<prompt>" || strings.Contains(strings.Join(invocation.RedactedArgv, " "), "User task:") {
-		t.Fatalf("OpenCode redaction drift: argv=%#v redacted=%#v", invocation.Argv, invocation.RedactedArgv)
+	if invocation.PiDCGBinary != binary {
+		t.Fatalf("Pi run does not carry the DCG binary: %#v", invocation)
 	}
 }
 

@@ -135,7 +135,7 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch codex <astra\|sol\|terra\|luna>` | OpenAI coding models on the personal OpenAI account (ChatGPT/Codex subscription or API key); the Zeta route is `hatch bedrock` |
 | `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
 | `hatch gemini [argon]` | Oh My Pi with `google-antigravity/gemini-4-argon` on the personal Google AI Ultra subscription |
-| `hatch openrouter <deepseek\|glm-5.3-flash>` | OpenCode with an OpenRouter model alias (`deepseek` = V4.1 Flash 1017, pinned to the DeepSeek upstream) |
+| `hatch openrouter <deepseek\|glm-5.3-flash>` | Pi with an OpenRouter model alias (`deepseek` = V4.1 Flash 1017, pinned to the DeepSeek upstream) |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 | `hatch review <MODEL ...>` | Explicitly requested two-phase independent code review; execs `hatch-review` (review-hub in `~/git/me`), requires a model, takes no prompt; receipts are optional audit data, not shipping gates |
 
@@ -158,7 +158,7 @@ Anthropic models have two routes, chosen by who pays:
   subscription and strips Bedrock, API-key and OpenRouter environment.
 - **Zeta or other employer work**: `hatch bedrock opus` / `hatch bedrock sonnet`.
   This runs `amazon-bedrock/global.anthropic.claude-{opus,sonnet}-5-5` through
-  OpenCode (default), Pi, or Oh My Pi on AWS SSO profile `zh-ml-mlengineer`
+  Pi (default) or Oh My Pi on AWS SSO profile `zh-ml-mlengineer`
   (`us-east-1`). Hatch checks `aws sts get-caller-identity` first and prints the
   `aws sso login --profile zh-ml-mlengineer` command when the session expired.
 
@@ -214,11 +214,10 @@ efforts, including `none` and `max`.
 
 ### Select the coding harness
 
-Bedrock, Codex and OpenRouter surfaces default to OpenCode, but callers can choose the
+Bedrock, Codex and OpenRouter surfaces default to Pi, but callers can choose the
 harness explicitly:
 
 ```bash
-hatch codex astra --harness opencode "Review this branch"
 hatch codex astra --harness pi "Review this branch"
 hatch codex astra --harness omp "Review this branch"
 hatch bedrock sonnet --harness pi "Review this branch"
@@ -237,7 +236,7 @@ harness separately.
 
 `--harness` is recorded in the effective backend field of the run manifest, so
 JSON callers can see which implementation actually ran. The equivalent raw
-forms are `--backend opencode`, `--backend pi`, and `--backend omp` with an
+forms are `--backend pi`, and `--backend omp` with an
 explicit `--model`.
 
 Every surfaced agent receives a bounded-run instruction: stay within the task,
@@ -260,18 +259,14 @@ Unknown OpenAI models require an explicit effort before Hatch launches them.
 
 `luna` at `xhigh` is the one model/effort pair that opts into OpenAI Fast mode
 (`service_tier=priority`), which is billed above standard rates. Every other
-run stays on the default tier. OpenCode receives the tier as a per-run
-`serviceTier` model option, in the same injected configuration that carries
-aggregator routing pins, and Oh My Pi receives `--service-tier priority`, so the
-choice never depends on local provider configuration. The Pi harness and raw
-Codex backend have no equivalent in their Hatch invocation and stay on the
+run stays on the default tier. Pi receives the tier as a `service_tier` sampling
+parameter in the per-run `models.json`, which also carries aggregator routing
+pins and models missing from Pi's catalog, and Oh My Pi receives
+`--service-tier priority`, so the choice never depends on local provider
+configuration. The raw Codex backend has no equivalent and stays on the
 standard tier.
 
-Provider session state is isolated per run. OpenCode receives private XDG data
-and state paths, while version-keyed config dependencies and cache are shared
-outside run artifacts. Successful runs discard native OpenCode state after the
-event stream and result are durable; abnormal runs retain only the allowlisted
-database snapshot used by the current recovery contract. Raw Codex receives a
+Provider session state is isolated per run. Raw Codex receives a
 private `CODEX_HOME`, ignores user configuration, and runs ephemerally, so a
 previous local Codex session cannot silently affect a Hatch run or be mistaken
 for a recoverable Hatch session.
@@ -280,7 +275,7 @@ Pi and Oh My Pi receive private `PI_CODING_AGENT_DIR` and
 one-shot runs, and record their JSON event streams in the Hatch artifact.
 
 `hatch runs gc` is deliberately narrower than evidence retention. It removes
-old per-run OpenCode config installations and caches that were never declared
+old per-run provider config installations (including those from the retired OpenCode harness) and caches that were never declared
 as evidence. It skips nonterminal runs and runs containing a `.hatch-pin` file;
 without `--apply` it only measures and reports.
 
@@ -300,7 +295,7 @@ Install and authenticate the relevant native CLI first:
 
 - `claude` for the Claude surface
 - `cursor-agent` for Cursor
-- `opencode` for Codex and OpenRouter surfaces
+- `pi` for the Bedrock, Codex and OpenRouter surfaces (and `omp` for Gemini)
 - an `OPENAI_API_KEY` for Codex and Expert, or an `OPENROUTER_API_KEY` for
   OpenRouter; Cursor login or `CURSOR_API_KEY` for Cursor
 
@@ -317,7 +312,7 @@ To make the reasoning choice explicit:
 ./hatch codex astra --reasoning-effort high "Review the risky parts of this change"
 ```
 
-Use the doctor after installing or upgrading Cursor or OpenCode. It checks the
+Use the doctor after installing or upgrading Cursor or Pi. It checks the
 configured model aliases against the locally available provider catalogs:
 
 ```sh
@@ -366,7 +361,7 @@ Cursor) cannot be continued on a personal one, or the reverse.
 If this is all you need:
 
 ```sh
-opencode run -m <model> "<prompt>"
+pi --print --model <model> "<prompt>"
 ```
 
 you probably do not need Hatch. It adds policy, provider aliases, durable local

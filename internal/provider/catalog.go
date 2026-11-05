@@ -50,13 +50,13 @@ var ModelRegistry = []ModelSpec{
 	// Codex: the personal OpenAI account (ChatGPT/Codex subscription or an OpenAI
 	// API key). Explicit-only (`hatch codex <alias>`): bare OpenAI aliases
 	// resolve to the Bedrock surface below, which is the Zeta route.
-	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "opencode", NoShorthand: true},
-	{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol", Backend: "opencode", NoShorthand: true},
-	{Surface: "codex", Alias: "terra", Model: "openai/gpt-6.1-terra", Backend: "opencode", NoShorthand: true},
-	{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna", Backend: "opencode", NoShorthand: true, PriorityEfforts: []string{"xhigh"}},
-	{Surface: "codex", Alias: "nano", Model: "openai/gpt-5.4-nano", Backend: "opencode"},
-	{Surface: "codex", Alias: "mini", Model: "openai/gpt-5.4-mini", Backend: "opencode"},
-	{Surface: "codex", Alias: "max", Model: "openai/gpt-5.5", Backend: "opencode"},
+	{Surface: "codex", Alias: "astra", Model: "openai/gpt-6-astra", Backend: "pi", NoShorthand: true},
+	{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol", Backend: "pi", NoShorthand: true},
+	{Surface: "codex", Alias: "terra", Model: "openai/gpt-6.1-terra", Backend: "pi", NoShorthand: true},
+	{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna", Backend: "pi", NoShorthand: true, PriorityEfforts: []string{"xhigh"}},
+	{Surface: "codex", Alias: "nano", Model: "openai/gpt-5.4-nano", Backend: "pi"},
+	{Surface: "codex", Alias: "mini", Model: "openai/gpt-5.4-mini", Backend: "pi"},
+	{Surface: "codex", Alias: "max", Model: "openai/gpt-5.5", Backend: "pi"},
 
 	// Claude
 	{Surface: "claude", Alias: "haiku", Model: "claude-haiku-5-5", Backend: "claude"},
@@ -68,12 +68,12 @@ var ModelRegistry = []ModelSpec{
 	// Bedrock: Zeta work. Runs on the employer AWS account through a coding
 	// harness and hosts both Anthropic Claude and OpenAI models. Bare OpenAI
 	// aliases resolve here; personal work uses the claude/gemini surfaces.
-	{Surface: "bedrock", Alias: "opus", Model: "amazon-bedrock/global.anthropic.claude-opus-5-5", Backend: "opencode", NoShorthand: true},
-	{Surface: "bedrock", Alias: "sonnet", Model: "amazon-bedrock/global.anthropic.claude-sonnet-5-5", Backend: "opencode", NoShorthand: true},
-	{Surface: "bedrock", Alias: "astra", Model: "amazon-bedrock/global.openai.gpt-6-astra", Backend: "opencode"},
-	{Surface: "bedrock", Alias: "sol", Model: "amazon-bedrock/global.openai.gpt-6.1-sol", Backend: "opencode"},
-	{Surface: "bedrock", Alias: "terra", Model: "amazon-bedrock/global.openai.gpt-6.1-terra", Backend: "opencode"},
-	{Surface: "bedrock", Alias: "luna", Model: "amazon-bedrock/global.openai.gpt-6-luna", Backend: "opencode"},
+	{Surface: "bedrock", Alias: "opus", Model: "amazon-bedrock/global.anthropic.claude-opus-5-5", Backend: "pi", NoShorthand: true},
+	{Surface: "bedrock", Alias: "sonnet", Model: "amazon-bedrock/global.anthropic.claude-sonnet-5-5", Backend: "pi", NoShorthand: true},
+	{Surface: "bedrock", Alias: "astra", Model: "amazon-bedrock/global.openai.gpt-6-astra", Backend: "pi"},
+	{Surface: "bedrock", Alias: "sol", Model: "amazon-bedrock/global.openai.gpt-6.1-sol", Backend: "pi"},
+	{Surface: "bedrock", Alias: "terra", Model: "amazon-bedrock/global.openai.gpt-6.1-terra", Backend: "pi"},
+	{Surface: "bedrock", Alias: "luna", Model: "amazon-bedrock/global.openai.gpt-6-luna", Backend: "pi"},
 
 	// Cursor: Zeta work. Runs on the Cursor subscription (cursor-agent login
 	// drose@zetaglobal.com). gemini-4-argon carries no bare shorthand so a
@@ -91,7 +91,7 @@ var ModelRegistry = []ModelSpec{
 		Surface:    "openrouter",
 		Alias:      "deepseek",
 		Model:      "openrouter/deepseek/deepseek-v4.1-flash-1017",
-		Backend:    "opencode",
+		Backend:    "pi",
 		Deprecated: []string{"deepseek-v4.1-flash", "deepseek-v4-flash", "deepseek-v4-pro"},
 		// The September alias resolved to the 20260910 snapshot; 1017 is the
 		// October 17 checkpoint. Pin the family so future snapshots inherit it.
@@ -105,7 +105,7 @@ var ModelRegistry = []ModelSpec{
 		Surface: "openrouter",
 		Alias:   "glm-5.3-flash",
 		Model:   "openrouter/z-ai/glm-5.3-flash",
-		Backend: "opencode",
+		Backend: "pi",
 		Routing: &RoutingPolicy{
 			ProviderOrder:  []string{"Modal", "Z.AI", "Novita", "Together", "Parasail", "DeepInfra"},
 			AllowFallbacks: true,

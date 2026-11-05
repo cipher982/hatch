@@ -169,8 +169,8 @@ func buildTestProviderForCLI(t *testing.T, root string) string {
 
 func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 	for _, test := range []struct{ model, backend, want string }{
-		{"openai/gpt-6-astra", "opencode", "codex.astra"},
-		{"openai/gpt-5.4-nano", "opencode", "codex.nano"},
+		{"openai/gpt-6-astra", "pi", "codex.astra"},
+		{"openai/gpt-5.4-nano", "pi", "codex.nano"},
 		{"kimi-k3", "cursor", "cursor.kimi-k3"},
 		{"gemini-4-argon-medium", "cursor", "cursor.gemini-4-argon"},
 		{"google-antigravity/gemini-4-argon", "omp", "gemini.argon"},
@@ -239,12 +239,16 @@ func TestMainDoctorJSON(t *testing.T) {
 	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3' 'gemini-4-argon-medium - Gemini 4 Argon Medium'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	opencodeBinary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(opencodeBinary, []byte("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode test'; exit 0; fi\n[ \"$2\" = amazon-bedrock ] || [ \"$OPENAI_API_KEY\" = test-secret ] || [ \"$OPENROUTER_API_KEY\" = test-secret ] || exit 9\nprintf '%s\\n' 'amazon-bedrock/global.anthropic.claude-opus-5-5' 'amazon-bedrock/global.anthropic.claude-sonnet-5-5' 'amazon-bedrock/global.openai.gpt-6-astra' 'amazon-bedrock/global.openai.gpt-6.1-sol' 'amazon-bedrock/global.openai.gpt-6.1-terra' 'amazon-bedrock/global.openai.gpt-6-luna' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6.1-terra' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5' 'openrouter/deepseek/deepseek-v4.1-flash-1017' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
 	piBinary := filepath.Join(directory, "pi")
-	if err := os.WriteFile(piBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'pi test'\n"), 0o700); err != nil {
+	piScript := `#!/bin/sh
+if [ "$1" = "--version" ]; then printf '%s\n' 'pi test'; exit 0; fi
+printf '%s\n' 'provider model context' \
+ 'amazon-bedrock global.anthropic.claude-opus-5-5 1M' 'amazon-bedrock global.anthropic.claude-sonnet-5-5 1M' \
+ 'amazon-bedrock global.openai.gpt-6-astra 1M' 'amazon-bedrock global.openai.gpt-6-luna 1M' \
+ 'openai gpt-6-astra 272K' 'openai gpt-6-luna 272K' 'openai gpt-5.4-nano 272K' 'openai gpt-5.4-mini 272K' 'openai gpt-5.5 272K' \
+ 'openrouter z-ai/glm-5.3-flash 1M'
+`
+	if err := os.WriteFile(piBinary, []byte(piScript), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	ompBinary := filepath.Join(directory, "omp")
@@ -260,8 +264,7 @@ printf '%s\n' '{"models":[{"id":"gemini-4-argon","selector":"google-antigravity/
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	t.Setenv("OPENAI_API_KEY", "")
-	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("CURSOR_API_KEY", "")
 	t.Setenv(credentialHelperEnv, helper)
 	var stdout, stderr bytes.Buffer
 	if exit := Main([]string{"doctor", "--json"}, bytes.NewReader(nil), &stdout, &stderr, true); exit != 0 {
@@ -277,7 +280,7 @@ printf '%s\n' '{"models":[{"id":"gemini-4-argon","selector":"google-antigravity/
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || len(result.Checks) != 8 {
+	if !result.OK || len(result.Checks) != 7 {
 		t.Fatalf("doctor = %#v", result)
 	}
 	for _, check := range result.Checks {

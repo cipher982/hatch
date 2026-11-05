@@ -101,7 +101,7 @@
     {
       "node_id": "tests/test_backends.py::TestBackendConfig::test_build_env_strips_dcg_bypass",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestApplyDCGOpenCodeIsolation",
+      "proof": "internal/cli.TestApplyDCGLoadsGuardExtensionIntoPi",
       "reason": null
     },
     {
@@ -233,7 +233,7 @@
     {
       "node_id": "tests/test_backends.py::TestConfigureOpenCode::test_dcg_uses_isolated_config_without_pure",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestApplyDCGOpenCodeIsolation",
+      "proof": "internal/cli.TestApplyDCGLoadsGuardExtensionIntoPi",
       "reason": null
     },
     {
@@ -1007,13 +1007,13 @@
     {
       "node_id": "tests/test_cli.py::TestMain::test_opencode_structured_error_surfaces_in_json",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/opencode_error",
+      "proof": "internal/contracts.TestContractLegacyParity/pi_error",
       "reason": null
     },
     {
       "node_id": "tests/test_cli.py::TestMain::test_opencode_success_surfaces_durable_run_identity",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/opencode_success",
+      "proof": "internal/contracts.TestContractLegacyParity/pi_success",
       "reason": null
     },
     {
@@ -1751,13 +1751,13 @@
     {
       "node_id": "tests/test_runner.py::TestOpenCodeStreamRunSync::test_timeout_preserves_partial_stream_and_isolated_session_state",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/run.TestOpenCodeTimeoutProducesVersionBoundRecoveryHint",
+      "proof": "internal/cli.TestPopulateProviderVersion",
       "reason": null
     },
     {
       "node_id": "tests/test_runner.py::TestOpenCodeStreamRunSync::test_recovers_bedrock_error_from_print_logs_stderr",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/provider.TestInterpretOpenCodeLogError",
+      "proof": "internal/provider.TestInterpretPiSurfacesProviderErrorCarriedOnTheAssistantMessage",
       "reason": null
     },
     {
@@ -1853,7 +1853,7 @@
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[opencode_success]",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/opencode_success",
+      "proof": "internal/contracts.TestContractLegacyParity/pi_success",
       "reason": null
     },
     {
@@ -1889,13 +1889,13 @@
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[opencode_error]",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/opencode_error",
+      "proof": "internal/contracts.TestContractLegacyParity/pi_error",
       "reason": "The corpus records the intentional raw-output projection difference separately while preserving the public error semantics."
     },
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[opencode_missing_terminal]",
       "disposition": "intentional_change",
-      "proof": "internal/contracts.TestContractLegacyParity/opencode_missing_terminal",
+      "proof": "internal/contracts.TestContractLegacyParity/pi_missing_terminal",
       "reason": "Go fails closed when a structured provider never emits a terminal marker; Python treated partial text as success."
     },
     {

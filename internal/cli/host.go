@@ -68,7 +68,7 @@ func applyHostContext(invocation *provider.Invocation, backend string, ctx Execu
 	if ctx.InContainer && !ctx.HomeWritable {
 		invocation.SetEnv["HOME"] = ctx.EffectiveHome()
 	}
-	if backend == "opencode" {
+	if backend == "pi" {
 		applyObservatoryTrust(invocation.SetEnv, ctx)
 	}
 	return applyDCG(invocation, backend, ctx)
@@ -108,21 +108,8 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 		insert := index + 2
 		invocation.Argv = append(invocation.Argv[:insert], append([]string{"--settings", string(settings)}, invocation.Argv[insert:]...)...)
 		invocation.RedactedArgv = append(invocation.RedactedArgv[:insert], append([]string{"--settings", string(settings)}, invocation.RedactedArgv[insert:]...)...)
-	case "opencode":
-		root := filepath.Join(home, ".config", "hatch", "dcg")
-		source := filepath.Join(home, "git", "me", "config", "dcg", "opencode-plugin.js")
-		plugin := filepath.Join(root, "opencode", "plugins", "dcg-guard.js")
-		isolatedBinary := filepath.Join(root, "bin", "dcg")
-		if !exactSymlink(plugin, source) || !regularNonSymlink(source) || !exactSymlink(isolatedBinary, binary) {
-			if required {
-				return fmt.Errorf("Agent Home requires the reviewed OpenCode DCG plugin at %s; run `agents guard install`", plugin)
-			}
-			return nil
-		}
-		invocation.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(root, "opencode")
-		invocation.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] = "1"
-		invocation.Argv = removeArg(invocation.Argv, "--pure")
-		invocation.RedactedArgv = removeArg(invocation.RedactedArgv, "--pure")
+	case "pi":
+		invocation.PiDCGBinary = binary
 	}
 	return nil
 }

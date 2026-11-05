@@ -49,29 +49,6 @@ func (p *ProgressParser) Observe(line []byte) []string {
 		if typeName == "result" && event["subtype"] == "success" && event["is_error"] != true {
 			return []string{completedMessage("Cursor", event["duration_ms"])}
 		}
-	case "opencode":
-		label := p.Label
-		if label == "" {
-			label = "Agent"
-		}
-		if typeName == "step_start" {
-			return []string{startedMessage(label, event, "sessionID")}
-		}
-		if typeName == "tool_use" {
-			part, _ := event["part"].(map[string]any)
-			id, _ := part["callID"].(string)
-			if id != "" && p.seen[id] {
-				return nil
-			}
-			p.seen[id] = true
-			return []string{summarizeOpenCodeTool(part)}
-		}
-		if typeName == "step_finish" {
-			part, _ := event["part"].(map[string]any)
-			if part["reason"] == "stop" {
-				return []string{"[hatch] " + label + " completed"}
-			}
-		}
 	case "pi", "omp":
 		label := p.Label
 		if label == "" {
@@ -168,20 +145,6 @@ func summarizeCursorTool(call map[string]any) string {
 		return "[hatch] Cursor " + name
 	}
 	return "[hatch] Cursor tool"
-}
-
-func summarizeOpenCodeTool(part map[string]any) string {
-	name, _ := part["tool"].(string)
-	name = defaultName(name, "tool")
-	if title, _ := part["title"].(string); title != "" {
-		return fmt.Sprintf("[hatch] %s: %s", name, compact(title))
-	}
-	state, _ := part["state"].(map[string]any)
-	input, _ := state["input"].(map[string]any)
-	if value := firstString(input, "description", "command", "filePath", "path", "pattern", "query"); value != "" {
-		return fmt.Sprintf("[hatch] %s: %s", name, compact(value))
-	}
-	return "[hatch] " + name
 }
 
 func summarizePiLikeTool(event map[string]any) string {

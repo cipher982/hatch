@@ -3,12 +3,9 @@ package run
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -334,61 +331,6 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	if interpretation.NativeID != "" {
 		state.NativeID = &interpretation.NativeID
 	}
-	if req.Invocation.Adapter == "opencode" {
-		state.Capabilities["state_isolation"] = "hatch_per_run"
-		if outcome == OutcomeSucceeded || outcome == OutcomeSucceededWarnings {
-			if pruneErr := discardProviderRuntime(artifact, "opencode"); pruneErr != nil {
-				warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
-				outcome = OutcomeSucceededWarnings
-			}
-			state.Retention = "unavailable"
-			state.Capabilities["snapshot"] = "not_retained_terminal_success"
-			state.Capabilities["inspect"] = "run_artifact_only"
-		} else {
-			snapshot, approved, pruneErr := freezeOpenCodeState(artifact)
-			if pruneErr != nil {
-				warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
-				artifact.Manifest.Capture.State = "degraded"
-			}
-			if approved > 0 {
-				state.SnapshotPath = &snapshot
-				state.Retention = "hatch_preserved"
-				state.Capabilities["snapshot"] = "supported"
-				if req.Invocation.ProviderVersion != "" {
-					state.ProviderVersion = &req.Invocation.ProviderVersion
-				}
-				if state.NativeID != nil && req.Invocation.ProviderVersion != "" {
-					envArgs := openCodeRecoveryEnvironment(artifact, snapshot, req.Invocation)
-					state.InspectHint = &OperatorHint{
-						Argv:         append(append([]string(nil), envArgs...), "opencode", "export", *state.NativeID),
-						VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion,
-					}
-					state.Capabilities["inspect"] = "supported_same_version"
-					if timedOut {
-						argv := append(append([]string(nil), envArgs...), "opencode", "run", "--dangerously-skip-permissions")
-						if targetCWD != "" {
-							argv = append(argv, "--dir", targetCWD)
-						}
-						if hasInvocationArg(req.Invocation.Argv, "--pure") {
-							argv = append(argv, "--pure")
-						}
-						argv = append(argv, "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model)
-						if req.Invocation.ReasoningPolicy.Effort != "" && req.Invocation.ReasoningPolicy.Support != "unsupported" {
-							argv = append(argv, "--variant", req.Invocation.ReasoningPolicy.Effort)
-						}
-						argv = append(argv, "--session", *state.NativeID, "Return only the concise final answer from the evidence already gathered. Do not use tools or expand the investigation.")
-						state.RecoveryHint = &OperatorHint{Argv: argv, VersionBound: true, ProviderVersion: req.Invocation.ProviderVersion, RequiresApprovalBypass: true}
-						state.Capabilities["recovery_hint"] = "best_effort_same_version"
-					}
-				} else if state.NativeID != nil {
-					state.Capabilities["inspect"] = "unsupported"
-				}
-			} else {
-				state.Retention = "unavailable"
-				state.Capabilities["snapshot"] = "unsupported"
-			}
-		}
-	}
 	if req.Invocation.Adapter == "pi" || req.Invocation.Adapter == "omp" {
 		state.Retention = "unavailable"
 		state.Capabilities["state_isolation"] = "hatch_per_run"
@@ -687,37 +629,6 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 	if invocation.SetEnv == nil {
 		invocation.SetEnv = map[string]string{}
 	}
-	if invocation.Adapter == "opencode" {
-		root := filepath.Join(artifact.Path, "provider", "opencode")
-		for name, envName := range map[string]string{
-			"data": "XDG_DATA_HOME", "state": "XDG_STATE_HOME",
-		} {
-			path := filepath.Join(root, name)
-			if err := secureMkdirAll(path); err != nil {
-				return nil, err
-			}
-			invocation.SetEnv[envName] = path
-		}
-		configHome, cacheHome, managedConfig := sharedOpenCodeRuntimeHomes(artifact, *invocation)
-		if managedConfig {
-			if err := secureMkdirAll(filepath.Join(configHome, "opencode")); err != nil {
-				return nil, err
-			}
-		}
-		if err := secureMkdirAll(cacheHome); err != nil {
-			return nil, err
-		}
-		invocation.SetEnv["XDG_CONFIG_HOME"] = configHome
-		invocation.SetEnv["XDG_CACHE_HOME"] = cacheHome
-		if strings.TrimSpace(invocation.SetEnv["OPENCODE_CONFIG_DIR"]) == "" {
-			invocation.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(configHome, "opencode")
-		}
-		invocation.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] = "1"
-		if len(invocation.OpenCodeConfigJSON) > 0 {
-			invocation.SetEnv["OPENCODE_CONFIG_CONTENT"] = string(invocation.OpenCodeConfigJSON)
-		}
-		return func() { _ = discardProviderRuntime(artifact, "opencode") }, nil
-	}
 	if invocation.Adapter == "pi" || invocation.Adapter == "omp" {
 		root := filepath.Join(artifact.Path, "provider", invocation.Adapter)
 		if err := secureMkdirAll(root); err != nil {
@@ -731,6 +642,9 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 		invocation.SetEnv["PI_CODING_AGENT_DIR"] = root
 		invocation.SetEnv["PI_CODING_AGENT_SESSION_DIR"] = sessionDir
 		invocation.SetEnv["PI_TELEMETRY"] = "0"
+		if err := writePiRuntimeFiles(root, invocation); err != nil {
+			return nil, err
+		}
 		return func() { _ = discardProviderRuntime(artifact, invocation.Adapter) }, nil
 	}
 	if isRawCodexInvocation(*invocation) {
@@ -751,23 +665,6 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 		return func() { _ = discardProviderRuntime(artifact, "cursor") }, nil
 	}
 	return func() {}, nil
-}
-
-func sharedOpenCodeRuntimeHomes(artifact *Artifact, invocation provider.Invocation) (string, string, bool) {
-	version := strings.TrimSpace(invocation.ProviderVersion)
-	if version == "" && len(invocation.Argv) > 0 {
-		version = filepath.Base(invocation.Argv[0]) + "-unknown-version"
-	}
-	digest := sha256.Sum256([]byte(version))
-	key := "v-" + hex.EncodeToString(digest[:8])
-	root := filepath.Join(filepath.Dir(filepath.Dir(artifact.Path)), "provider-runtime", "opencode", key)
-	configHome := filepath.Join(root, "config")
-	managedConfig := true
-	if configDir := strings.TrimSpace(invocation.SetEnv["OPENCODE_CONFIG_DIR"]); filepath.Base(configDir) == "opencode" {
-		configHome = filepath.Dir(configDir)
-		managedConfig = false
-	}
-	return configHome, filepath.Join(root, "cache"), managedConfig
 }
 
 func isRawCodexInvocation(invocation provider.Invocation) bool {
@@ -851,27 +748,6 @@ func displayReasoningEffort(policy provider.ReasoningPolicy) string {
 	return policy.Effort
 }
 
-func openCodeRecoveryEnvironment(artifact *Artifact, snapshot string, invocation provider.Invocation) []string {
-	dataHome := filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "data")
-	stateHome := filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "state")
-	values := []struct{ name, value string }{
-		{"XDG_DATA_HOME", dataHome},
-		{"XDG_STATE_HOME", stateHome},
-		{"XDG_CONFIG_HOME", invocation.SetEnv["XDG_CONFIG_HOME"]},
-		{"XDG_CACHE_HOME", invocation.SetEnv["XDG_CACHE_HOME"]},
-		{"OPENCODE_CONFIG_DIR", invocation.SetEnv["OPENCODE_CONFIG_DIR"]},
-		{"OPENCODE_CONFIG_CONTENT", invocation.SetEnv["OPENCODE_CONFIG_CONTENT"]},
-		{"OPENCODE_DISABLE_PROJECT_CONFIG", "1"},
-	}
-	args := []string{"env", "-u", "OPENCODE_CONFIG", "-u", "OPENCODE_CONFIG_CONTENT"}
-	for _, item := range values {
-		if item.value != "" {
-			args = append(args, item.name+"="+item.value)
-		}
-	}
-	return args
-}
-
 func discardProviderRuntime(artifact *Artifact, name string) error {
 	root := filepath.Join(artifact.Path, "provider", name)
 	if err := os.RemoveAll(root); err != nil {
@@ -881,167 +757,26 @@ func discardProviderRuntime(artifact *Artifact, name string) error {
 	return nil
 }
 
-var openCodeStateAllowlist = map[string]bool{
-	"data/opencode/opencode.db":     true,
-	"data/opencode/opencode.db-shm": true,
-	"data/opencode/opencode.db-wal": true,
-	"data/opencode/session.db":      true, // Hermetic compatibility oracle.
-}
-
-func freezeOpenCodeState(artifact *Artifact) (snapshot string, approved int, resultErr error) {
-	providerRoot := filepath.Join(artifact.Path, "provider")
-	liveRoot := filepath.Join(providerRoot, "opencode")
-	tempRoot, err := os.MkdirTemp(providerRoot, ".opencode-snapshot-")
-	if err != nil {
-		return "", 0, err
-	}
-	finished := false
-	defer func() {
-		if !finished {
-			_ = os.RemoveAll(tempRoot)
-			_ = os.RemoveAll(liveRoot)
-		}
-	}()
-
-	for attempt := 0; attempt < 3; attempt++ {
-		if err := os.RemoveAll(tempRoot); err != nil {
-			return "", 0, err
-		}
-		if err := os.MkdirAll(tempRoot, 0o700); err != nil {
-			return "", 0, err
-		}
-		before, err := approvedOpenCodeFingerprints(liveRoot)
-		if err != nil {
-			return "", 0, err
-		}
-		if len(before) == 0 {
-			if err := os.RemoveAll(liveRoot); err != nil {
-				return "", 0, err
-			}
-			if err := os.MkdirAll(liveRoot, 0o500); err != nil {
-				return "", 0, err
-			}
-			if err := os.Chmod(liveRoot, 0o500); err != nil {
-				return "", 0, err
-			}
-			finished = true
-			return "", 0, nil
-		}
-		if err := copyApprovedOpenCodeState(liveRoot, tempRoot, before); err != nil {
-			if attempt == 2 {
-				return "", 0, err
-			}
-			time.Sleep(50 * time.Millisecond)
-			continue
-		}
-		after, err := approvedOpenCodeFingerprints(liveRoot)
-		if err != nil {
-			if attempt == 2 {
-				return "", 0, err
-			}
-			time.Sleep(50 * time.Millisecond)
-			continue
-		}
-		copied, err := approvedOpenCodeFingerprints(tempRoot)
-		if err == nil && maps.Equal(before, after) && maps.Equal(before, copied) {
-			approved = len(copied)
-			break
-		}
-		if attempt == 2 {
-			return "", 0, fmt.Errorf("OpenCode state did not quiesce for a coherent snapshot")
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-
-	snapshotRoot := filepath.Join(providerRoot, "opencode-snapshot")
-	if err := os.Rename(tempRoot, snapshotRoot); err != nil {
-		return "", 0, err
-	}
-	if err := os.RemoveAll(liveRoot); err != nil {
-		return "", 0, err
-	}
-	if err := os.MkdirAll(liveRoot, 0o500); err != nil {
-		return "", 0, err
-	}
-	if err := os.Chmod(liveRoot, 0o500); err != nil {
-		return "", 0, err
-	}
-	finished = true
-	return "provider/opencode-snapshot", approved, nil
-}
-
-func approvedOpenCodeFingerprints(root string) (map[string]string, error) {
-	result := map[string]string{}
-	for relative := range openCodeStateAllowlist {
-		path := filepath.Join(root, filepath.FromSlash(relative))
-		safe, err := regularPathWithoutSymlinkParents(root, relative)
-		if err != nil {
-			return nil, err
-		}
-		if !safe {
-			// Never follow provider-created links or preserve special files.
-			// They are removed with the retired live state below.
-			continue
-		}
-		digest, err := hashFile(path)
-		if err != nil {
-			return nil, err
-		}
-		result[relative] = digest
-	}
-	return result, nil
-}
-
-func regularPathWithoutSymlinkParents(root, relative string) (bool, error) {
-	current := root
-	components := strings.Split(filepath.ToSlash(relative), "/")
-	for index, component := range components {
-		current = filepath.Join(current, component)
-		info, err := os.Lstat(current)
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		if info.Mode()&os.ModeSymlink != 0 {
-			return false, nil
-		}
-		if index < len(components)-1 && !info.IsDir() {
-			return false, nil
-		}
-		if index == len(components)-1 && !info.Mode().IsRegular() {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func copyApprovedOpenCodeState(sourceRoot, destinationRoot string, files map[string]string) error {
-	for relative := range files {
-		source := filepath.Join(sourceRoot, filepath.FromSlash(relative))
-		destination := filepath.Join(destinationRoot, filepath.FromSlash(relative))
-		if err := secureMkdirAll(filepath.Dir(destination)); err != nil {
+// writePiRuntimeFiles gives a Pi run its per-run models.json and DCG guard
+// extension. The user's own models.json, if any, is replaced for this run only.
+func writePiRuntimeFiles(root string, invocation *provider.Invocation) error {
+	if len(invocation.PiModelsJSON) > 0 {
+		path := filepath.Join(root, "models.json")
+		_ = os.Remove(path) // may be a symlink to the user's file; never write through it
+		if err := os.WriteFile(path, invocation.PiModelsJSON, 0o600); err != nil {
 			return err
 		}
-		input, err := os.Open(source)
-		if err != nil {
+	}
+	if invocation.PiDCGBinary != "" {
+		path := filepath.Join(root, "dcg-guard.mjs")
+		if err := os.WriteFile(path, provider.PiDCGGuardSource(), 0o600); err != nil {
 			return err
 		}
-		output, err := openPrivate(destination)
-		if err != nil {
-			input.Close()
-			return err
-		}
-		_, copyErr := io.Copy(output, input)
-		inputCloseErr := input.Close()
-		syncErr := output.Sync()
-		outputCloseErr := output.Close()
-		for _, err := range []error{copyErr, inputCloseErr, syncErr, outputCloseErr} {
-			if err != nil {
-				return err
-			}
-		}
+		invocation.SetEnv["HATCH_DCG_BINARY"] = invocation.PiDCGBinary
+		last := len(invocation.Argv) - 1
+		invocation.Argv = append(invocation.Argv[:last], "-e", path, invocation.Argv[last])
+		redacted := len(invocation.RedactedArgv) - 1
+		invocation.RedactedArgv = append(invocation.RedactedArgv[:redacted], "-e", path, invocation.RedactedArgv[redacted])
 	}
 	return nil
 }

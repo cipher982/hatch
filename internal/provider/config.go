@@ -2,7 +2,6 @@ package provider
 
 import (
 	"fmt"
-	"strings"
 )
 
 const boundedRunContract = `Hatch execution contract:
@@ -42,11 +41,12 @@ type Invocation struct {
 	Adapter         string
 	ProviderVersion string
 	ReasoningPolicy ReasoningPolicy
-	// OpenCodeConfigJSON, when set, is written into the per-run OpenCode
-	// config dir as opencode.json before launch. Carries routing pins (for
-	// example an OpenRouter provider order that keeps prefix caching warm);
-	// never contains credentials.
-	OpenCodeConfigJSON []byte
+	// PiModelsJSON, when set, is written into the per-run Pi config dir as
+	// models.json before launch (see PiModelsJSON). Never contains credentials.
+	PiModelsJSON []byte
+	// PiDCGBinary, when set, loads the DCG guard extension into the Pi run and
+	// tells it which dcg executable to ask before every bash command.
+	PiDCGBinary string
 	// ReadOnlyMechanism names how a ReadOnly request is enforced; empty
 	// when the run is not read-only.
 	ReadOnlyMechanism string
@@ -57,9 +57,6 @@ func PreparePrompt(prompt string) string {
 }
 
 func Build(req Request) (Invocation, error) {
-	if req.Backend == "opencode" && req.Model == "" {
-		return Invocation{}, fmt.Errorf("OpenCode backend requires an explicit model")
-	}
 	policy, err := ResolveReasoning(req.Backend, req.Model, req.ReasoningEffort)
 	if err != nil {
 		return Invocation{}, err
@@ -142,41 +139,6 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 			invocation.SetEnv["CURSOR_API_KEY"] = req.APIKey
 		}
 		return invocation, nil
-	case "opencode":
-		if req.Model == "" {
-			return Invocation{}, fmt.Errorf("OpenCode backend requires an explicit model")
-		}
-		argv := []string{"opencode", "run", "--dangerously-skip-permissions"}
-		if req.CWD != "" {
-			argv = append(argv, "--dir", req.CWD)
-		}
-		argv = append(argv, "--pure", "--print-logs", "--log-level", "ERROR", "--format", "json", "-m", req.Model)
-		if policy.Effort != "" && policy.Support != "unsupported" {
-			argv = append(argv, "--variant", policy.Effort)
-		}
-		argv = append(argv, prompt)
-		invocation := Invocation{
-			Argv:         argv,
-			SetEnv:       map[string]string{},
-			StreamFormat: "jsonl", Adapter: "opencode", ReasoningPolicy: policy,
-			UnsetEnv: []string{
-				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "OPENAI_API_KEY", "CODEX_API_KEY",
-				"OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "OPENCODE_CONFIG_DIR", "OPENCODE_DISABLE_PROJECT_CONFIG",
-				"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME",
-			},
-		}
-		if strings.HasPrefix(req.Model, "openai/") && req.APIKey != "" {
-			invocation.SetEnv["OPENAI_API_KEY"] = req.APIKey
-		}
-		if strings.HasPrefix(req.Model, "openrouter/") && req.APIKey != "" {
-			invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey
-		}
-		invocation.OpenCodeConfigJSON = openCodeConfigJSON(req.Model, policy.Effort, req.ReadOnly)
-		if strings.HasPrefix(req.Model, "amazon-bedrock/") {
-			invocation.SetEnv["AWS_PROFILE"] = BedrockAWSProfile
-			invocation.SetEnv["AWS_REGION"] = BedrockAWSRegion
-		}
-		return redactInvocation(invocation, len(invocation.Argv)-1), nil
 	case "pi", "omp":
 		return buildPiLikeInvocation(req, policy)
 	case "codex":
@@ -226,112 +188,4 @@ func redactInvocation(invocation Invocation, promptIndices ...int) Invocation {
 		}
 	}
 	return invocation
-}
-
-// openAIPriorityServiceTier is the OpenAI service tier that puts a request in
-// the priority processing queue.
-const openAIPriorityServiceTier = "priority"
-
-// OpenCodeCatalogConfigJSON adds explicit GPT-6.1 Sol and GPT-6 Luna entries to
-// OpenCode's built-in OpenAI catalog. The same model definitions are injected
-// per run and into doctor probes.
-func OpenCodeCatalogConfigJSON() []byte {
-	models := make(map[string]any, len(openAIGPT6Models))
-	for id, definition := range openAIGPT6Models {
-		models[id] = definition
-	}
-	return encodeOpenCodeConfig(map[string]any{"provider": map[string]any{
-		"openai": map[string]any{"models": models},
-	}})
-}
-
-var openAIGPT6Models = map[string]map[string]any{
-	"gpt-6.1-sol":   openAIGPT6Model("GPT-6.1 Sol", "low", "medium", "high", "xhigh", "max"),
-	"gpt-6.1-terra": openAIGPT6Model("GPT-6.1 Terra", "none", "low", "medium", "high", "xhigh", "max"),
-	"gpt-6-luna":    openAIGPT6Model("GPT-6 Luna", "none", "low", "medium", "high", "xhigh", "max"),
-}
-
-// openAIGPT6Model declares a model with one OpenCode variant per reasoning
-// effort the API accepts for it (GPT-6 Astra and GPT-6.1 Sol reject "none").
-func openAIGPT6Model(name string, efforts ...string) map[string]any {
-	variants := make(map[string]any, len(efforts))
-	for _, effort := range efforts {
-		variants[effort] = map[string]any{
-			"reasoningEffort":  effort,
-			"reasoningSummary": "auto",
-			"include":          []string{"reasoning.encrypted_content"},
-		}
-	}
-	return map[string]any{
-		"name":       name,
-		"reasoning":  true,
-		"tool_call":  true,
-		"attachment": true,
-		"limit": map[string]any{
-			"context": 1_050_000,
-			"input":   922_000,
-			"output":  128_000,
-		},
-		"modalities": map[string]any{
-			"input":  []string{"text", "image"},
-			"output": []string{"text"},
-		},
-		"variants": variants,
-	}
-}
-
-// openCodeConfigJSON returns the per-run OpenCode configuration for one model:
-// custom GPT-6 catalog entries, aggregator routing pins, and priority processing
-// when the model and reasoning effort call for it.
-func openCodeConfigJSON(model, effort string, readOnly bool) []byte {
-	providers := map[string]any{}
-	if strings.HasPrefix(model, "openrouter/") {
-		if routing := FindRoutingPolicy(model); routing != nil {
-			providers["openrouter"] = map[string]any{
-				"models": map[string]any{
-					strings.TrimPrefix(model, "openrouter/"): map[string]any{
-						"options": map[string]any{
-							"provider": map[string]any{
-								"order":           routing.ProviderOrder,
-								"allow_fallbacks": routing.AllowFallbacks,
-							},
-						},
-					},
-				},
-			}
-		}
-	}
-	modelID := strings.TrimPrefix(model, "openai/")
-	openAIModel, hasOpenAIModel := openAIGPT6Models[modelID]
-	if hasOpenAIModel || RequestsPriorityTier(model, effort) {
-		modelConfig := make(map[string]any, len(openAIModel)+1)
-		for key, value := range openAIModel {
-			modelConfig[key] = value
-		}
-		if RequestsPriorityTier(model, effort) {
-			modelConfig["options"] = map[string]any{"serviceTier": openAIPriorityServiceTier}
-		}
-		providers["openai"] = map[string]any{
-			"models": map[string]any{modelID: modelConfig},
-		}
-	}
-	if len(providers) == 0 && !readOnly {
-		return nil
-	}
-	config := map[string]any{}
-	if len(providers) > 0 {
-		config["provider"] = providers
-	}
-	if readOnly {
-		config["permission"] = openCodeReadOnlyPermission()
-	}
-	return encodeOpenCodeConfig(config)
-}
-
-func encodeOpenCodeConfig(config map[string]any) []byte {
-	encoded, err := marshalPlain(config)
-	if err != nil {
-		panic("static opencode config cannot fail to marshal")
-	}
-	return encoded
 }

@@ -105,8 +105,8 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 			case "-b", "--backend":
 				req.Backend = value
 			case "--harness":
-				if !oneOf(value, "opencode", "pi", "omp") {
-					return req, fmt.Errorf("invalid harness %q. Choose one of: opencode, pi, omp", value)
+				if !oneOf(value, "pi", "omp") {
+					return req, fmt.Errorf("invalid harness %q. Choose one of: pi, omp", value)
 				}
 				req.Harness = value
 			case "--model":
@@ -164,7 +164,7 @@ func normalizeSurface(args []string) ([]string, error) {
 	index := aliasCandidateIndex(args)
 	if index < 0 {
 		if hasExplicitModel {
-			return append([]string{"--backend", "opencode"}, args...), nil
+			return append([]string{"--backend", "pi"}, args...), nil
 		}
 		return append([]string(nil), args...), nil
 	}
@@ -172,7 +172,7 @@ func normalizeSurface(args []string) ([]string, error) {
 	surface, ok := surfaces[surfaceName]
 	if !ok {
 		if hasExplicitModel {
-			return append([]string{"--backend", "opencode"}, args...), nil
+			return append([]string{"--backend", "pi"}, args...), nil
 		}
 		return append([]string(nil), args...), nil
 	}

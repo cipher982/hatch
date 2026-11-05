@@ -27,15 +27,6 @@ func TestProgressParserDeduplicatesToolsAndReportsLifecycle(t *testing.T) {
 			want: []string{"[hatch] Cursor shell: go test ./..."},
 		},
 		{
-			name: "opencode", adapter: "opencode", label: "OpenRouter",
-			lines: []string{
-				`{"type":"step_start","sessionID":"ses_123456789"}`,
-				`{"type":"tool_use","part":{"callID":"call-1","tool":"bash","state":{"input":{"description":"run tests"}}}}`,
-				`{"type":"step_finish","part":{"reason":"stop"}}`,
-			},
-			want: []string{"[hatch] OpenRouter started (session ses_1234)", "[hatch] bash: run tests", "[hatch] OpenRouter completed"},
-		},
-		{
 			name: "omp", adapter: "omp", label: "OpenRouter",
 			lines: []string{
 				`{"type":"session","id":"omp_123456789"}`,

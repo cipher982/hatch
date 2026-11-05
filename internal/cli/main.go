@@ -86,7 +86,7 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 		inheritFromPriorRun(&request, loaded)
 	}
 	if request.Harness != "" {
-		if !oneOf(request.Backend, "opencode", "pi", "omp") {
+		if !oneOf(request.Backend, "pi", "omp") {
 			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for bedrock, codex, gemini, or openrouter surfaces"))
 		}
 		request.Backend = request.Harness
@@ -94,8 +94,8 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if request.Backend == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("No default model is configured; choose an explicit provider"))
 	}
-	if !oneOf(request.Backend, "claude", "cursor", "codex", "gemini", "opencode", "pi", "omp") {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, codex, gemini, opencode, pi, omp", request.Backend))
+	if !oneOf(request.Backend, "claude", "cursor", "codex", "gemini", "pi", "omp") {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, codex, gemini, pi, omp", request.Backend))
 	}
 	if request.CWD != "" {
 		info, statErr := os.Stat(request.CWD)
@@ -212,12 +212,8 @@ func runDoctor(args []string, stdout, stderr io.Writer) int {
 		return renderConfigError(jsonOutput, stdout, stderr, fmt.Errorf("unrecognized argument: %s", arg))
 	}
 	cursor, cursorErr := resolveCredential("", "CURSOR_API_KEY")
-	openAI, openAIErr := resolveCredential("", "OPENAI_API_KEY")
-	openRouter, openRouterErr := resolveCredential("", "OPENROUTER_API_KEY")
 	checks := doctor.Run(doctor.Options{
-		Cursor:     doctor.Credential{Value: cursor, ResolutionError: cursorErr},
-		OpenAI:     doctor.Credential{Value: openAI, ResolutionError: openAIErr},
-		OpenRouter: doctor.Credential{Value: openRouter, ResolutionError: openRouterErr},
+		Cursor: doctor.Credential{Value: cursor, ResolutionError: cursorErr},
 	})
 	ok := true
 	for _, check := range checks {
@@ -295,7 +291,7 @@ func identity(backend, model string) (string, string) {
 		return "cursor.raw", "cursor"
 	case "gemini":
 		return "gemini.raw", "google"
-	case "opencode", "pi", "omp":
+	case "pi", "omp":
 		for alias, configured := range surfaces["bedrock"].models {
 			if configured == model {
 				return "bedrock." + alias, "bedrock"
@@ -346,8 +342,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
 One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenRouter, and expert calls
 
 Coding harness selection:
-  --harness opencode     Use OpenCode (default for bedrock, codex, and openrouter)
-  --harness pi           Use Pi
+  --harness pi           Use Pi (default for bedrock, codex, and openrouter)
   --harness omp          Use Oh My Pi (default for gemini)
 
 Model-first aliases (each surface bills a different account):
@@ -392,7 +387,7 @@ Common options:
   --caller-request ID  Group runs from one request (or HATCH_CALLER_REQUEST_ID)
   --max-output-bytes N  Inline answer preview, 256..32768 bytes (default: 8192)
   -t, --timeout SEC    Hard timeout (default: 1800)
-  --harness NAME       Select opencode, pi, or omp for bedrock/codex/gemini/openrouter
+  --harness NAME       Select pi or omp for bedrock/codex/gemini/openrouter
   --reasoning-effort LEVEL  none|low|medium|high|xhigh|max
   -r, --resume RUN_ID  Continue an earlier Hatch run (see above)
   --read-only          No file edits and no builds, tests or other programs (every surface)

@@ -68,21 +68,6 @@ func main() {
 			"type": "result", "subtype": "success", "is_error": false,
 			"duration_ms": 1250, "result": "fake cursor kimi output",
 		})
-	case "success_opencode":
-		writeOpenCodeState()
-		emitJSON(map[string]any{
-			"type": "step_start", "sessionID": "ses_oracle1234",
-		})
-		emitJSON(map[string]any{
-			"type": "text",
-			"part": map[string]any{
-				"text":     "fake opencode output",
-				"metadata": map[string]any{"openai": map[string]any{"phase": "final_answer"}},
-			},
-		})
-		emitJSON(map[string]any{
-			"type": "step_finish", "part": map[string]any{"reason": "stop"},
-		})
 	case "success_pi", "success_omp":
 		emitJSON(map[string]any{"type": "session", "id": os.Getenv("HATCH_TEST_SESSION")})
 		emitJSON(map[string]any{
@@ -90,25 +75,21 @@ func main() {
 			"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": "fake " + os.Getenv("HATCH_TEST_SCENARIO") + " output"}}},
 		})
 		emitJSON(map[string]any{"type": "agent_end", "isTerminal": true})
+	case "pi_error":
+		emitJSON(map[string]any{"type": "session", "id": "pi-error-session"})
+		emitJSON(map[string]any{"type": "message_end", "message": map[string]any{"role": "assistant", "content": []any{}, "stopReason": "error", "errorMessage": "provider unavailable"}})
+		emitJSON(map[string]any{"type": "agent_end", "isTerminal": true})
+	case "pi_transient_then_success":
+		emitJSON(map[string]any{"type": "session", "id": "pi-recovered-session"})
+		emitJSON(map[string]any{"type": "message_end", "message": map[string]any{"role": "assistant", "content": []any{}, "stopReason": "error", "errorMessage": "transient transport error"}})
+		emitJSON(map[string]any{"type": "message_end", "message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": "recovered answer"}}}})
+		emitJSON(map[string]any{"type": "agent_end", "isTerminal": true})
+	case "pi_missing_terminal":
+		emitJSON(map[string]any{"type": "session", "id": "pi-incomplete-session"})
+		emitJSON(map[string]any{"type": "message_update", "delta": "useful evidence"})
 	case "cursor_error":
 		emitJSON(map[string]any{"type": "system", "subtype": "init", "session_id": "cursor-error-session"})
 		emitJSON(map[string]any{"type": "result", "subtype": "error", "is_error": true, "result": "request rejected"})
-	case "opencode_error":
-		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_error"})
-		emitJSON(map[string]any{"type": "error", "error": map[string]any{"data": map[string]any{"message": "provider unavailable"}}})
-	case "opencode_transient_then_success":
-		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_recovered"})
-		emitJSON(map[string]any{"type": "error", "error": map[string]any{"data": map[string]any{"message": "transient transport error"}}})
-		emitJSON(map[string]any{"type": "text", "part": map[string]any{"text": "recovered answer", "metadata": map[string]any{"openai": map[string]any{"phase": "final_answer"}}}})
-		emitJSON(map[string]any{"type": "step_finish", "part": map[string]any{"reason": "stop"}})
-	case "opencode_missing_terminal":
-		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_incomplete"})
-		emitJSON(map[string]any{"type": "text", "part": map[string]any{"text": "useful evidence"}})
-	case "hang_opencode":
-		writeOpenCodeState()
-		emitJSON(map[string]any{"type": "step_start", "sessionID": "ses_timeout"})
-		emitJSON(map[string]any{"type": "text", "part": map[string]any{"text": "partial evidence"}})
-		time.Sleep(10 * time.Second)
 	case "stderr_nonzero":
 		fmt.Fprintln(os.Stderr, "fake provider failure")
 		os.Exit(23)
@@ -172,8 +153,8 @@ func main() {
 	}
 }
 
-// startDetachedSentinelChild starts a child in its own session (as OpenCode does
-// for each bash command) that writes HATCH_CHILD_SENTINEL if it is left alive.
+// startDetachedSentinelChild starts a child in its own session (as a coding
+// agent's bash tool can) that writes HATCH_CHILD_SENTINEL if it is left alive.
 // It has no pipes to the parent, so it cannot be reaped through them.
 func startDetachedSentinelChild() {
 	child := exec.Command(os.Args[0])
@@ -182,24 +163,6 @@ func startDetachedSentinelChild() {
 	if err := child.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(92)
-	}
-}
-
-func writeOpenCodeState() {
-	if dataHome := os.Getenv("XDG_DATA_HOME"); dataHome != "" {
-		stateDir := filepath.Join(dataHome, "opencode")
-		if err := os.MkdirAll(stateDir, 0o700); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(94)
-		}
-		if err := os.WriteFile(filepath.Join(stateDir, "session.db"), []byte("fake opencode state"), 0o600); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(94)
-		}
-		if err := os.WriteFile(filepath.Join(stateDir, "auth.json"), []byte("fake credential that must be pruned"), 0o600); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(94)
-		}
 	}
 }
 

@@ -4,12 +4,11 @@ This directory holds reproducible comparisons of the coding harnesses behind
 Hatch. The public switch is:
 
 ```bash
-hatch astra --harness opencode --json "task"
 hatch astra --harness pi --json "task"
 hatch astra --harness omp --json "task"
 ```
 
-OpenCode remains the default for the `codex` and `openrouter` surfaces. The
+Pi is the default for the `bedrock`, `codex` and `openrouter` surfaces (OpenCode was removed). The
 evaluation harness must always make the selected implementation explicit in
 its output metadata.
 

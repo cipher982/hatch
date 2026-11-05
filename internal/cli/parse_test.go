@@ -9,8 +9,8 @@ func TestParseSurfacedCommands(t *testing.T) {
 	}{
 		{[]string{"claude", "haiku", "--json", "-"}, "claude", "claude-haiku-5-5"},
 		{[]string{"claude", "sonnet", "--json", "-"}, "claude", "claude-sonnet-5-5"},
-		{[]string{"bedrock", "opus", "--json", "-"}, "opencode", "amazon-bedrock/global.anthropic.claude-opus-5-5"},
-		{[]string{"bedrock", "sonnet", "--json", "-"}, "opencode", "amazon-bedrock/global.anthropic.claude-sonnet-5-5"},
+		{[]string{"bedrock", "opus", "--json", "-"}, "pi", "amazon-bedrock/global.anthropic.claude-opus-5-5"},
+		{[]string{"bedrock", "sonnet", "--json", "-"}, "pi", "amazon-bedrock/global.anthropic.claude-sonnet-5-5"},
 		{[]string{"claude", "fable", "--json", "-"}, "claude", "claude-fable-5-1"},
 		{[]string{"claude", "fable-5.1", "--json", "-"}, "claude", "claude-fable-5-1"},
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "grok-4.7-high"},
@@ -18,12 +18,12 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"cursor", "gemini-4-argon", "--json", "-"}, "cursor", "gemini-4-argon-medium"},
 		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-4-argon"},
 		{[]string{"gemini", "argon", "--json", "-"}, "omp", "google-antigravity/gemini-4-argon"},
-		{[]string{"codex", "astra", "--json", "-"}, "opencode", "openai/gpt-6-astra"},
-		{[]string{"codex", "sol", "--json", "-"}, "opencode", "openai/gpt-6.1-sol"},
-		{[]string{"codex", "terra", "--json", "-"}, "opencode", "openai/gpt-6.1-terra"},
-		{[]string{"codex", "luna", "--json", "-"}, "opencode", "openai/gpt-6-luna"},
-		{[]string{"openrouter", "deepseek", "--json", "-"}, "opencode", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
-		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "opencode", "openrouter/z-ai/glm-5.3-flash"},
+		{[]string{"codex", "astra", "--json", "-"}, "pi", "openai/gpt-6-astra"},
+		{[]string{"codex", "sol", "--json", "-"}, "pi", "openai/gpt-6.1-sol"},
+		{[]string{"codex", "terra", "--json", "-"}, "pi", "openai/gpt-6.1-terra"},
+		{[]string{"codex", "luna", "--json", "-"}, "pi", "openai/gpt-6-luna"},
+		{[]string{"openrouter", "deepseek", "--json", "-"}, "pi", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
+		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "pi", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
 		got, err := Parse(test.args, true)
@@ -60,7 +60,7 @@ func TestParseExplicitHarness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "openai/gpt-6-astra" {
+	if got.Backend != "pi" || got.Harness != "omp" || got.Model != "openai/gpt-6-astra" {
 		t.Fatalf("parsed harness = %#v", got)
 	}
 }
@@ -70,7 +70,7 @@ func TestParseCodexTierShorthand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Backend != "opencode" || got.Harness != "omp" || got.Model != "amazon-bedrock/global.openai.gpt-6-astra" || len(got.PromptArgs) != 1 || got.PromptArgs[0] != "prompt" {
+	if got.Backend != "pi" || got.Harness != "omp" || got.Model != "amazon-bedrock/global.openai.gpt-6-astra" || len(got.PromptArgs) != 1 || got.PromptArgs[0] != "prompt" {
 		t.Fatalf("parsed shorthand = %#v", got)
 	}
 }
@@ -83,15 +83,15 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"sonnet", "claude", "claude-sonnet-5-5"},
 		{"fable", "claude", "claude-fable-5-1"},
 		{"fable-5.1", "claude", "claude-fable-5-1"},
-		{"astra", "opencode", "amazon-bedrock/global.openai.gpt-6-astra"},
-		{"sol", "opencode", "amazon-bedrock/global.openai.gpt-6.1-sol"},
-		{"terra", "opencode", "amazon-bedrock/global.openai.gpt-6.1-terra"},
-		{"luna", "opencode", "amazon-bedrock/global.openai.gpt-6-luna"},
+		{"astra", "pi", "amazon-bedrock/global.openai.gpt-6-astra"},
+		{"sol", "pi", "amazon-bedrock/global.openai.gpt-6.1-sol"},
+		{"terra", "pi", "amazon-bedrock/global.openai.gpt-6.1-terra"},
+		{"luna", "pi", "amazon-bedrock/global.openai.gpt-6-luna"},
 		{"grok", "cursor", "grok-4.7-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
 		{"argon", "omp", "google-antigravity/gemini-4-argon"},
-		{"deepseek", "opencode", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
-		{"glm-5.3-flash", "opencode", "openrouter/z-ai/glm-5.3-flash"},
+		{"deepseek", "pi", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
+		{"glm-5.3-flash", "pi", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
 		t.Run(test.alias, func(t *testing.T) {
@@ -113,13 +113,13 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 	}{
 		{"explicit backend wins", []string{"-b", "zai", "codex", "review"}, []string{"-b", "zai", "codex", "review"}},
 		{"explicit backend equals wins", []string{"--backend=gemini", "claude", "review"}, []string{"--backend=gemini", "claude", "review"}},
-		{"explicit model wins", []string{"codex", "--model", "openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model", "openai/gpt-5.4", "review"}},
-		{"explicit model equals routes", []string{"--model=openai/gpt-5.4", "review"}, []string{"--backend", "opencode", "--model=openai/gpt-5.4", "review"}},
-		{"model shorthand", []string{"astra", "review"}, []string{"--backend", "opencode", "--model", "amazon-bedrock/global.openai.gpt-6-astra", "review"}},
+		{"explicit model wins", []string{"codex", "--model", "openai/gpt-5.4", "review"}, []string{"--backend", "pi", "--model", "openai/gpt-5.4", "review"}},
+		{"explicit model equals routes", []string{"--model=openai/gpt-5.4", "review"}, []string{"--backend", "pi", "--model=openai/gpt-5.4", "review"}},
+		{"model shorthand", []string{"astra", "review"}, []string{"--backend", "pi", "--model", "amazon-bedrock/global.openai.gpt-6-astra", "review"}},
 		{"cursor raw override", []string{"cursor", "grok", "--model", "cursor-grok-4.5-low", "review"}, []string{"--backend", "cursor", "--model", "cursor-grok-4.5-low", "review"}},
 		{"option value provider", []string{"--cwd", "claude", "review"}, []string{"--cwd", "claude", "review"}},
 		{"option equals provider", []string{"--cwd=claude", "review"}, []string{"--cwd=claude", "review"}},
-		{"model value provider", []string{"--model", "claude", "review"}, []string{"--backend", "opencode", "--model", "claude", "review"}},
+		{"model value provider", []string{"--model", "claude", "review"}, []string{"--backend", "pi", "--model", "claude", "review"}},
 		{"double dash", []string{"--", "claude", "review"}, []string{"--", "claude", "review"}},
 		{"surface help", []string{"codex", "--help"}, []string{"codex", "--help"}},
 		{"surface advanced help", []string{"claude", "--advanced-help"}, []string{"claude", "--advanced-help"}},
@@ -192,8 +192,8 @@ func TestParseTerraRoutesToBedrockByDefault(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Parse(%v) rejected terra: %v", test.args, err)
 		}
-		if got.Model != test.want || got.Backend != "opencode" {
-			t.Fatalf("Parse(%v) = %#v, want %s on opencode", test.args, got, test.want)
+		if got.Model != test.want || got.Backend != "pi" {
+			t.Fatalf("Parse(%v) = %#v, want %s on pi", test.args, got, test.want)
 		}
 	}
 }
@@ -234,7 +234,7 @@ func TestParseReadOnlyFlag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !req.ReadOnly || req.TimeoutSeconds != 300 || req.Backend != "opencode" || len(req.PromptArgs) != 1 {
+	if !req.ReadOnly || req.TimeoutSeconds != 300 || req.Backend != "pi" || len(req.PromptArgs) != 1 {
 		t.Fatalf("request = %#v", req)
 	}
 	if plain, err := Parse([]string{"openrouter", "deepseek", "prompt"}, false); err != nil || plain.ReadOnly {

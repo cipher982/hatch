@@ -21,7 +21,7 @@ func configureProcess(cmd *exec.Cmd) {
 
 // killRunProcesses ends everything a provider run started. Killing the process
 // group is not enough: a provider that launches each shell command detached
-// (OpenCode does) puts it in its own session, so a hung `cargo test` outlives
+// (a coding agent's bash tool can) puts it in its own session, so a hung `cargo test` outlives
 // its parent. The run's descendants are read from the process table before the
 // group dies, and any survivor that still carries the run's HATCH_RUN_ID (every
 // child inherits it) is swept afterwards, which also catches orphans already

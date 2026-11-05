@@ -3,7 +3,7 @@
   "name": "bedrock_success",
   "provider_binaries": [
     "aws",
-    "opencode"
+    "pi"
   ],
   "arguments": [
     "bedrock",
@@ -12,7 +12,7 @@
     "-"
   ],
   "stdin": "oracle prompt",
-  "scenario": "success_opencode",
+  "scenario": "success_pi",
   "expected": {
     "exit_code": 0,
     "stderr_contains": [
@@ -22,31 +22,35 @@
     "result": {
       "ok": true,
       "status": "ok",
-      "output": "fake opencode output",
+      "output": "fake success_pi output",
       "exit_code": 0,
       "error": null,
       "stderr": "",
       "artifact_path": "$ARTIFACT",
-      "session_id": "ses_oracle1234",
+      "session_id": "pi-session-oracle",
       "resume_command": null
     },
     "provider_argv": [
-      "opencode",
-      "run",
-      "--dangerously-skip-permissions",
-      "--pure",
-      "--print-logs",
-      "--log-level",
-      "ERROR",
-      "--format",
+      "pi",
+      "--print",
+      "--mode",
       "json",
-      "-m",
+      "--no-session",
+      "--approve",
+      "--no-extensions",
+      "--no-skills",
+      "--no-prompt-templates",
+      "--no-themes",
+      "--model",
       "amazon-bedrock/global.anthropic.claude-sonnet-5-5",
-      "--variant",
+      "--thinking",
       "low",
       "$PREPARED_PROMPT"
     ],
     "provider_stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "provider_stdin_bytes": 0
+  },
+  "environment": {
+    "HATCH_TEST_SESSION": "pi-session-oracle"
   }
 }

@@ -66,7 +66,7 @@ func IsValidReasoningEffort(value string) bool {
 
 // ResolveReasoning applies Hatch's policy before a provider process or HTTP
 // request is created. Known OpenAI model variants are checked here because
-// OpenCode's --variant flag is provider-specific rather than a universal
+// Pi's --thinking levels are provider-specific rather than a universal
 // reasoning API.
 func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error) {
 	if requested != "" && !IsValidReasoningEffort(requested) {
@@ -80,26 +80,6 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 		return resolveNativeReasoning("Codex", requested, model)
 	case "expert":
 		return resolveNativeReasoning("Expert", requested, model)
-	case "opencode":
-		if model == "" {
-			return ReasoningPolicy{}, fmt.Errorf("OpenCode backend requires an explicit model")
-		}
-		if isBedrockOpenAIModel(model) {
-			return resolveOpenCodeOpenAIReasoning(model, requested)
-		}
-		if isBedrockSurfaceModel(model) {
-			return resolveClaudeReasoning(requested)
-		}
-		if strings.HasPrefix(model, "openai/") {
-			return resolveOpenCodeOpenAIReasoning(model, requested)
-		}
-		if strings.HasPrefix(model, "openrouter/z-ai/glm-5.3-flash") {
-			return resolveOpenCodeGLMReasoning(model, requested)
-		}
-		if requested != "" {
-			return ReasoningPolicy{}, fmt.Errorf("--reasoning-effort is unsupported for OpenCode model %q", model)
-		}
-		return ReasoningPolicy{Source: "unsupported", Support: "unsupported"}, nil
 	case "pi", "omp":
 		return resolvePiLikeReasoning(backend, model, requested)
 	case "cursor", "gemini":
@@ -120,13 +100,13 @@ func resolvePiLikeReasoning(backend, model, requested string) (ReasoningPolicy, 
 		return ReasoningPolicy{}, fmt.Errorf("%s backend requires an explicit model", backend)
 	}
 	if isBedrockOpenAIModel(model) {
-		return resolveOpenCodeOpenAIReasoning(model, requested)
+		return resolvePiOpenAIReasoning(model, requested)
 	}
 	if isBedrockSurfaceModel(model) {
 		return resolveClaudeReasoning(requested)
 	}
 	if strings.HasPrefix(model, "openai/") {
-		return resolveOpenCodeOpenAIReasoning(model, requested)
+		return resolvePiOpenAIReasoning(model, requested)
 	}
 	if strings.HasPrefix(model, "google-antigravity/") || strings.HasPrefix(model, "google/") {
 		effort, source := requested, "explicit"
@@ -170,11 +150,11 @@ func resolveNativeReasoning(providerName, requested, model string) (ReasoningPol
 	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
 }
 
-func resolveOpenCodeOpenAIReasoning(model, requested string) (ReasoningPolicy, error) {
+func resolvePiOpenAIReasoning(model, requested string) (ReasoningPolicy, error) {
 	known, supportsNone, supportsMax := knownOpenAIModel(model)
 	if !known {
 		if requested == "" {
-			return ReasoningPolicy{}, fmt.Errorf("OpenCode model %q has no verified reasoning variants; pass --reasoning-effort explicitly", model)
+			return ReasoningPolicy{}, fmt.Errorf("model %q has no verified reasoning variants; pass --reasoning-effort explicitly", model)
 		}
 		return ReasoningPolicy{Effort: requested, Source: "explicit", Support: "unknown"}, nil
 	}
@@ -183,15 +163,7 @@ func resolveOpenCodeOpenAIReasoning(model, requested string) (ReasoningPolicy, e
 		effort, source = DefaultReasoningEffort, "default"
 	}
 	if effort == "max" && !supportsMax || effort == "none" && !supportsNone {
-		return ReasoningPolicy{}, fmt.Errorf("reasoning effort %q is not supported by OpenCode model %q", effort, model)
-	}
-	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
-}
-
-func resolveOpenCodeGLMReasoning(model, requested string) (ReasoningPolicy, error) {
-	effort, source := requested, "explicit"
-	if effort == "" {
-		effort, source = DefaultReasoningEffort, "default"
+		return ReasoningPolicy{}, fmt.Errorf("reasoning effort %q is not supported by model %q", effort, model)
 	}
 	return ReasoningPolicy{Effort: effort, Source: source, Support: "native"}, nil
 }

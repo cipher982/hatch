@@ -19,9 +19,7 @@ type Credential struct {
 }
 
 type Options struct {
-	Cursor     Credential
-	OpenAI     Credential
-	OpenRouter Credential
+	Cursor Credential
 }
 
 type Check struct {
@@ -44,14 +42,13 @@ func ParseCursorModelIDs(output string) map[string]struct{} {
 
 func Run(options Options) []Check {
 	return []Check{
-		checkHarness("harness.opencode", "opencode"),
 		checkHarness("harness.pi", "pi"),
 		checkHarness("harness.omp", "omp"),
 		checkCursorModel(options.Cursor),
-		checkOpenCodeModels("bedrock.catalog", "amazon-bedrock", "", Credential{}, modelValues(provider.BedrockSurfaceModels)),
-		checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", options.OpenAI, modelValues(provider.CodexSurfaceModels)),
+		checkPiModels("bedrock.catalog", modelValues(provider.BedrockSurfaceModels)),
+		checkPiModels("codex.catalog", modelValues(provider.CodexSurfaceModels)),
 		checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels)),
-		checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", options.OpenRouter, modelValues(provider.OpenRouterSurfaceModels)),
+		checkPiModels("openrouter.catalog", modelValues(provider.OpenRouterSurfaceModels)),
 	}
 }
 
@@ -88,57 +85,47 @@ func modelValues(catalog map[string]string) []string {
 	return models
 }
 
-func ParseOpenCodeModelIDs(output string) map[string]struct{} {
+// ParsePiModelIDs reads `pi --list-models` output (a table of provider, model
+// id and capabilities) into "provider/id" selectors.
+func ParsePiModelIDs(output string) map[string]struct{} {
 	result := map[string]struct{}{}
 	for _, line := range strings.Split(output, "\n") {
-		if id := strings.TrimSpace(line); id != "" {
-			result[id] = struct{}{}
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] != "provider" {
+			result[fields[0]+"/"+fields[1]] = struct{}{}
 		}
 	}
 	return result
 }
 
-func checkOpenCodeModels(name, providerName, credentialName string, credential Credential, required []string) Check {
-	if credentialName != "" {
-		if credential.ResolutionError != nil {
-			return Check{Name: name, Detail: "credential resolver failed for catalog probe: " + credential.ResolutionError.Error()}
-		}
-		if strings.TrimSpace(credential.Value) == "" {
-			return Check{Name: name, Detail: credentialName + " is unavailable for catalog probe"}
-		}
-	}
+// checkPiModels verifies every configured model is either in Pi's catalog or
+// declared by Hatch's own per-run models.json (a catalog gap Hatch fills).
+func checkPiModels(name string, required []string) Check {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "opencode", "models", providerName)
-	if credentialName != "" {
-		cmd.Env = replaceEnvironment(os.Environ(), credentialName, credential.Value)
-	}
-	if providerName == "openai" {
-		cmd.Env = replaceEnvironment(cmd.Env, "OPENCODE_CONFIG_CONTENT", string(provider.OpenCodeCatalogConfigJSON()))
-	}
-	stdout, err := cmd.Output()
+	stdout, err := exec.CommandContext(ctx, "pi", "--list-models").Output()
 	if ctx.Err() == context.DeadlineExceeded {
-		return Check{Name: name, Detail: "opencode models timed out after 30s"}
+		return Check{Name: name, Detail: "pi --list-models timed out after 30s"}
 	}
 	if err != nil {
 		if _, ok := err.(*exec.Error); ok {
-			return Check{Name: name, Detail: "opencode is not installed"}
+			return Check{Name: name, Detail: "pi is not installed"}
 		}
 		detail := err.Error()
 		if exit, ok := err.(*exec.ExitError); ok && strings.TrimSpace(string(exit.Stderr)) != "" {
 			detail = strings.TrimSpace(string(exit.Stderr))
 		}
-		return Check{Name: name, Detail: "could not list OpenCode models: " + detail}
+		return Check{Name: name, Detail: "could not list Pi models: " + detail}
 	}
-	available := ParseOpenCodeModelIDs(string(stdout))
+	available := ParsePiModelIDs(string(stdout))
 	missing := []string{}
 	for _, model := range required {
-		if _, ok := available[model]; !ok {
+		if _, ok := available[model]; !ok && !provider.PiDeclaresModel(model) {
 			missing = append(missing, model)
 		}
 	}
 	if len(missing) > 0 {
-		return Check{Name: name, Detail: fmt.Sprintf("configured models unavailable: %s; run `opencode models %s --refresh` and update Hatch aliases", strings.Join(missing, ", "), providerName)}
+		return Check{Name: name, Detail: fmt.Sprintf("configured models unavailable: %s; run `pi update` or declare them in Hatch's Pi models config and update Hatch aliases", strings.Join(missing, ", "))}
 	}
 	return Check{Name: name, OK: true, Detail: fmt.Sprintf("%d configured models are available", len(required))}
 }

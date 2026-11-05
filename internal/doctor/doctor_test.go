@@ -16,69 +16,59 @@ func TestParseCursorModelIDs(t *testing.T) {
 	}
 }
 
-func TestParseOpenCodeModelIDs(t *testing.T) {
-	got := ParseOpenCodeModelIDs("openai/gpt-6.1-sol\nopenai/gpt-6-luna\n")
-	if _, ok := got["openai/gpt-6.1-sol"]; !ok || len(got) != 2 {
+const piModelTable = `provider        model                          context  max-out  thinking  images
+openrouter      z-ai/glm-5.3-flash             1.0M     943.7K   yes       yes
+openrouter      deepseek/deepseek-v4.1-flash   1.0M     943.7K   yes       yes
+openai          gpt-6-astra                    272K     128K     yes       yes
+amazon-bedrock  global.openai.gpt-6-astra      1.1M     128K     yes       yes
+`
+
+func TestParsePiModelIDs(t *testing.T) {
+	got := ParsePiModelIDs(piModelTable)
+	if _, ok := got["openai/gpt-6-astra"]; !ok || len(got) != 4 {
 		t.Fatalf("models = %#v", got)
 	}
+	if _, header := got["provider/model"]; header {
+		t.Fatal("table header parsed as a model")
+	}
 }
 
-func TestCheckOpenAIGPT6ModelsAreInjectedIntoCatalogProbe(t *testing.T) {
+func fakePi(t *testing.T, listing string) {
+	t.Helper()
 	directory := t.TempDir()
-	binary := filepath.Join(directory, "opencode")
-	script := `#!/bin/sh
-[ "$OPENAI_API_KEY" = expected-secret ] || exit 9
-case "$OPENCODE_CONFIG_CONTENT" in *gpt-6.1-sol* ) ;; *) exit 8 ;; esac
-case "$OPENCODE_CONFIG_CONTENT" in *gpt-6.1-terra* ) ;; *) exit 8 ;; esac
-case "$OPENCODE_CONFIG_CONTENT" in *gpt-6-luna* ) ;; *) exit 8 ;; esac
-printf '%s\n' 'openai/gpt-6-astra' 'openai/gpt-6.1-sol' 'openai/gpt-6.1-terra' 'openai/gpt-6-luna' 'openai/gpt-5.4-nano' 'openai/gpt-5.4-mini' 'openai/gpt-5.5'
-`
-	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
+	script := "#!/bin/sh\nwhile IFS= read -r line; do printf '%s\\n' \"$line\"; done <<'EOF'\n" + listing + "EOF\n"
+	if err := os.WriteFile(filepath.Join(directory, "pi"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	check := checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", Credential{Value: "expected-secret"}, modelValues(provider.CodexSurfaceModels))
-	if !check.OK || check.Name != "codex.catalog" {
+}
+
+func TestCheckPiModelsAcceptsCatalogAndHatchDeclaredModels(t *testing.T) {
+	fakePi(t, piModelTable)
+	// gpt-6.1-sol and the 1017 DeepSeek snapshot are absent from the listing:
+	// Hatch declares them in its own models.json.
+	check := checkPiModels("bedrock.catalog", []string{"amazon-bedrock/global.openai.gpt-6-astra", "amazon-bedrock/global.openai.gpt-6.1-sol"})
+	if !check.OK {
+		t.Fatalf("check = %#v", check)
+	}
+	check = checkPiModels("openrouter.catalog", modelValues(provider.OpenRouterSurfaceModels))
+	if !check.OK {
 		t.Fatalf("check = %#v", check)
 	}
 }
 
-func TestCheckOpenCodeModels(t *testing.T) {
-	directory := t.TempDir()
-	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\n[ \"$OPENROUTER_API_KEY\" = expected-secret ] || exit 9\nprintf '%s\\n' 'openrouter/deepseek/deepseek-v4.1-flash-1017' 'openrouter/z-ai/glm-5.3-flash'\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", directory)
-	check := checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", Credential{Value: "expected-secret"}, modelValues(provider.OpenRouterSurfaceModels))
-	if !check.OK || check.Name != "openrouter.catalog" {
+func TestCheckPiModelsDetectsDrift(t *testing.T) {
+	fakePi(t, "provider model\nopenrouter other 1M 1M yes yes\n")
+	check := checkPiModels("openrouter.catalog", []string{"openrouter/z-ai/glm-5.3-flash"})
+	if check.OK || !strings.Contains(check.Detail, "glm-5.3-flash") || !strings.Contains(check.Detail, "pi update") {
 		t.Fatalf("check = %#v", check)
 	}
 }
 
-func TestCheckOpenCodeModelsDetectsDrift(t *testing.T) {
-	directory := t.TempDir()
-	binary := filepath.Join(directory, "opencode")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'openrouter/other'\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", directory)
-	check := checkOpenCodeModels("openrouter.catalog", "openrouter", "OPENROUTER_API_KEY", Credential{Value: "expected-secret"}, modelValues(provider.OpenRouterSurfaceModels))
-	if check.OK || !strings.Contains(check.Detail, "deepseek-v4.1-flash") || !strings.Contains(check.Detail, "glm-5.3-flash") || !strings.Contains(check.Detail, "--refresh") {
-		t.Fatalf("check = %#v", check)
-	}
-}
-
-func TestCheckOpenCodeModelsDistinguishesMissingCredential(t *testing.T) {
-	check := checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", Credential{}, modelValues(provider.CodexSurfaceModels))
-	if check.OK || !strings.Contains(check.Detail, "OPENAI_API_KEY is unavailable") {
-		t.Fatalf("check = %#v", check)
-	}
-}
-
-func TestCheckOpenCodeModelsReportsCredentialResolverFailure(t *testing.T) {
-	check := checkOpenCodeModels("codex.catalog", "openai", "OPENAI_API_KEY", Credential{ResolutionError: os.ErrPermission}, modelValues(provider.CodexSurfaceModels))
-	if check.OK || !strings.Contains(check.Detail, "credential resolver failed") {
+func TestCheckPiModelsReportsMissingPi(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	check := checkPiModels("codex.catalog", []string{"openai/gpt-6-astra"})
+	if check.OK || !strings.Contains(check.Detail, "not installed") {
 		t.Fatalf("check = %#v", check)
 	}
 }

@@ -21,7 +21,9 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 			"--auto-approve", "--approval-mode", "yolo",
 		)
 	}
-	if req.CWD != "" {
+	// Pi has no --cwd flag; it works in the directory it is launched in, and the
+	// coordinator launches every run in the requested directory.
+	if req.CWD != "" && command == "omp" {
 		argv = append(argv, "--cwd", req.CWD)
 	}
 	if req.ReadOnly {
@@ -33,10 +35,10 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 	}
 	argv = append(argv, "--model", req.Model)
 	if policy.Effort != "" && policy.Support != "unsupported" {
-		argv = append(argv, "--thinking", policy.Effort)
+		argv = append(argv, "--thinking", piThinkingLevel(policy.Effort))
 	}
-	// Oh My Pi exposes OpenAI's service tier directly; Pi has no equivalent
-	// flag, so a Pi run stays on the standard tier.
+	// Oh My Pi exposes OpenAI's service tier as a flag; Pi gets it through the
+	// per-run models.json (PiModelsJSON).
 	if command == "omp" && RequestsPriorityTier(req.Model, policy.Effort) {
 		argv = append(argv, "--service-tier", openAIPriorityServiceTier)
 	}
@@ -66,7 +68,18 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 		invocation.SetEnv["AWS_PROFILE"] = BedrockAWSProfile
 		invocation.SetEnv["AWS_REGION"] = BedrockAWSRegion
 	}
+	if command == "pi" {
+		invocation.PiModelsJSON = PiModelsJSON(req.Model, policy.Effort)
+	}
 	return redactInvocation(invocation, len(invocation.Argv)-1), nil
+}
+
+// piThinkingLevel maps Hatch's effort names to Pi's: "none" is Pi's "off".
+func piThinkingLevel(effort string) string {
+	if effort == "none" {
+		return "off"
+	}
+	return effort
 }
 
 func invalidModelForBackend(backend string) error {

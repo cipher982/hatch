@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -25,74 +24,6 @@ func argvValue(argv []string, flag string) string {
 		return argv[i+1]
 	}
 	return ""
-}
-
-func TestReadOnlyOpenCodePermissionPolicy(t *testing.T) {
-	invocation := readOnlyBuild(t, "opencode", "openrouter/deepseek/deepseek-v4.1-flash-1017")
-	var config struct {
-		Provider   map[string]any             `json:"provider"`
-		Permission map[string]json.RawMessage `json:"permission"`
-	}
-	if err := json.Unmarshal(invocation.OpenCodeConfigJSON, &config); err != nil {
-		t.Fatalf("config is not valid JSON: %v\n%s", err, invocation.OpenCodeConfigJSON)
-	}
-	if config.Provider["openrouter"] == nil {
-		t.Fatalf("read-only config dropped the provider routing pin: %s", invocation.OpenCodeConfigJSON)
-	}
-	text := string(invocation.OpenCodeConfigJSON)
-	// OpenCode evaluates rules last-match-wins in key order: each catch-all deny
-	// must come before every rule it is meant to be narrowed by.
-	permission := text[strings.Index(text, `"permission"`):]
-	if !strings.HasPrefix(permission, `"permission":{"*":"deny",`) {
-		t.Fatalf("permission policy must open with the catch-all deny: %s", permission)
-	}
-	bash := permission[strings.Index(permission, `"bash":{`):]
-	if !strings.HasPrefix(bash, `"bash":{"*":"deny",`) {
-		t.Fatalf("bash policy must open with the catch-all deny: %s", bash)
-	}
-	for _, allowed := range []string{`"git diff *":"allow"`, `"git log":"allow"`, `"rg *":"allow"`} {
-		if !strings.Contains(bash, allowed) {
-			t.Fatalf("bash allowlist lacks %s", allowed)
-		}
-	}
-	for _, denied := range []string{`"cargo`, `"make`, `"pytest`, `"uv `, `"npm`, `"bun`, `"python`, `"sed`, `"find`, `"rm`, `"git push`, `"git commit`, `"git checkout`} {
-		if strings.Contains(bash, denied) {
-			t.Fatalf("bash allowlist must not name %s: %s", denied, bash)
-		}
-	}
-	// The flags that make an inspection command run a program or write a file
-	// are denied after the allows that would otherwise match them.
-	if strings.LastIndex(bash, `"git *--output*":"deny"`) < strings.LastIndex(bash, `"allow"`) {
-		t.Fatalf("flag denies must follow the allowlist: %s", bash)
-	}
-	if !strings.Contains(bash, `"git -C * log *":"allow"`) {
-		t.Fatalf("git -C form missing: %s", bash)
-	}
-	for _, want := range []string{`"edit":"deny"`, `"webfetch":"deny"`, `"task":"deny"`, `"*.env":"deny"`} {
-		if !strings.Contains(permission, want) {
-			t.Fatalf("permission policy lacks %s: %s", want, permission)
-		}
-	}
-	if !slices.Contains(invocation.Argv, "--dangerously-skip-permissions") {
-		t.Fatalf("read-only OpenCode still needs the auto-approve flag so nothing asks: %v", invocation.Argv)
-	}
-}
-
-func TestOpenCodeWithoutReadOnlyCarriesNoPermissionPolicy(t *testing.T) {
-	invocation, err := Build(Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Prompt: "prompt", APIKey: "fake"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(invocation.OpenCodeConfigJSON), "permission") || invocation.ReadOnlyMechanism != "" {
-		t.Fatalf("ordinary run picked up read-only state: %s", invocation.OpenCodeConfigJSON)
-	}
-	bare, err := Build(Request{Backend: "opencode", Model: "amazon-bedrock/global.anthropic.claude-opus-5-5", Prompt: "prompt", ReadOnly: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(string(bare.OpenCodeConfigJSON), `{"permission":{"*":"deny"`) {
-		t.Fatalf("read-only run with no provider pin needs the policy on its own: %s", bare.OpenCodeConfigJSON)
-	}
 }
 
 func TestReadOnlyClaudeHasNoShellOrEditTools(t *testing.T) {
@@ -160,19 +91,6 @@ func TestReadOnlyRefusedWhereNoMechanismExists(t *testing.T) {
 	}
 }
 
-// evaluate is OpenCode's rule engine as documented: patterns are anchored
-// wildcards (`*` any run, `?` one character) and the last matching rule wins.
-func evaluate(policy rules, text string) string {
-	verdict := "deny"
-	for _, r := range policy {
-		action, _ := r.value.(string)
-		if globMatch(r.key, text) {
-			verdict = action
-		}
-	}
-	return verdict
-}
-
 func globMatch(pattern, text string) bool {
 	if pattern == "" {
 		return text == ""
@@ -189,37 +107,5 @@ func globMatch(pattern, text string) bool {
 		return text != "" && globMatch(pattern[1:], text[1:])
 	default:
 		return text != "" && text[0] == pattern[0] && globMatch(pattern[1:], text[1:])
-	}
-}
-
-func TestReadOnlyBashPolicyVerdicts(t *testing.T) {
-	var bash rules
-	for _, r := range openCodeReadOnlyPermission() {
-		if r.key == "bash" {
-			bash = r.value.(rules)
-		}
-	}
-	allowed := []string{
-		"git diff HEAD~1", "git -C /some/worktree log --oneline -3", "git show abc:path/to/file.rs", "git status",
-		`rg -n "fn .*->" engine/src`, `rg -n "=> " engine/src`, "cat go.mod", "head -20 file.rs", "tail -n +50 file.rs",
-		"cat go.mod 2>/dev/null", "ls 2>&1", "rg foo 2>/dev/null", "git grep -n foo 2>&1", "cd /some/dir", "echo ---",
-		"gh run view 123", `echo "$(git log --oneline -1)"`,
-	}
-	for _, command := range allowed {
-		if got := evaluate(bash, command); got != "allow" {
-			t.Errorf("%q = %s, want allow", command, got)
-		}
-	}
-	denied := []string{
-		"cargo test", "make test", "python3 script.py", "uv run pytest", "npm test", "go test ./...", "find . -delete", "touch f",
-		"sed -i s/a/b/ f", "bash -c 'cargo test'", "xargs rm", "tee f",
-		"cat x > y", "cat x>y", "echo hi>/tmp/f", "ls >f", "ls > f", "cat x >> y", "cat x>>y", "cat x &> y", "ls 2> f", "ls 2>f",
-		"cat x > y 2>/dev/null", "cat x>y 2>/dev/null", "cat x 2>/dev/null > y", "cat x 2>/dev/null>y", "ls 2>&1 >f", "ls 2>&1>f", "ls >f 2>&1",
-		"cat x 1>y", "cat x 1> y", "git log --output=f", "git diff --output f --stat", "git log --ext-diff", "rg --pre=sh foo", "git grep -O foo",
-	}
-	for _, command := range denied {
-		if got := evaluate(bash, command); got != "deny" {
-			t.Errorf("%q = %s, want deny", command, got)
-		}
 	}
 }

@@ -273,7 +273,6 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 	}{
 		{"claude", "claude", "haiku", "success_claude", "fake claude output", "claude-session-oracle"},
 		{"cursor", "cursor", "grok-4.7-high", "success_cursor", "fake cursor output", "cursor-session-oracle"},
-		{"opencode", "opencode", "openai/gpt-6-astra", "success_opencode", "fake opencode output", "ses_oracle1234"},
 		{"pi", "pi", "openai/gpt-6-astra", "success_pi", "fake success_pi output", ""},
 		{"omp", "omp", "openai/gpt-6-astra", "success_omp", "fake success_omp output", ""},
 		{"cursor-kimi", "cursor", "kimi-k3", "success_cursor_kimi", "fake cursor kimi output", "cursor-kimi-session-oracle"},
@@ -315,17 +314,6 @@ func TestCoordinatorStructuredProviders(t *testing.T) {
 				if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider")); !os.IsNotExist(err) {
 					t.Fatalf("%s provider runtime retained: %v", test.backend, err)
 				}
-			} else if test.backend == "opencode" {
-				if result.Run.ProviderState.SnapshotPath != nil || result.Run.ProviderState.Retention != "unavailable" ||
-					result.Run.ProviderState.Capabilities["snapshot"] != "not_retained_terminal_success" {
-					t.Fatalf("successful OpenCode state was retained: %#v", result.Run.ProviderState)
-				}
-				if len(progress) < 3 || progress[0][:12] != "[hatch] run " {
-					t.Fatalf("progress = %#v", progress)
-				}
-				if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider")); !os.IsNotExist(err) {
-					t.Fatalf("successful provider runtime retained: %v", err)
-				}
 			}
 		})
 	}
@@ -340,9 +328,9 @@ func TestCoordinatorStructuredFailureAndRecovery(t *testing.T) {
 		warnings                                          int
 	}{
 		{"cursor error", "cursor", "grok-4.7-high", "cursor_error", "", "request rejected", false, OutcomeFailed, 0},
-		{"opencode error", "opencode", "openai/gpt-6-astra", "opencode_error", "", "provider unavailable", false, OutcomeFailed, 0},
-		{"opencode recovered", "opencode", "openai/gpt-6-astra", "opencode_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
-		{"opencode missing terminal", "opencode", "openai/gpt-6-astra", "opencode_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 1},
+		{"pi error", "pi", "openai/gpt-6-astra", "pi_error", "", "provider unavailable", false, OutcomeFailed, 0},
+		{"pi recovered", "pi", "openai/gpt-6-astra", "pi_transient_then_success", "recovered answer", "", true, OutcomeSucceededWarnings, 1},
+		{"pi missing terminal", "pi", "openai/gpt-6-astra", "pi_missing_terminal", "useful evidence", "structured provider output did not contain a terminal marker", false, OutcomeFailed, 1},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -443,87 +431,40 @@ func TestCoordinatorCancelledBeforeProviderLaunch(t *testing.T) {
 	}
 }
 
-func TestOpenCodeTimeoutProducesVersionBoundRecoveryHint(t *testing.T) {
-	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-astra", Prompt: "prompt", APIKey: "fake"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	invocation.Argv[0] = fake
-	invocation.ProviderVersion = "opencode 1.2.3"
-	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "hang_opencode"
-	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "codex.astra", Provider: "openai", Model: "openai/gpt-6-astra", CWD: t.TempDir(), Prompt: "prompt",
-		Timeout: 2 * time.Second, Invocation: invocation,
-	})
-	if result.Status != "timeout" || result.Run == nil || result.Run.ProviderState.RecoveryHint == nil ||
-		result.Run.ProviderState.InspectHint == nil || result.Run.ProviderState.ProviderVersion == nil ||
-		*result.Run.ProviderState.ProviderVersion != "opencode 1.2.3" || result.ResumeCommand == nil ||
-		!result.Run.ProviderState.RecoveryHint.VersionBound || !result.Run.ProviderState.RecoveryHint.RequiresApprovalBypass ||
-		result.Run.ProviderState.Capabilities["inspect"] != "supported_same_version" ||
-		result.Run.ProviderState.Capabilities["recovery_hint"] != "best_effort_same_version" {
-		t.Fatalf("result = %#v", result)
-	}
-	for _, arg := range result.Run.ProviderState.RecoveryHint.Argv {
-		if strings.Contains(arg, "fake") || strings.Contains(arg, "KEY") {
-			t.Fatalf("credential-like recovery arg: %q", arg)
-		}
-	}
-}
-
-func TestOpenCodeDoesNotClaimInspectionWithoutToolVersion(t *testing.T) {
-	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-astra", Prompt: "prompt", APIKey: "fake"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	invocation.Argv[0] = fake
-	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_opencode"
-	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "openai/gpt-6-astra", Prompt: "prompt",
-		Timeout: time.Second, Invocation: invocation,
-	})
-	if !result.OK || result.Run == nil || result.Run.ProviderState.SnapshotPath != nil ||
-		result.Run.ProviderState.InspectHint != nil || result.Run.ProviderState.RecoveryHint != nil ||
-		result.Run.ProviderState.Capabilities["inspect"] != "run_artifact_only" {
-		t.Fatalf("unverified provider capability = %#v", result.Run)
-	}
-}
-
 func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), "runs"))
-	openCode, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-astra", Prompt: "prompt", APIKey: "fake"})
+	pi, err := provider.Build(provider.Request{Backend: "pi", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Prompt: "prompt", APIKey: "fake"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	openCode.SetEnv["OPENCODE_CONFIG_DIR"] = filepath.Join(t.TempDir(), "reviewed-opencode-config")
-	artifact, err := store.Prepare(PreparedRun{Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "openai/gpt-6-astra", Request: "prompt", ReasoningPolicy: openCode.ReasoningPolicy})
+	pi.PiDCGBinary = "/usr/local/bin/dcg"
+	artifact, err := store.Prepare(PreparedRun{Surface: "openrouter.deepseek", Backend: "pi", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Request: "prompt", ReasoningPolicy: pi.ReasoningPolicy})
 	if err != nil {
 		t.Fatal(err)
 	}
-	cleanup, err := prepareProviderState(artifact, &openCode)
+	cleanup, err := prepareProviderState(artifact, &pi)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cleanup()
-	if openCode.SetEnv["XDG_DATA_HOME"] == "" || openCode.SetEnv["XDG_STATE_HOME"] == "" ||
-		openCode.SetEnv["XDG_CONFIG_HOME"] == "" || openCode.SetEnv["XDG_CACHE_HOME"] == "" ||
-		openCode.SetEnv["OPENCODE_DISABLE_PROJECT_CONFIG"] != "1" ||
-		!strings.HasPrefix(openCode.SetEnv["XDG_DATA_HOME"], artifact.Path) ||
-		!strings.HasPrefix(openCode.SetEnv["XDG_STATE_HOME"], artifact.Path) ||
-		strings.HasPrefix(openCode.SetEnv["XDG_CONFIG_HOME"], artifact.Path) ||
-		strings.HasPrefix(openCode.SetEnv["XDG_CACHE_HOME"], artifact.Path) ||
-		!strings.Contains(openCode.SetEnv["XDG_CONFIG_HOME"], "provider-runtime") ||
-		!strings.Contains(openCode.SetEnv["XDG_CACHE_HOME"], "provider-runtime") {
-		t.Fatalf("OpenCode isolation = %#v", openCode.SetEnv)
+	configDir := pi.SetEnv["PI_CODING_AGENT_DIR"]
+	if !strings.HasPrefix(configDir, artifact.Path) || !strings.HasPrefix(pi.SetEnv["PI_CODING_AGENT_SESSION_DIR"], artifact.Path) {
+		t.Fatalf("Pi isolation = %#v", pi.SetEnv)
 	}
-	for _, path := range []string{filepath.Join(artifact.Path, "provider", "opencode-config"), filepath.Join(artifact.Path, "provider", "opencode-cache")} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatalf("per-run runtime path exists: %s (%v)", path, err)
-		}
+	models, err := os.ReadFile(filepath.Join(configDir, "models.json"))
+	if err != nil || !bytes.Contains(models, []byte(`"order":["DeepSeek"]`)) || !bytes.Contains(models, []byte(`"allow_fallbacks":false`)) {
+		t.Fatalf("per-run models.json = %s (%v)", models, err)
 	}
-	if openCode.SetEnv["OPENCODE_CONFIG_DIR"] == "" || !strings.Contains(openCode.SetEnv["OPENCODE_CONFIG_DIR"], "reviewed-opencode-config") {
-		t.Fatalf("reviewed config was not preserved: %#v", openCode.SetEnv)
+	if info, err := os.Lstat(filepath.Join(configDir, "models.json")); err != nil || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("models.json must be a real per-run file, not a link to the user's: %v", err)
+	}
+	guard := filepath.Join(configDir, "dcg-guard.mjs")
+	last := len(pi.Argv) - 1
+	if pi.SetEnv["HATCH_DCG_BINARY"] != "/usr/local/bin/dcg" || pi.Argv[last-2] != "-e" || pi.Argv[last-1] != guard || pi.Argv[last] != provider.PreparePrompt("prompt") {
+		t.Fatalf("DCG guard not loaded before the prompt: env=%#v argv=%#v", pi.SetEnv, pi.Argv)
+	}
+	if len(pi.RedactedArgv) != len(pi.Argv) || pi.RedactedArgv[len(pi.RedactedArgv)-1] != "<prompt>" {
+		t.Fatalf("redaction drift: %#v", pi.RedactedArgv)
 	}
 
 	codex, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-6.1-sol", Prompt: "prompt", APIKey: "fake"})
@@ -539,7 +480,7 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer codexCleanup()
-	if !strings.HasPrefix(codex.SetEnv["CODEX_HOME"], codexArtifact.Path) || codex.SetEnv["CODEX_HOME"] == openCode.SetEnv["XDG_DATA_HOME"] {
+	if !strings.HasPrefix(codex.SetEnv["CODEX_HOME"], codexArtifact.Path) || codex.SetEnv["CODEX_HOME"] == configDir {
 		t.Fatalf("Codex isolation = %#v", codex.SetEnv)
 	}
 
@@ -564,60 +505,6 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 	}
 }
 
-func TestOpenCodeProviderStateWritesRoutingConfig(t *testing.T) {
-	store := NewStore(filepath.Join(t.TempDir(), "runs"))
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Prompt: "prompt", APIKey: "fake"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(invocation.OpenCodeConfigJSON) == 0 {
-		t.Fatal("openrouter deepseek run missing routing config")
-	}
-	artifact, err := store.Prepare(PreparedRun{Surface: "openrouter.deepseek", Backend: "opencode", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Request: "prompt", ReasoningPolicy: invocation.ReasoningPolicy})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cleanup, err := prepareProviderState(artifact, &invocation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
-	data := []byte(invocation.SetEnv["OPENCODE_CONFIG_CONTENT"])
-	if !bytes.Contains(data, []byte(`"DeepSeek"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":false`)) {
-		t.Fatalf("inline routing config content = %s", data)
-	}
-	if _, err := os.Stat(filepath.Join(invocation.SetEnv["OPENCODE_CONFIG_DIR"], "opencode.json")); !os.IsNotExist(err) {
-		t.Fatalf("per-run routing file was written: %v", err)
-	}
-}
-
-func TestOpenCodeGLMProviderStateWritesRoutingConfig(t *testing.T) {
-	store := NewStore(filepath.Join(t.TempDir(), "runs"))
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/z-ai/glm-5.3-flash", Prompt: "prompt", APIKey: "fake"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(invocation.OpenCodeConfigJSON) == 0 {
-		t.Fatal("openrouter glm run missing routing config")
-	}
-	artifact, err := store.Prepare(PreparedRun{Surface: "openrouter.glm-5.3-flash", Backend: "opencode", Provider: "openrouter", Model: "openrouter/z-ai/glm-5.3-flash", Request: "prompt", ReasoningPolicy: invocation.ReasoningPolicy})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cleanup, err := prepareProviderState(artifact, &invocation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
-	data := []byte(invocation.SetEnv["OPENCODE_CONFIG_CONTENT"])
-	if !bytes.Contains(data, []byte(`"Modal"`)) || !bytes.Contains(data, []byte(`"allow_fallbacks":true`)) {
-		t.Fatalf("inline routing config content = %s", data)
-	}
-	if _, err := os.Stat(filepath.Join(invocation.SetEnv["OPENCODE_CONFIG_DIR"], "opencode.json")); !os.IsNotExist(err) {
-		t.Fatalf("per-run routing file was written: %v", err)
-	}
-}
-
 func TestRawCodexRunRecordsEphemeralIsolation(t *testing.T) {
 	fake := buildTestProvider(t)
 	invocation, err := provider.Build(provider.Request{Backend: "codex", Model: "gpt-6.1-sol", Prompt: "prompt", APIKey: "fake"})
@@ -635,31 +522,6 @@ func TestRawCodexRunRecordsEphemeralIsolation(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider")); !os.IsNotExist(err) {
 		t.Fatalf("Codex provider runtime retained: %v", err)
-	}
-}
-
-func TestOpenCodeRecoveryHintIncludesPolicyAndIsolation(t *testing.T) {
-	fake := buildTestProvider(t)
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openai/gpt-6-astra", Prompt: "prompt", APIKey: "fake"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	invocation.Argv[0] = fake
-	invocation.ProviderVersion = "opencode 1.2.3"
-	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "hang_opencode"
-	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "codex.astra", Backend: "opencode", Provider: "openai", Model: "openai/gpt-6-astra", CWD: t.TempDir(), Prompt: "prompt",
-		Timeout: 2 * time.Second, Invocation: invocation,
-	})
-	if result.Run == nil || result.Run.ProviderState.RecoveryHint == nil {
-		t.Fatalf("missing recovery hint: %#v", result)
-	}
-	argv := result.Run.ProviderState.RecoveryHint.Argv
-	joined := strings.Join(argv, " ")
-	for _, fragment := range []string{"-u OPENCODE_CONFIG", "-u OPENCODE_CONFIG_CONTENT", "XDG_CONFIG_HOME=", "XDG_CACHE_HOME=", "OPENCODE_CONFIG_DIR=", "OPENCODE_DISABLE_PROJECT_CONFIG=1", "--variant medium"} {
-		if !strings.Contains(joined, fragment) {
-			t.Fatalf("recovery hint lacks %q: %v", fragment, argv)
-		}
 	}
 }
 
@@ -776,12 +638,12 @@ func TestCoordinatorRedactsPromptAndCredentialValues(t *testing.T) {
 	fake := buildTestProvider(t)
 	secret := "sk-secret-never-persist"
 	prompt := "prompt with $(shell) and 'quotes'"
-	invocation, err := provider.Build(provider.Request{Backend: "opencode", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Prompt: prompt, APIKey: secret})
+	invocation, err := provider.Build(provider.Request{Backend: "pi", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Prompt: prompt, APIKey: secret})
 	if err != nil {
 		t.Fatal(err)
 	}
 	invocation.Argv[0] = fake
-	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_opencode"
+	invocation.SetEnv["HATCH_TEST_SCENARIO"] = "success_pi"
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
 		Surface: "openrouter.deepseek", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Prompt: prompt,
 		Timeout: 5 * time.Second, Invocation: invocation, CredentialNames: []string{"OPENROUTER_API_KEY"},
@@ -846,78 +708,6 @@ func TestCoordinatorThirtyTwoConcurrentRunsAreIsolated(t *testing.T) {
 	}
 	if len(ids) != count || len(paths) != count {
 		t.Fatalf("ids=%d paths=%d", len(ids), len(paths))
-	}
-}
-
-func TestFreezeOpenCodeStateUsesExplicitAllowlist(t *testing.T) {
-	artifact := &Artifact{Path: t.TempDir()}
-	root := filepath.Join(artifact.Path, "provider", "opencode", "data", "opencode")
-	if err := os.MkdirAll(root, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	for name, value := range map[string]string{"opencode.db": "db", "opencode.db-wal": "wal", "auth.json": "secret", "log.txt": "prompt"} {
-		if err := os.WriteFile(filepath.Join(root, name), []byte(value), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.Symlink(filepath.Join(root, "opencode.db"), filepath.Join(root, "opencode.db-shm")); err != nil {
-		t.Fatal(err)
-	}
-	lateWriter, err := os.OpenFile(filepath.Join(root, "opencode.db"), os.O_APPEND|os.O_WRONLY, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	snapshot, approved, err := freezeOpenCodeState(artifact)
-	if err != nil || approved != 2 || snapshot != "provider/opencode-snapshot" {
-		t.Fatalf("snapshot=%q approved=%d err=%v", snapshot, approved, err)
-	}
-	if _, err := lateWriter.WriteString("late detached write"); err != nil {
-		t.Fatal(err)
-	}
-	if err := lateWriter.Close(); err != nil {
-		t.Fatal(err)
-	}
-	liveRoot := filepath.Join(artifact.Path, "provider", "opencode")
-	liveInfo, err := os.Stat(liveRoot)
-	if err != nil || !liveInfo.IsDir() || liveInfo.Mode().Perm() != 0o500 {
-		t.Fatalf("live provider state is not locked: info=%v err=%v", liveInfo, err)
-	}
-	snapshotRoot := filepath.Join(artifact.Path, filepath.FromSlash(snapshot), "data", "opencode")
-	for _, name := range []string{"auth.json", "log.txt", "opencode.db-shm"} {
-		if _, err := os.Lstat(filepath.Join(snapshotRoot, name)); !os.IsNotExist(err) {
-			t.Fatalf("%s retained: %v", name, err)
-		}
-	}
-	for _, name := range []string{"opencode.db", "opencode.db-wal"} {
-		if _, err := os.Stat(filepath.Join(snapshotRoot, name)); err != nil {
-			t.Fatalf("%s missing: %v", name, err)
-		}
-	}
-	database, err := os.ReadFile(filepath.Join(snapshotRoot, "opencode.db"))
-	if err != nil || string(database) != "db" {
-		t.Fatalf("snapshot changed through retired descriptor: %q err=%v", database, err)
-	}
-}
-
-func TestFreezeOpenCodeStateDoesNotFollowSymlinkedParents(t *testing.T) {
-	artifact := &Artifact{Path: t.TempDir()}
-	external := t.TempDir()
-	if err := os.WriteFile(filepath.Join(external, "opencode.db"), []byte("outside"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	dataRoot := filepath.Join(artifact.Path, "provider", "opencode", "data")
-	if err := os.MkdirAll(dataRoot, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(external, filepath.Join(dataRoot, "opencode")); err != nil {
-		t.Fatal(err)
-	}
-	snapshot, approved, err := freezeOpenCodeState(artifact)
-	if err != nil || snapshot != "" || approved != 0 {
-		t.Fatalf("snapshot=%q approved=%d err=%v", snapshot, approved, err)
-	}
-	if data, err := os.ReadFile(filepath.Join(external, "opencode.db")); err != nil || string(data) != "outside" {
-		t.Fatalf("external state changed: %q err=%v", data, err)
 	}
 }
 
