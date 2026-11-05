@@ -366,3 +366,21 @@ func TestPiHasNoCwdFlagButOmpDoes(t *testing.T) {
 		}
 	}
 }
+
+func TestPiOpenCodeGoDeepSeekIsDeclaredAndKeyedByOpenCodeKey(t *testing.T) {
+	providers := piConfig(t, "opencode-go/deepseek-v4.1-flash", "")
+	model := providers["opencode-go"].(map[string]any)["models"].([]any)[0].(map[string]any)
+	if model["id"] != "deepseek-v4.1-flash" || model["baseUrl"] != "https://opencode.ai/zen/go/v1" || model["api"] != "openai-completions" {
+		t.Fatalf("opencode-go model = %#v", model)
+	}
+	invocation, err := Build(Request{Backend: "pi", Model: "opencode-go/deepseek-v4.1-flash", Prompt: "prompt", APIKey: "fake-go-key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invocation.SetEnv["OPENCODE_API_KEY"] != "fake-go-key" || invocation.SetEnv["OPENROUTER_API_KEY"] != "" {
+		t.Fatalf("env = %#v", invocation.SetEnv)
+	}
+	if !slices.Contains(invocation.UnsetEnv, "OPENCODE_API_KEY") {
+		t.Fatalf("an inherited OPENCODE_API_KEY must be unset first: %#v", invocation.UnsetEnv)
+	}
+}

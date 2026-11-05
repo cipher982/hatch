@@ -111,7 +111,7 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: streamFormat, Adapter: adapter,
 			ReasoningPolicy: policy,
 			UnsetEnv: []string{
-				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY",
+				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "OPENCODE_API_KEY", "ANTHROPIC_API_KEY",
 				"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION", "ANTHROPIC_MODEL",
 			},
@@ -130,7 +130,7 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		invocation := Invocation{
 			Argv: append(argv, prompt), StreamFormat: "jsonl", Adapter: "cursor", ReasoningPolicy: policy, SetEnv: map[string]string{},
 			UnsetEnv: []string{
-				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "OPENCODE_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
 				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK",
 			},
 		}

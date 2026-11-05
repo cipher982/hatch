@@ -280,7 +280,7 @@ printf '%s\n' '{"models":[{"id":"gemini-4-argon","selector":"google-antigravity/
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || len(result.Checks) != 7 {
+	if !result.OK || len(result.Checks) != 8 {
 		t.Fatalf("doctor = %#v", result)
 	}
 	for _, check := range result.Checks {

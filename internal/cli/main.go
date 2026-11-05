@@ -120,6 +120,8 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	credentialEnvironment := ""
 	if strings.HasPrefix(request.Model, "openrouter/") {
 		credentialEnvironment = "OPENROUTER_API_KEY"
+	} else if strings.HasPrefix(request.Model, "opencode-go/") {
+		credentialEnvironment = "OPENCODE_API_KEY"
 	} else if strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex" {
 		credentialEnvironment = "OPENAI_API_KEY"
 	} else if request.Backend == "cursor" {
@@ -133,6 +135,9 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	}
 	if strings.HasPrefix(request.Model, "openrouter/") && apiKey == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENROUTER_API_KEY is not set or available from the configured credential helper"))
+	}
+	if strings.HasPrefix(request.Model, "opencode-go/") && apiKey == "" {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENCODE_API_KEY is not set or available from the configured credential helper"))
 	}
 	if (strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex") && apiKey == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENAI_API_KEY is not set or available from the configured credential helper"))
@@ -167,6 +172,8 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	credentialNames := []string{}
 	if strings.HasPrefix(request.Model, "openrouter/") {
 		credentialNames = append(credentialNames, "OPENROUTER_API_KEY")
+	} else if strings.HasPrefix(request.Model, "opencode-go/") {
+		credentialNames = append(credentialNames, "OPENCODE_API_KEY")
 	} else if strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex" {
 		credentialNames = append(credentialNames, "OPENAI_API_KEY")
 	} else if request.Backend == "cursor" && apiKey != "" {
@@ -193,6 +200,8 @@ func progressLabel(surface string) string {
 		return "Cursor"
 	case strings.HasPrefix(surface, "openrouter."):
 		return "OpenRouter"
+	case strings.HasPrefix(surface, "opencode-go."):
+		return "OpenCode Go"
 	case strings.HasPrefix(surface, "codex."):
 		return "Codex"
 	case strings.HasPrefix(surface, "gemini."):
@@ -302,6 +311,11 @@ func identity(backend, model string) (string, string) {
 				return "openrouter." + alias, "openrouter"
 			}
 		}
+		for alias, configured := range surfaces["opencode-go"].models {
+			if configured == model {
+				return "opencode-go." + alias, "opencode-go"
+			}
+		}
 		for alias, configured := range surfaces["codex"].models {
 			if configured == model {
 				return "codex." + alias, "openai"
@@ -317,6 +331,9 @@ func identity(backend, model string) (string, string) {
 		}
 		if strings.HasPrefix(model, "openrouter/") {
 			return "openrouter.raw", "openrouter"
+		}
+		if strings.HasPrefix(model, "opencode-go/") {
+			return "opencode-go.raw", "opencode-go"
 		}
 		if strings.HasPrefix(model, "openai/") {
 			return "codex.raw", "openai"
@@ -334,15 +351,16 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch codex <astra|sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3|gemini-4-argon> [OPTIONS] "prompt"
        hatch gemini [argon] [OPTIONS] "prompt"
+       hatch opencode-go <deepseek> [OPTIONS] "prompt"
        hatch openrouter <deepseek|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|read|audit|gc> [OPTIONS]
        hatch review MODEL... [--reasoning-effort LEVEL] [--base REF] [--pass-timeout SEC]   (explicit model; two-phase, read-only review; no prompt)
 
-One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenRouter, and expert calls
+One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenCode Go, OpenRouter, and expert calls
 
 Coding harness selection:
-  --harness pi           Use Pi (default for bedrock, codex, and openrouter)
+  --harness pi           Use Pi (default for bedrock, codex, opencode-go, and openrouter)
   --harness omp          Use Oh My Pi (default for gemini)
 
 Model-first aliases (each surface bills a different account):
@@ -352,7 +370,8 @@ Model-first aliases (each surface bills a different account):
   Codex (personal OpenAI, explicit):    hatch codex <astra|sol|terra|luna>
   Cursor (Zeta Cursor subscription):    grok, kimi-k3, gemini-4-argon
   Gemini (personal Google AI Ultra):    argon
-  OpenRouter (OpenRouter balance):      deepseek, glm-5.3-flash
+  OpenCode Go (flat-rate Go plan):      deepseek (the bare "hatch deepseek" alias)
+  OpenRouter (OpenRouter balance):      deepseek, glm-5.3-flash (explicit only)
 
   OpenAI models are served by Bedrock on the Zeta AWS account, so the bare
   astra/sol/terra/luna aliases resolve to "hatch bedrock" (astra = GPT-6 Astra,
@@ -418,5 +437,5 @@ Credential helper:
   HATCH_CREDENTIAL_HELPER must name an explicitly configured absolute executable.
 
 Provider environment:
-  OPENAI_API_KEY, OPENROUTER_API_KEY, CURSOR_API_KEY, AWS_PROFILE, AWS_REGION
+  OPENAI_API_KEY, OPENROUTER_API_KEY, OPENCODE_API_KEY, CURSOR_API_KEY, AWS_PROFILE, AWS_REGION
 `

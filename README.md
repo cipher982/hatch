@@ -124,6 +124,7 @@ hatch bedrock opus "Review this diff"
 hatch codex astra --harness omp "Review this branch"
 hatch gemini "Summarize this code"
 hatch cursor gemini-4-argon "Summarize this code"
+hatch opencode-go deepseek "Fix the failing tests"
 hatch openrouter deepseek "Fix the failing tests"
 hatch openrouter glm-5.3-flash "Fix the failing tests"
 ```
@@ -135,6 +136,7 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch codex <astra\|sol\|terra\|luna>` | OpenAI coding models on the personal OpenAI account (ChatGPT/Codex subscription or API key); the Zeta route is `hatch bedrock` |
 | `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
 | `hatch gemini [argon]` | Oh My Pi with `google-antigravity/gemini-4-argon` on the personal Google AI Ultra subscription |
+| `hatch opencode-go <deepseek>` | Pi with the OpenCode Go plan (`deepseek` = V4.1 Flash; bare `hatch deepseek` runs this) |
 | `hatch openrouter <deepseek\|glm-5.3-flash>` | Pi with an OpenRouter model alias (`deepseek` = V4.1 Flash 1017, pinned to the DeepSeek upstream) |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
 | `hatch review <MODEL ...>` | Explicitly requested two-phase independent code review; execs `hatch-review` (review-hub in `~/git/me`), requires a model, takes no prompt; receipts are optional audit data, not shipping gates |
@@ -192,7 +194,8 @@ Each surface bills a different account:
 | `codex` | Personal OpenAI account (ChatGPT/Codex subscription, or an OpenAI API key) | astra, sol, terra, luna (plus `nano`, `mini`, `max`) |
 | `cursor` | Zeta-account Cursor subscription | grok, kimi-k3, gemini-4-argon |
 | `gemini` | Personal Google AI Ultra subscription (Oh My Pi) | argon |
-| `openrouter` | OpenRouter balance | deepseek, glm-5.3-flash |
+| `opencode-go` | OpenCode Go flat-rate plan | deepseek |
+| `openrouter` | OpenRouter balance | deepseek, glm-5.3-flash (explicit only) |
 
 Zeta's Bedrock account serves both Anthropic Claude and OpenAI models, so the
 bare OpenAI aliases resolve to `hatch bedrock`:

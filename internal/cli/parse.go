@@ -38,12 +38,13 @@ var surfaces = map[string]struct {
 	backend string
 	models  map[string]string
 }{
-	"bedrock":    {provider.SurfaceBackend("bedrock"), provider.BedrockSurfaceModels},
-	"claude":     {provider.SurfaceBackend("claude"), provider.ClaudeSurfaceModels},
-	"cursor":     {provider.SurfaceBackend("cursor"), provider.CursorSurfaceModels},
-	"codex":      {provider.SurfaceBackend("codex"), provider.CodexSurfaceModels},
-	"gemini":     {provider.SurfaceBackend("gemini"), provider.GeminiSurfaceModels},
-	"openrouter": {provider.SurfaceBackend("openrouter"), provider.OpenRouterSurfaceModels},
+	"bedrock":     {provider.SurfaceBackend("bedrock"), provider.BedrockSurfaceModels},
+	"claude":      {provider.SurfaceBackend("claude"), provider.ClaudeSurfaceModels},
+	"cursor":      {provider.SurfaceBackend("cursor"), provider.CursorSurfaceModels},
+	"codex":       {provider.SurfaceBackend("codex"), provider.CodexSurfaceModels},
+	"gemini":      {provider.SurfaceBackend("gemini"), provider.GeminiSurfaceModels},
+	"openrouter":  {provider.SurfaceBackend("openrouter"), provider.OpenRouterSurfaceModels},
+	"opencode-go": {provider.SurfaceBackend("opencode-go"), provider.OpenCodeGoSurfaceModels},
 }
 
 var flagsWithValue = map[string]bool{

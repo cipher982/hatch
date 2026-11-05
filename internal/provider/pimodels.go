@@ -37,6 +37,19 @@ var piCatalogGaps = map[string]func() map[string]any{
 	"openai/gpt-6.1-terra": func() map[string]any {
 		return piOpenAIModel("gpt-6.1-terra", "GPT-6.1 Terra", "openai-responses", true)
 	},
+	"opencode-go/deepseek-v4.1-flash": func() map[string]any {
+		return map[string]any{
+			"id": "deepseek-v4.1-flash", "name": "DeepSeek V4.1 Flash (OpenCode Go)",
+			"api": "openai-completions", "baseUrl": "https://opencode.ai/zen/go/v1",
+			"reasoning": true, "input": []string{"text", "image"},
+			"contextWindow": 1000000, "maxTokens": 384000,
+			"thinkingLevelMap": map[string]any{"off": nil, "minimal": nil, "low": "low", "medium": nil, "high": "high", "xhigh": nil, "max": "max"},
+			"compat": map[string]any{
+				"supportsStore": false, "supportsDeveloperRole": false, "maxTokensField": "max_tokens",
+				"requiresReasoningContentOnAssistantMessages": true, "thinkingFormat": "deepseek",
+			},
+		}
+	},
 	"openrouter/deepseek/deepseek-v4.1-flash-1017": func() map[string]any {
 		return map[string]any{
 			"id": "deepseek/deepseek-v4.1-flash-1017", "name": "DeepSeek V4.1 Flash (1017)",

@@ -52,7 +52,7 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 		ReasoningPolicy: policy,
 		UnsetEnv: []string{
 			"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION",
-			"OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY",
+			"OPENAI_API_KEY", "OPENROUTER_API_KEY", "OPENCODE_API_KEY", "ANTHROPIC_API_KEY",
 			"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_BASE_URL",
 			"GEMINI_API_KEY", "CODEX_API_KEY", "PI_CODING_AGENT_DIR",
 			"PI_CODING_AGENT_SESSION_DIR", "OMP_PROFILE",
@@ -60,6 +60,9 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 	}
 	if strings.HasPrefix(req.Model, "openai/") && req.APIKey != "" {
 		invocation.SetEnv["OPENAI_API_KEY"] = req.APIKey
+	}
+	if strings.HasPrefix(req.Model, "opencode-go/") && req.APIKey != "" {
+		invocation.SetEnv["OPENCODE_API_KEY"] = req.APIKey
 	}
 	if strings.HasPrefix(req.Model, "openrouter/") && req.APIKey != "" {
 		invocation.SetEnv["OPENROUTER_API_KEY"] = req.APIKey

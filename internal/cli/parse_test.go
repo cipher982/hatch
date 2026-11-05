@@ -23,6 +23,7 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"codex", "terra", "--json", "-"}, "pi", "openai/gpt-6.1-terra"},
 		{[]string{"codex", "luna", "--json", "-"}, "pi", "openai/gpt-6-luna"},
 		{[]string{"openrouter", "deepseek", "--json", "-"}, "pi", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
+		{[]string{"opencode-go", "deepseek", "--json", "-"}, "pi", "opencode-go/deepseek-v4.1-flash"},
 		{[]string{"openrouter", "glm-5.3-flash", "--json", "-"}, "pi", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {
@@ -90,7 +91,7 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"grok", "cursor", "grok-4.7-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
 		{"argon", "omp", "google-antigravity/gemini-4-argon"},
-		{"deepseek", "pi", "openrouter/deepseek/deepseek-v4.1-flash-1017"},
+		{"deepseek", "pi", "opencode-go/deepseek-v4.1-flash"},
 		{"glm-5.3-flash", "pi", "openrouter/z-ai/glm-5.3-flash"},
 	}
 	for _, test := range tests {

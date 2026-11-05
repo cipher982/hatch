@@ -86,13 +86,20 @@ var ModelRegistry = []ModelSpec{
 	// explicit `hatch cursor gemini-4-argon` route instead.
 	{Surface: "gemini", Alias: "argon", Model: "google-antigravity/gemini-4-argon", Backend: "omp"},
 
+	// OpenCode Go: personal flat-rate plan. `hatch deepseek` lands here. The
+	// workspace privacy region must be Global or DeepSeek calls are refused.
+	{Surface: "opencode-go", Alias: "deepseek", Model: "opencode-go/deepseek-v4.1-flash", Backend: "pi"},
+
 	// OpenRouter
 	{
-		Surface:    "openrouter",
-		Alias:      "deepseek",
-		Model:      "openrouter/deepseek/deepseek-v4.1-flash-1017",
-		Backend:    "pi",
-		Deprecated: []string{"deepseek-v4.1-flash", "deepseek-v4-flash", "deepseek-v4-pro"},
+		Surface: "openrouter",
+		Alias:   "deepseek",
+		Model:   "openrouter/deepseek/deepseek-v4.1-flash-1017",
+		Backend: "pi",
+		// The bare `deepseek` shorthand belongs to the OpenCode Go surface
+		// (flat-rate plan); OpenRouter stays reachable as an explicit fallback.
+		NoShorthand: true,
+		Deprecated:  []string{"deepseek-v4.1-flash", "deepseek-v4-flash", "deepseek-v4-pro"},
 		// The September alias resolved to the 20260910 snapshot; 1017 is the
 		// October 17 checkpoint. Pin the family so future snapshots inherit it.
 		RoutingPrefix: "openrouter/deepseek/deepseek-v4.1-flash",
@@ -124,6 +131,7 @@ var (
 	CursorSurfaceModels     = map[string]string{}
 	GeminiSurfaceModels     = map[string]string{}
 	OpenRouterSurfaceModels = map[string]string{}
+	OpenCodeGoSurfaceModels = map[string]string{}
 
 	shorthandMap       = map[string]string{}
 	deprecatedAliasMap = map[string]string{}
@@ -149,6 +157,8 @@ func init() {
 			GeminiSurfaceModels[spec.Alias] = spec.Model
 		case "openrouter":
 			OpenRouterSurfaceModels[spec.Alias] = spec.Model
+		case "opencode-go":
+			OpenCodeGoSurfaceModels[spec.Alias] = spec.Model
 		}
 
 		if !spec.NoShorthand {
@@ -269,6 +279,7 @@ func SurfaceCatalog() []CatalogEntry {
 		{"cursor", CursorSurfaceModels},
 		{"gemini", GeminiSurfaceModels},
 		{"openrouter", OpenRouterSurfaceModels},
+		{"opencode-go", OpenCodeGoSurfaceModels},
 	}
 	entries := make([]CatalogEntry, 0, 16)
 	for _, catalog := range catalogs {

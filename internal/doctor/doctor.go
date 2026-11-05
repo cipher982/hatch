@@ -49,6 +49,7 @@ func Run(options Options) []Check {
 		checkPiModels("codex.catalog", modelValues(provider.CodexSurfaceModels)),
 		checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels)),
 		checkPiModels("openrouter.catalog", modelValues(provider.OpenRouterSurfaceModels)),
+		checkPiModels("opencode-go.catalog", modelValues(provider.OpenCodeGoSurfaceModels)),
 	}
 }
 
