@@ -40,7 +40,7 @@ func TestContractLegacyParityCommandBuilders(t *testing.T) {
 			invocation, err := provider.Build(provider.Request{
 				Backend: parsed.Backend, Model: parsed.Model, Prompt: prompt,
 				CWD: parsed.CWD, ReasoningEffort: parsed.ReasoningEffort, APIKey: parsed.APIKey,
-				OutputFormat: parsed.OutputFormat, Resume: parsed.Resume,
+				OutputFormat:        parsed.OutputFormat,
 				RawStructuredOutput: parsed.OutputFormatExplicit && parsed.OutputFormat == "stream-json",
 				SkipGitRepoCheck:    parsed.SkipGitRepoCheck, IncludePartialMessages: parsed.IncludePartialMessages,
 			})

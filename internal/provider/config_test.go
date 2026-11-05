@@ -338,15 +338,15 @@ func TestBuildOracleInvocations(t *testing.T) {
 }
 
 func TestBuildAdvancedBackendInvocations(t *testing.T) {
-	t.Run("claude resume and explicit stream", func(t *testing.T) {
+	t.Run("claude explicit stream", func(t *testing.T) {
 		got, err := Build(Request{
 			Backend: "claude", Model: "claude-opus-5-5", Prompt: "p", OutputFormat: "stream-json",
-			IncludePartialMessages: true, Resume: "ses_1",
+			IncludePartialMessages: true,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		wantTail := []string{"--include-partial-messages", "--resume", "ses_1"}
+		wantTail := []string{"--include-partial-messages"}
 		if !reflect.DeepEqual(got.Argv[len(got.Argv)-len(wantTail):], wantTail) || got.Adapter != "claude" ||
 			got.ReasoningPolicy != (ReasoningPolicy{Effort: "low", Source: "default", Support: "native"}) {
 			t.Fatalf("claude invocation = %#v", got)

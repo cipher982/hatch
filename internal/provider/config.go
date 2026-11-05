@@ -24,7 +24,6 @@ type Request struct {
 	OutputFormat           string
 	RawStructuredOutput    bool
 	APIKey                 string
-	Resume                 string
 	SkipGitRepoCheck       bool
 	IncludePartialMessages bool
 	// ReadOnly restricts the run to reading: no file edits, no builds, tests or
@@ -104,9 +103,6 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		)
 		if req.IncludePartialMessages || req.OutputFormat == "" || req.OutputFormat == "text" {
 			argv = append(argv, "--include-partial-messages")
-		}
-		if req.Resume != "" {
-			argv = append(argv, "--resume", req.Resume)
 		}
 		adapter, streamFormat := "raw", "text"
 		if outputFormat == "stream-json" && !req.RawStructuredOutput {

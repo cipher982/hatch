@@ -73,6 +73,8 @@ Credentials are resolved explicitly before backend launch:
   a small JSON request on stdin and receives credentials on stdout without
   owning a secret-manager integration
 
+Follow-ups: `hatch --resume <run-id> "task"` (also `hatch <model> --resume <run-id> ...`) continues any finished Hatch run on any provider by replaying that run's request and answer from the run store into a fresh run (`internal/run/followup.go`). Native provider sessions are not used (surfaced runs are ephemeral by design, so they cannot be resumed). Model, harness, effort and cwd inherit from the prior run; `--read-only` does not. Zeta (bedrock, cursor) and personal runs never cross (`provider.SurfaceAccount`). Every result has a `follow_up` field. Flags a backend would silently ignore are rejected (`checkFlagSupport`).
+
 Machine callers:
 - non-interactive agent runs default to JSON output and automation mode; `expert` requires explicit `--json`
 - agent prompts automatically receive a bounded-run contract: stay within scope,
@@ -132,6 +134,8 @@ explicit surfaced provider.
 7. **Artifact publication is ordered** - `result.json` precedes the terminal manifest. A terminal manifest is the commit point; never rewrite an existing run artifact or infer loss from a collapsed caller transcript.
 
 ## Learnings
+
+- (2026-11-05) [resume] Native `--resume SESSION_ID` was removed: it only reached Claude, where `--no-session-persistence` made it a no-op, and other providers dropped it silently. Follow-ups are now Hatch-level (`--resume <run-id>`), uniform across providers, discoverable in the main `--help`, and advertised in every result's `follow_up` field.
 
 <!-- Agents: append below. Human compacts weekly. -->
 

@@ -72,6 +72,19 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
+	root, err := runner.DefaultRoot()
+	if err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
+	}
+	var prior *runner.PriorRun
+	if request.Resume != "" {
+		loaded, err := runner.LoadPriorRun(root, request.Resume)
+		if err != nil {
+			return renderConfigError(request.JSON, stdout, stderr, err)
+		}
+		prior = &loaded
+		inheritFromPriorRun(&request, loaded)
+	}
 	if request.Harness != "" {
 		if !oneOf(request.Backend, "opencode", "pi", "omp") {
 			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for bedrock, codex, gemini, or openrouter surfaces"))
@@ -93,8 +106,8 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 			return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("cwd is not a directory: %s", request.CWD))
 		}
 	}
-	if oneOf(request.Backend, "opencode", "pi", "omp") && request.SkipGitRepoCheck {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("--skip-git-repo-check is not supported for surfaced providers"))
+	if err := checkFlagSupport(request); err != nil {
+		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
 	if _, err := provider.ResolveReasoning(request.Backend, request.Model, request.ReasoningEffort); err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
@@ -124,11 +137,21 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if (strings.HasPrefix(request.Model, "openai/") || request.Backend == "codex") && apiKey == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("OPENAI_API_KEY is not set or available from the configured credential helper"))
 	}
+	surface, providerName := identity(request.Backend, request.Model)
+	providerPrompt := prompt
+	if prior != nil {
+		if provider.SurfaceAccount(prior.Surface) != provider.SurfaceAccount(surface) {
+			return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf(
+				"run %s used %s (%s account) and %s is on the %s account; work and personal text never cross. Continue with a %s model, or start a fresh run",
+				prior.RunID, prior.Surface, provider.SurfaceAccount(prior.Surface), surface, provider.SurfaceAccount(surface), provider.SurfaceAccount(prior.Surface)))
+		}
+		providerPrompt = prior.FollowUpPrompt(prompt)
+	}
 	invocation, err := provider.Build(provider.Request{
-		Backend: request.Backend, Model: request.Model, Prompt: prompt, CWD: request.CWD,
+		Backend: request.Backend, Model: request.Model, Prompt: providerPrompt, CWD: request.CWD,
 		ReasoningEffort: request.ReasoningEffort, OutputFormat: request.OutputFormat, APIKey: apiKey,
-		RawStructuredOutput: request.OutputFormatExplicit && request.OutputFormat == "stream-json",
-		Resume:              request.Resume, SkipGitRepoCheck: request.SkipGitRepoCheck,
+		RawStructuredOutput:    request.OutputFormatExplicit && request.OutputFormat == "stream-json",
+		SkipGitRepoCheck:       request.SkipGitRepoCheck,
 		IncludePartialMessages: request.IncludePartialMessages, ReadOnly: request.ReadOnly,
 	})
 	if err != nil {
@@ -141,11 +164,6 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if err := preflightBedrock(request.Model, invocation); err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
 	}
-	root, err := runner.DefaultRoot()
-	if err != nil {
-		return renderConfigError(request.JSON, stdout, stderr, err)
-	}
-	surface, providerName := identity(request.Backend, request.Model)
 	credentialNames := []string{}
 	if strings.HasPrefix(request.Model, "openrouter/") {
 		credentialNames = append(credentialNames, "OPENROUTER_API_KEY")
@@ -360,6 +378,13 @@ Start here:
   hatch cursor gemini-4-argon "Summarize this code"
   hatch expert "Is this refactor direction sound?"
 
+Follow up on an earlier run (any model, any surface):
+  hatch --resume <run-id> "Now fix what you found"      same model, same directory
+  hatch opus --resume <run-id> "Implement the fix"      a different model of the same account
+  Every result prints its run id and a "follow_up" command. The new run receives the
+  earlier task and answer as context. Work (Zeta: bedrock, cursor) and personal runs
+  never cross; continue within the same account.
+
 Common options:
   -C, --cwd DIR        Working directory for the agent
   --title TEXT         Short single-line task title (up to 160 bytes)
@@ -369,6 +394,8 @@ Common options:
   -t, --timeout SEC    Hard timeout (default: 1800)
   --harness NAME       Select opencode, pi, or omp for bedrock/codex/gemini/openrouter
   --reasoning-effort LEVEL  none|low|medium|high|xhigh|max
+  -r, --resume RUN_ID  Continue an earlier Hatch run (see above)
+  --read-only          No file edits and no builds, tests or other programs (every surface)
   --json               Emit exactly one JSON document on stdout
   --advanced-help      Show raw/backend-specific flags
 
@@ -384,15 +411,12 @@ Other commands:
 
 const AdvancedHelp = Help + `
 Advanced raw/backend options:
-  --read-only          No file edits and no builds, tests or other programs, enforced by the
-                       backend's own permission/tool/sandbox mechanism (refused where none exists)
   -b, --backend NAME
   --model MODEL
   --skip-git-repo-check
   --output-format <text|json|stream-json>
   --include-partial-messages
   --api-key KEY
-  -r, --resume SESSION_ID
   --automation
 
 Credential helper:

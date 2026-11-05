@@ -184,6 +184,21 @@ func init() {
 	})
 }
 
+// SurfaceAccount names who pays for, and may see, work sent through a surface
+// or a manifest surface label such as "bedrock.sol": "zeta" for the employer
+// accounts (Bedrock, Cursor) and "personal" for everything else. Work and
+// personal content never cross, so a follow-up refuses to move a run's text
+// from one to the other.
+func SurfaceAccount(surface string) string {
+	name, _, _ := strings.Cut(surface, ".")
+	switch name {
+	case "bedrock", "cursor":
+		return "zeta"
+	default:
+		return "personal"
+	}
+}
+
 // ShorthandSurface returns the canonical surface for a shorthand model alias (active or deprecated).
 func ShorthandSurface(alias string) string {
 	return shorthandMap[alias]

@@ -28,13 +28,16 @@ func parseOutputLimit(value string) (int, error) {
 // Display limits never change the coordinator result or its durable projection.
 type resultDisplay struct {
 	runner.PublicResult
-	OutputTruncated   bool     `json:"output_truncated"`
-	StderrTruncated   bool     `json:"stderr_truncated"`
-	ErrorTruncated    bool     `json:"error_truncated"`
-	MetadataTruncated bool     `json:"metadata_truncated"`
-	ReadCommand       []string `json:"read_command,omitempty"`
-	ManifestCommand   []string `json:"manifest_command,omitempty"`
-	StderrCommand     []string `json:"stderr_command,omitempty"`
+	OutputTruncated   bool `json:"output_truncated"`
+	StderrTruncated   bool `json:"stderr_truncated"`
+	ErrorTruncated    bool `json:"error_truncated"`
+	MetadataTruncated bool `json:"metadata_truncated"`
+	// FollowUp is the exact command that continues this run with the same
+	// model, from the same directory, with its request and answer as context.
+	FollowUp        string   `json:"follow_up,omitempty"`
+	ReadCommand     []string `json:"read_command,omitempty"`
+	ManifestCommand []string `json:"manifest_command,omitempty"`
+	StderrCommand   []string `json:"stderr_command,omitempty"`
 }
 
 func displayResult(result runner.PublicResult, limit int) resultDisplay {
@@ -50,6 +53,7 @@ func displayResult(result runner.PublicResult, limit int) resultDisplay {
 	}
 	if result.Run != nil {
 		d.Run, d.MetadataTruncated = displayManifest(result.Run)
+		d.FollowUp = FollowUpCommand(result.Run.RunID)
 		d.ReadCommand = []string{"hatch", "runs", "read", result.Run.RunID, "--part", "result", "--json"}
 		d.ManifestCommand = []string{"hatch", "runs", "read", result.Run.RunID, "--part", "manifest", "--json"}
 		if d.StderrTruncated || d.ErrorTruncated {
@@ -63,6 +67,12 @@ func displayResult(result runner.PublicResult, limit int) resultDisplay {
 		d.MetadataTruncated = d.MetadataTruncated || clipped
 	}
 	return d
+}
+
+// FollowUpCommand is how a caller continues a run, for example to act on what
+// an investigation found.
+func FollowUpCommand(runID string) string {
+	return `hatch --resume ` + runID + ` "<next task>"`
 }
 
 func renderResult(result runner.PublicResult, limit int, jsonOutput bool, stdout, stderr io.Writer) int {
@@ -95,6 +105,9 @@ func renderResult(result runner.PublicResult, limit int, jsonOutput bool, stdout
 		}
 		if d.Error != nil {
 			fmt.Fprintf(stderr, "Error: %s\n", *d.Error)
+		}
+		if d.FollowUp != "" && result.OK {
+			fmt.Fprintf(stderr, "[hatch] Follow up on this run: %s\n", d.FollowUp)
 		}
 		if d.OutputTruncated {
 			fmt.Fprintf(stderr, "Output preview truncated; read the full result with: %s\n", commandText(d.ReadCommand))

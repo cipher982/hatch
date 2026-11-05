@@ -344,6 +344,23 @@ Provider invocations are intentionally non-interactive and permission-bypassed.
 Treat Hatch like any other unattended coding agent: give it a scoped working
 directory and a prompt whose tool authority you are willing to grant.
 
+## Following up on a run
+
+Every result carries a run id and a `follow_up` command. To act on what an
+investigation found, resume it:
+
+```sh
+hatch deepseek --read-only "Why does the parking lot spin outward?"   # run id in the result
+hatch --resume <run-id> "Now implement and verify the fix"            # same model, same directory
+hatch sonnet --resume <run-id> "Implement the fix"                    # different model, same account
+```
+
+The new run starts with the earlier task and answer as context, so it behaves
+the same on every provider; nothing depends on the provider keeping a session.
+Model, harness, reasoning effort and working directory are inherited unless
+named. `--read-only` is not inherited. A run on a Zeta surface (Bedrock,
+Cursor) cannot be continued on a personal one, or the reverse.
+
 ## What Hatch is not
 
 If this is all you need:
@@ -360,7 +377,7 @@ Hatch is also deliberately not:
 
 - a general-purpose agent framework or background job system;
 - a persistent runtime, scheduler, or MCP server;
-- a promise that every provider supports resume or session inspection; or
+- a promise that every provider keeps native session state: follow-ups replay the earlier request and answer from Hatch's own run store instead; or
 - a portable substitute for provider subscriptions, API accounts, or their
   native CLIs.
 
