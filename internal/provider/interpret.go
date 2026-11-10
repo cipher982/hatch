@@ -40,6 +40,9 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 	case "cursor":
 		result.Retention = "unknown"
 		result.Capabilities["identify"] = "supported"
+	case "antigravity":
+		result.Retention = "provider_owned"
+		result.Capabilities["identify"] = "supported"
 	case "pi", "omp":
 		result.Capabilities["identify"] = "supported"
 	}
@@ -138,6 +141,38 @@ func Interpret(adapter string, stdout, stderr []byte) Interpretation {
 			if typeName == "error" {
 				if message := piLikeErrorMessage(event); message != "" {
 					result.Error = message
+				}
+			}
+		case "antigravity":
+			// Antigravity names its envelope by the event itself
+			// ({"event":"init",...}) and puts the payload under that key.
+			name, _ := event["event"].(string)
+			payload, _ := event[name].(map[string]any)
+			switch name {
+			case "init":
+				observeSession(&result, event, "conversation_id")
+			case "step_update":
+				if payload["step_type"] == "agent_response" && payload["state"] == "ACTIVE" {
+					if delta, ok := payload["text_delta"].(string); ok && delta != "" {
+						textChunks = append(textChunks, delta)
+					}
+				}
+			case "result":
+				result.TerminalMarker = "observed"
+				status, _ := payload["status"].(string)
+				response, _ := payload["response"].(string)
+				if status != "SUCCESS" {
+					// Antigravity exits 0 even when the run fails, and reports
+					// the failure only in the result event.
+					message, _ := payload["error"].(string)
+					if strings.TrimSpace(message) == "" {
+						message = "Antigravity returned an unsuccessful result (" + defaultName(status, "no status") + ")"
+					}
+					result.Error = message
+				} else if strings.TrimSpace(response) == "" {
+					result.Error = "Antigravity result event did not contain output"
+				} else {
+					finalChunks = []string{response}
 				}
 			}
 		}

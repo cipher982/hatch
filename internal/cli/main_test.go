@@ -123,15 +123,14 @@ func TestMainSelectsOMPForSurfacedCodexRun(t *testing.T) {
 	}
 }
 
-func TestMainSelectsOMPForSurfacedGeminiRun(t *testing.T) {
+func TestMainSelectsAntigravityForSurfacedGeminiRun(t *testing.T) {
 	root := t.TempDir()
 	fake := buildTestProviderForCLI(t, root)
-	if err := os.Symlink(fake, filepath.Join(root, "omp")); err != nil {
+	if err := os.Symlink(fake, filepath.Join(root, "agy")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("HATCH_TEST_SCENARIO", "success_omp")
-	t.Setenv("HATCH_TEST_SESSION", "omp-session-cli")
+	t.Setenv("HATCH_TEST_SCENARIO", "success_antigravity")
 	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", filepath.Join(root, "runs"))
 
 	var stdout, stderr bytes.Buffer
@@ -151,8 +150,9 @@ func TestMainSelectsOMPForSurfacedGeminiRun(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || result.Output != "fake success_omp output" || result.Run.Surface != "gemini.argon" || result.Run.Backend != "omp" || result.Run.Model != "google-antigravity/gemini-4-argon" {
-		t.Fatalf("unexpected OMP Gemini result: %#v", result)
+	if !result.OK || result.Output != "fake antigravity output\n" || result.Run.Surface != "gemini.argon" ||
+		result.Run.Backend != "antigravity" || result.Run.Model != "gemini-4-argon-medium" {
+		t.Fatalf("unexpected Antigravity Gemini result: %#v", result)
 	}
 }
 
@@ -173,7 +173,7 @@ func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 		{"openai/gpt-5.4-nano", "pi", "codex.nano"},
 		{"kimi-k3", "cursor", "cursor.kimi-k3"},
 		{"gemini-4-argon-medium", "cursor", "cursor.gemini-4-argon"},
-		{"google-antigravity/gemini-4-argon", "omp", "gemini.argon"},
+		{"gemini-4-argon-medium", "antigravity", "gemini.argon"},
 	} {
 		if got, _ := identity(test.backend, test.model); got != test.want {
 			t.Fatalf("identity(%q)=%q want=%q", test.model, got, test.want)
@@ -252,11 +252,15 @@ printf '%s\n' 'provider model context' \
 		t.Fatal(err)
 	}
 	ompBinary := filepath.Join(directory, "omp")
-	ompScript := `#!/bin/sh
-if [ "$1" = "--version" ]; then printf '%s\n' 'omp test'; exit 0; fi
-printf '%s\n' '{"models":[{"id":"gemini-4-argon","selector":"google-antigravity/gemini-4-argon"}]}'
+	if err := os.WriteFile(ompBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'omp test'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	agyBinary := filepath.Join(directory, "agy")
+	agyScript := `#!/bin/sh
+if [ "$1" = "--version" ]; then printf '%s\n' 'agy test'; exit 0; fi
+printf 'gemini-4-argon-medium\tGemini 4 Argon (Medium)\n'
 `
-	if err := os.WriteFile(ompBinary, []byte(ompScript), 0o700); err != nil {
+	if err := os.WriteFile(agyBinary, []byte(agyScript), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	helper := filepath.Join(directory, "credential-helper")
@@ -280,7 +284,7 @@ printf '%s\n' '{"models":[{"id":"gemini-4-argon","selector":"google-antigravity/
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || len(result.Checks) != 8 {
+	if !result.OK || len(result.Checks) != 9 {
 		t.Fatalf("doctor = %#v", result)
 	}
 	for _, check := range result.Checks {
@@ -303,7 +307,7 @@ func TestMainCatalogJSON(t *testing.T) {
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable", Model: "claude-fable-5-2"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable-5.2", Model: "claude-fable-5-2"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "argon", Model: "google-antigravity/gemini-4-argon"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "argon", Model: "gemini-4-argon-medium"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017"}) ||

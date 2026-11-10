@@ -22,6 +22,28 @@ func TestInterpretCursorError(t *testing.T) {
 	}
 }
 
+func TestInterpretAntigravitySuccess(t *testing.T) {
+	stdout := []byte(
+		`{"event":"init","conversation_id":"conv-1","init":{"model":"gemini-4-argon-medium"}}` + "\n" +
+			`{"event":"step_update","step_update":{"conversation_id":"conv-1","step_index":1,"state":"ACTIVE","step_type":"agent_response","text_delta":"partial"}}` + "\n" +
+			`{"event":"result","result":{"conversation_id":"conv-1","status":"SUCCESS","response":"final answer","duration_seconds":2,"num_turns":1}}` + "\n",
+	)
+	got := Interpret("antigravity", stdout, nil)
+	if string(got.Output) != "final answer" || got.TerminalMarker != "observed" || got.NativeID != "conv-1" || got.Error != "" {
+		t.Fatalf("unexpected interpretation: %#v", got)
+	}
+}
+
+// Antigravity exits 0 when a run fails, so the result event is the only
+// failure signal Hatch gets.
+func TestInterpretAntigravityErrorResult(t *testing.T) {
+	stdout := []byte(`{"event":"result","result":{"status":"ERROR","response":"","error":"invalid model selection"}}` + "\n")
+	got := Interpret("antigravity", stdout, nil)
+	if got.Error != "invalid model selection" || got.TerminalMarker != "observed" || string(got.Output) != "" {
+		t.Fatalf("unexpected interpretation: %#v", got)
+	}
+}
+
 func TestInterpretClaudeStructuredError(t *testing.T) {
 	stdout := []byte(`{"type":"result","subtype":"error","is_error":true,"result":"permission denied"}` + "\n")
 	got := Interpret("claude", stdout, nil)

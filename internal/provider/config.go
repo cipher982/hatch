@@ -164,6 +164,30 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 			SetEnv:          map[string]string{"OPENAI_API_KEY": req.APIKey},
 			UnsetEnv:        []string{"CODEX_API_KEY", "CODEX_HOME", "CLAUDE_CODE_USE_BEDROCK"},
 		}), nil
+	case "antigravity":
+		// Google's Antigravity CLI. Its print flag takes the prompt as its
+		// value, and flags placed after it are read as prompt text, so the
+		// prompt must come last.
+		model := req.Model
+		if model == "" {
+			return Invocation{}, invalidModelForBackend(req.Backend)
+		}
+		argv := []string{"agy"}
+		if req.ReadOnly {
+			argv = append(argv, antigravityReadOnlyFlags...)
+		} else {
+			argv = append(argv, "--dangerously-skip-permissions")
+		}
+		argv = append(argv, "--output-format", "stream-json", "--model", model, "-p", prompt)
+		return redactInvocation(Invocation{
+			Argv: argv, StreamFormat: "jsonl", Adapter: "antigravity", ReasoningPolicy: policy,
+			UnsetEnv: []string{
+				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "OPENCODE_API_KEY", "ANTHROPIC_API_KEY",
+				"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_BASE_URL",
+				"GEMINI_API_KEY", "CODEX_API_KEY", "CURSOR_API_KEY", "CLAUDE_CODE_USE_BEDROCK",
+				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION",
+			},
+		}, len(argv)-1), nil
 	case "gemini":
 		model := req.Model
 		if model == "" {

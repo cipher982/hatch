@@ -23,6 +23,8 @@ func ReadOnlyMechanism(backend string) (string, error) {
 		return "Oh My Pi tool allowlist (read, grep, glob; no bash, edit or write)", nil
 	case "cursor":
 		return "Cursor Agent ask mode (read-only by its own definition) without --force", nil
+	case "antigravity":
+		return "Antigravity plan mode (read-only research; the run returns a plan instead of making changes)", nil
 	case "codex":
 		return "Codex read-only sandbox (writes and network blocked)", nil
 	default:
@@ -36,9 +38,12 @@ var (
 		"--permission-mode", "dontAsk", "--allowedTools", claudeReadOnlyTools, "--strict-mcp-config",
 	}
 	cursorReadOnlyFlags = []string{"--mode", "ask"}
-	codexReadOnlyFlags  = []string{"--sandbox", "read-only"}
-	piReadOnlyTools     = "read,grep,find,ls"
-	ompReadOnlyTools    = "read,grep,glob"
+	// Antigravity's plan mode researches read-only and returns a plan; the
+	// permission bypass is never combined with it.
+	antigravityReadOnlyFlags = []string{"--mode", "plan"}
+	codexReadOnlyFlags       = []string{"--sandbox", "read-only"}
+	piReadOnlyTools          = "read,grep,find,ls"
+	ompReadOnlyTools         = "read,grep,glob"
 )
 
 // marshalPlain is json.Marshal without HTML escaping, so the redirect pattern

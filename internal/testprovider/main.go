@@ -68,6 +68,33 @@ func main() {
 			"type": "result", "subtype": "success", "is_error": false,
 			"duration_ms": 1250, "result": "fake cursor kimi output",
 		})
+	case "success_antigravity":
+		emitJSON(map[string]any{
+			"event": "init", "conversation_id": "agy-session-oracle",
+			"init": map[string]any{"model": "gemini-4-argon-medium", "cwd": "/oracle"},
+		})
+		emitJSON(map[string]any{
+			"event": "step_update",
+			"step_update": map[string]any{
+				"conversation_id": "agy-session-oracle", "step_index": 1,
+				"state": "DONE", "step_type": "agent_response",
+			},
+		})
+		emitJSON(map[string]any{
+			"event": "result",
+			"result": map[string]any{
+				"conversation_id": "agy-session-oracle", "status": "SUCCESS",
+				"response": "fake antigravity output\n", "duration_seconds": 2.5, "num_turns": 1,
+			},
+		})
+	case "antigravity_error":
+		emitJSON(map[string]any{
+			"event": "result",
+			"result": map[string]any{
+				"conversation_id": "", "status": "ERROR", "response": "",
+				"error": "invalid model selection",
+			},
+		})
 	case "success_pi", "success_omp":
 		emitJSON(map[string]any{"type": "session", "id": os.Getenv("HATCH_TEST_SESSION")})
 		emitJSON(map[string]any{

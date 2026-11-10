@@ -135,7 +135,7 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch bedrock <opus\|sonnet\|astra\|sol\|terra\|luna>` | Claude 5.5 and OpenAI GPT-6/6.1 on Zeta's AWS Bedrock account via the selected harness |
 | `hatch codex <astra\|sol\|terra\|luna>` | OpenAI coding models on the personal OpenAI account (ChatGPT/Codex subscription or API key); the Zeta route is `hatch bedrock` |
 | `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
-| `hatch gemini [argon]` | Oh My Pi with `google-antigravity/gemini-4-argon` on the personal Google AI Ultra subscription |
+| `hatch gemini [argon]` | Google Antigravity CLI (`agy`) with `gemini-4-argon-medium` on the personal Google AI Ultra subscription |
 | `hatch opencode-go <deepseek>` | Pi with the OpenCode Go plan (`deepseek` = V4.1 Flash; bare `hatch deepseek` runs this) |
 | `hatch openrouter <deepseek\|glm-5.3-flash>` | Pi with an OpenRouter model alias (`deepseek` = V4.1 Flash 1017, pinned to the DeepSeek upstream) |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
@@ -147,6 +147,9 @@ backend-specific options, use `hatch --advanced-help`.
 argon` selects it explicitly. Zeta Gemini work uses `hatch cursor
 gemini-4-argon`, which has no bare shorthand; pass another raw Cursor model ID
 with `--model` to choose a different supported Cursor variant.
+
+`hatch gemini` runs Google's own Antigravity CLI (`agy`), so the agent loop,
+tools, and model selection are Antigravity's rather than Pi's or Oh My Pi's.
 
 `opus` targets Claude Opus 5.5 through the local Claude Code CLI; the retired
 `opus-5` alias is rejected. `sonnet` targets Claude Sonnet 5.5 the same way.
@@ -173,9 +176,10 @@ the subscription route never falls back to Bedrock.
 Gemini 4 Argon has two routes, chosen by who pays:
 
 - **Personal work** (Zerg, Longhouse, personal infrastructure): `hatch gemini`
-  (alias `argon`). This runs `google-antigravity/gemini-4-argon` through Oh My
-  Pi on David's personal Google AI Ultra subscription, at Hatch's default
-  `medium` reasoning.
+  (alias `argon`). This runs `gemini-4-argon-medium` through Google's Antigravity
+  CLI (`agy`) on David's personal Google AI Ultra subscription. Antigravity model
+  ids carry the reasoning tier, so Hatch surfaces `medium` and rejects
+  `--reasoning-effort` instead of passing an override that would conflict.
 - **Zeta or other employer work**: `hatch cursor gemini-4-argon`. This runs
   Cursor's `gemini-4-argon-medium` through the local Cursor Agent CLI on the
   Zeta-account Cursor subscription.
@@ -193,7 +197,7 @@ Each surface bills a different account:
 | `bedrock` | Zeta AWS Bedrock, SSO profile `zh-ml-mlengineer` | Claude Opus/Sonnet 5.5 and OpenAI GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, GPT-6 Luna |
 | `codex` | Personal OpenAI account (ChatGPT/Codex subscription, or an OpenAI API key) | astra, sol, terra, luna (plus `nano`, `mini`, `max`) |
 | `cursor` | Zeta-account Cursor subscription | grok, kimi-k3, gemini-4-argon |
-| `gemini` | Personal Google AI Ultra subscription (Oh My Pi) | argon |
+| `gemini` | Personal Google AI Ultra subscription (Antigravity CLI) | argon |
 | `opencode-go` | OpenCode Go flat-rate plan | deepseek |
 | `openrouter` | OpenRouter balance | deepseek, glm-5.3-flash (explicit only) |
 
@@ -217,8 +221,9 @@ efforts, including `none` and `max`.
 
 ### Select the coding harness
 
-Bedrock, Codex and OpenRouter surfaces default to Pi, but callers can choose the
-harness explicitly:
+Bedrock, Codex, OpenCode Go and OpenRouter surfaces default to Pi, but callers
+can choose the harness explicitly. Gemini is pinned to Antigravity and takes no
+harness override:
 
 ```bash
 hatch codex astra --harness pi "Review this branch"
@@ -256,8 +261,9 @@ Known Codex/OpenAI surfaces default to `medium`; pass
 Hatch records the effort, whether it came from the default or the user, and
 whether the provider supports it in both the run manifest and JSON result.
 Claude and Bedrock (Opus/Sonnet 5.5) default to `low` and accept
-`low|medium|high|xhigh|max`. OpenRouter and Cursor report reasoning as
-unsupported instead of accepting a misleading override.
+`low|medium|high|xhigh|max`. OpenRouter, Cursor and Antigravity report reasoning
+as unsupported instead of accepting a misleading override; Gemini's tier is part
+of the Antigravity model id.
 Unknown OpenAI models require an explicit effort before Hatch launches them.
 
 `luna` at `xhigh` is the one model/effort pair that opts into OpenAI Fast mode
@@ -298,7 +304,9 @@ Install and authenticate the relevant native CLI first:
 
 - `claude` for the Claude surface
 - `cursor-agent` for Cursor
-- `pi` for the Bedrock, Codex and OpenRouter surfaces (and `omp` for Gemini)
+- `pi` for the Bedrock, Codex, OpenCode Go and OpenRouter surfaces (`omp` as an
+  alternative harness)
+- `agy` for the Gemini surface (Google Antigravity CLI)
 - an `OPENAI_API_KEY` for Codex and Expert, or an `OPENROUTER_API_KEY` for
   OpenRouter; Cursor login or `CURSOR_API_KEY` for Cursor
 

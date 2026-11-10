@@ -74,6 +74,29 @@ func (p *ProgressParser) Observe(line []byte) []string {
 				return []string{"[hatch] " + label + " completed"}
 			}
 		}
+	case "antigravity":
+		name, _ := event["event"].(string)
+		payload, _ := event[name].(map[string]any)
+		switch name {
+		case "init":
+			init, _ := event["init"].(map[string]any)
+			flat := map[string]any{"model": init["model"], "conversation_id": event["conversation_id"]}
+			return []string{startedMessage("Antigravity", flat, "conversation_id")}
+		case "step_update":
+			if payload["step_type"] != "tool" || payload["state"] != "ACTIVE" {
+				return nil
+			}
+			id := fmt.Sprintf("%v/%v", payload["conversation_id"], payload["step_index"])
+			if p.seen[id] {
+				return nil
+			}
+			p.seen[id] = true
+			return []string{summarizeAntigravityTool(payload)}
+		case "result":
+			if payload["status"] == "SUCCESS" {
+				return []string{completedSeconds("Antigravity", payload["duration_seconds"])}
+			}
+		}
 	}
 	return nil
 }
@@ -133,6 +156,26 @@ func completedMessage(label string, raw any) string {
 	default:
 		return "[hatch] " + label + " completed"
 	}
+}
+
+// completedSeconds formats a duration already reported in seconds, as
+// Antigravity reports it.
+func completedSeconds(label string, raw any) string {
+	if value, ok := raw.(float64); ok {
+		return fmt.Sprintf("[hatch] %s completed in %.1fs", label, value)
+	}
+	return "[hatch] " + label + " completed"
+}
+
+func summarizeAntigravityTool(payload map[string]any) string {
+	name, _ := payload["tool_name"].(string)
+	name = defaultName(name, "tool")
+	info, _ := payload["tool_info"].(map[string]any)
+	parameters, _ := info["parameters"].(map[string]any)
+	if value := firstString(parameters, "CommandLine", "command", "path", "file_path", "filePath", "query", "pattern"); value != "" {
+		return fmt.Sprintf("[hatch] Antigravity %s: %s", name, compact(value))
+	}
+	return "[hatch] Antigravity " + name
 }
 
 func summarizeCursorTool(call map[string]any) string {

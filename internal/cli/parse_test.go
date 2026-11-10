@@ -16,8 +16,8 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "grok-4.7-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"cursor", "gemini-4-argon", "--json", "-"}, "cursor", "gemini-4-argon-medium"},
-		{[]string{"gemini", "--json", "-"}, "omp", "google-antigravity/gemini-4-argon"},
-		{[]string{"gemini", "argon", "--json", "-"}, "omp", "google-antigravity/gemini-4-argon"},
+		{[]string{"gemini", "--json", "-"}, "antigravity", "gemini-4-argon-medium"},
+		{[]string{"gemini", "argon", "--json", "-"}, "antigravity", "gemini-4-argon-medium"},
 		{[]string{"codex", "astra", "--json", "-"}, "pi", "openai/gpt-6-astra"},
 		{[]string{"codex", "sol", "--json", "-"}, "pi", "openai/gpt-6.1-sol"},
 		{[]string{"codex", "terra", "--json", "-"}, "pi", "openai/gpt-6.1-terra"},
@@ -90,7 +90,7 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"luna", "pi", "amazon-bedrock/global.openai.gpt-6-luna"},
 		{"grok", "cursor", "grok-4.7-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
-		{"argon", "omp", "google-antigravity/gemini-4-argon"},
+		{"argon", "antigravity", "gemini-4-argon-medium"},
 		{"deepseek", "pi", "opencode-go/deepseek-v4.1-flash"},
 		{"glm-5.3-flash", "pi", "openrouter/z-ai/glm-5.3-flash"},
 	}
@@ -124,8 +124,8 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"double dash", []string{"--", "claude", "review"}, []string{"--", "claude", "review"}},
 		{"surface help", []string{"codex", "--help"}, []string{"codex", "--help"}},
 		{"surface advanced help", []string{"claude", "--advanced-help"}, []string{"claude", "--advanced-help"}},
-		{"gemini default prompt", []string{"gemini", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-4-argon", "review"}},
-		{"gemini shorthand", []string{"argon", "review"}, []string{"--backend", "omp", "--model", "google-antigravity/gemini-4-argon", "review"}},
+		{"gemini default prompt", []string{"gemini", "review"}, []string{"--backend", "antigravity", "--model", "gemini-4-argon-medium", "review"}},
+		{"gemini shorthand", []string{"argon", "review"}, []string{"--backend", "antigravity", "--model", "gemini-4-argon-medium", "review"}},
 		{"cursor gemini surface", []string{"cursor", "gemini-4-argon", "review"}, []string{"--backend", "cursor", "--model", "gemini-4-argon-medium", "review"}},
 	}
 	for _, test := range tests {

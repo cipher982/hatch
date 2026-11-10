@@ -2,7 +2,6 @@ package doctor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,10 +43,11 @@ func Run(options Options) []Check {
 	return []Check{
 		checkHarness("harness.pi", "pi"),
 		checkHarness("harness.omp", "omp"),
+		checkHarness("harness.agy", "agy"),
 		checkCursorModel(options.Cursor),
 		checkPiModels("bedrock.catalog", modelValues(provider.BedrockSurfaceModels)),
 		checkPiModels("codex.catalog", modelValues(provider.CodexSurfaceModels)),
-		checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels)),
+		checkAntigravityModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels)),
 		checkPiModels("openrouter.catalog", modelValues(provider.OpenRouterSurfaceModels)),
 		checkPiModels("opencode-go.catalog", modelValues(provider.OpenCodeGoSurfaceModels)),
 	}
@@ -211,46 +211,41 @@ func cursorRejectsModel(model string, credential Credential) bool {
 	return strings.Contains(string(output), "Cannot use this model")
 }
 
-type ompModelEntry struct {
-	ID       string `json:"id"`
-	Selector string `json:"selector"`
+// ParseAntigravityModelIDs reads `agy models` output (model id, tab, display
+// name) into model ids.
+func ParseAntigravityModelIDs(output string) map[string]struct{} {
+	result := map[string]struct{}{}
+	for _, line := range strings.Split(output, "\n") {
+		id, _, ok := strings.Cut(line, "\t")
+		if !ok {
+			continue
+		}
+		if id = strings.TrimSpace(id); id != "" && !strings.ContainsAny(id, " ") {
+			result[id] = struct{}{}
+		}
+	}
+	return result
 }
 
-type ompModelsResponse struct {
-	Models []ompModelEntry `json:"models"`
-}
-
-func checkOMPModels(name string, required []string) Check {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func checkAntigravityModels(name string, required []string) Check {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "omp", "models", "--json")
+	cmd := exec.CommandContext(ctx, "agy", "models")
 	stdout, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
-		return Check{Name: name, Detail: "omp models --json timed out after 10s"}
+		return Check{Name: name, Detail: "agy models timed out after 30s"}
 	}
 	if err != nil {
 		if _, ok := err.(*exec.Error); ok {
-			return Check{Name: name, Detail: "omp is not installed"}
+			return Check{Name: name, Detail: "agy is not installed"}
 		}
 		detail := err.Error()
 		if exit, ok := err.(*exec.ExitError); ok && strings.TrimSpace(string(exit.Stderr)) != "" {
 			detail = strings.TrimSpace(string(exit.Stderr))
 		}
-		return Check{Name: name, Detail: "could not list omp models: " + detail}
+		return Check{Name: name, Detail: "could not list Antigravity models: " + detail}
 	}
-	var resp ompModelsResponse
-	if err := json.Unmarshal(stdout, &resp); err != nil {
-		return Check{Name: name, Detail: "failed to parse omp models --json: " + err.Error()}
-	}
-	available := map[string]struct{}{}
-	for _, m := range resp.Models {
-		if m.Selector != "" {
-			available[m.Selector] = struct{}{}
-		}
-		if m.ID != "" {
-			available[m.ID] = struct{}{}
-		}
-	}
+	available := ParseAntigravityModelIDs(string(stdout))
 	missing := []string{}
 	for _, model := range required {
 		if _, ok := available[model]; !ok {
@@ -258,7 +253,7 @@ func checkOMPModels(name string, required []string) Check {
 		}
 	}
 	if len(missing) > 0 {
-		return Check{Name: name, Detail: fmt.Sprintf("configured models unavailable: %s; run `omp models` and update Hatch aliases", strings.Join(missing, ", "))}
+		return Check{Name: name, Detail: fmt.Sprintf("configured models unavailable: %s; run `agy models` and update Hatch aliases", strings.Join(missing, ", "))}
 	}
 	return Check{Name: name, OK: true, Detail: fmt.Sprintf("%d configured models are available", len(required))}
 }

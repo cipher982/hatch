@@ -87,15 +87,15 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	}
 	if request.Harness != "" {
 		if !oneOf(request.Backend, "pi", "omp") {
-			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for bedrock, codex, gemini, or openrouter surfaces"))
+			return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, fmt.Errorf("--harness can only select the coding harness for bedrock, codex, opencode-go, or openrouter surfaces"))
 		}
 		request.Backend = request.Harness
 	}
 	if request.Backend == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("No default model is configured; choose an explicit provider"))
 	}
-	if !oneOf(request.Backend, "claude", "cursor", "codex", "gemini", "pi", "omp") {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: claude, cursor, codex, gemini, pi, omp", request.Backend))
+	if !oneOf(request.Backend, "antigravity", "claude", "cursor", "codex", "gemini", "pi", "omp") {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: antigravity, claude, cursor, codex, gemini, pi, omp", request.Backend))
 	}
 	if request.CWD != "" {
 		info, statErr := os.Stat(request.CWD)
@@ -206,6 +206,8 @@ func progressLabel(surface string) string {
 		return "Codex"
 	case strings.HasPrefix(surface, "gemini."):
 		return "Gemini"
+	case strings.HasPrefix(surface, "antigravity."):
+		return "Antigravity"
 	default:
 		return "Agent"
 	}
@@ -300,6 +302,13 @@ func identity(backend, model string) (string, string) {
 		return "cursor.raw", "cursor"
 	case "gemini":
 		return "gemini.raw", "google"
+	case "antigravity":
+		for alias, configured := range surfaces["gemini"].models {
+			if configured == model {
+				return "gemini." + alias, "google"
+			}
+		}
+		return "antigravity.raw", "google"
 	case "pi", "omp":
 		for alias, configured := range surfaces["bedrock"].models {
 			if configured == model {
@@ -321,11 +330,6 @@ func identity(backend, model string) (string, string) {
 				return "codex." + alias, "openai"
 			}
 		}
-		for alias, configured := range surfaces["gemini"].models {
-			if configured == model {
-				return "gemini." + alias, "google"
-			}
-		}
 		if strings.HasPrefix(model, "amazon-bedrock/") {
 			return "bedrock.raw", "bedrock"
 		}
@@ -337,9 +341,6 @@ func identity(backend, model string) (string, string) {
 		}
 		if strings.HasPrefix(model, "openai/") {
 			return "codex.raw", "openai"
-		}
-		if strings.HasPrefix(model, "google-antigravity/") || strings.HasPrefix(model, "google/") {
-			return "gemini.raw", "google"
 		}
 	}
 	return backend + ".raw", "unknown"
@@ -361,7 +362,7 @@ One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenCode Go, OpenRo
 
 Coding harness selection:
   --harness pi           Use Pi (default for bedrock, codex, opencode-go, and openrouter)
-  --harness omp          Use Oh My Pi (default for gemini)
+  --harness omp          Use Oh My Pi instead of Pi
 
 Model-first aliases (each surface bills a different account):
   Claude (personal Max subscription):   haiku, sonnet, opus, fable, fable-5.2
@@ -369,7 +370,7 @@ Model-first aliases (each surface bills a different account):
                                         astra, sol, terra, luna (GPT-6 / GPT-6.1)
   Codex (personal OpenAI, explicit):    hatch codex <astra|sol|terra|luna>
   Cursor (Zeta Cursor subscription):    grok, kimi-k3, gemini-4-argon
-  Gemini (personal Google AI Ultra):    argon
+  Gemini (personal Google AI Ultra):    argon   (Google Antigravity CLI: agy)
   OpenCode Go (flat-rate Go plan):      deepseek (the bare "hatch deepseek" alias)
   OpenRouter (OpenRouter balance):      deepseek, glm-5.3-flash (explicit only)
 
@@ -406,7 +407,7 @@ Common options:
   --caller-request ID  Group runs from one request (or HATCH_CALLER_REQUEST_ID)
   --max-output-bytes N  Inline answer preview, 256..32768 bytes (default: 8192)
   -t, --timeout SEC    Hard timeout (default: 1800)
-  --harness NAME       Select pi or omp for bedrock/codex/gemini/openrouter
+  --harness NAME       Select pi or omp for bedrock/codex/opencode-go/openrouter
   --reasoning-effort LEVEL  none|low|medium|high|xhigh|max
   -r, --resume RUN_ID  Continue an earlier Hatch run (see above)
   --read-only          No file edits and no builds, tests or other programs (every surface)

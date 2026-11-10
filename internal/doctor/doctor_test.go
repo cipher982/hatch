@@ -114,18 +114,36 @@ func TestCheckHarness(t *testing.T) {
 	}
 }
 
-func TestCheckOMPModels(t *testing.T) {
+func TestCheckAntigravityModels(t *testing.T) {
 	directory := t.TempDir()
-	binary := filepath.Join(directory, "omp")
+	binary := filepath.Join(directory, "agy")
 	script := `#!/bin/sh
-printf '%s\n' '{"models":[{"id":"gemini-4-argon","selector":"google-antigravity/gemini-4-argon"}]}'
+printf 'Fetching available models...\n'
+printf 'gemini-4-carbon-medium\tGemini 4 Carbon (Medium)\n'
+printf 'gemini-4-argon-medium\tGemini 4 Argon (Medium)\n'
 `
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	check := checkOMPModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels))
+	check := checkAntigravityModels("gemini.catalog", modelValues(provider.GeminiSurfaceModels))
 	if !check.OK || check.Name != "gemini.catalog" {
+		t.Fatalf("check = %#v", check)
+	}
+}
+
+func TestCheckAntigravityModelsReportsMissingModel(t *testing.T) {
+	directory := t.TempDir()
+	binary := filepath.Join(directory, "agy")
+	script := `#!/bin/sh
+printf 'gemini-4-carbon-medium\tGemini 4 Carbon (Medium)\n'
+`
+	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", directory)
+	check := checkAntigravityModels("gemini.catalog", []string{"gemini-4-argon-medium"})
+	if check.OK || !strings.Contains(check.Detail, "gemini-4-argon-medium") {
 		t.Fatalf("check = %#v", check)
 	}
 }

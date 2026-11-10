@@ -81,10 +81,12 @@ var ModelRegistry = []ModelSpec{
 	{Surface: "cursor", Alias: "grok", Model: "grok-4.7-high", Backend: "cursor"},
 	{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium", Backend: "cursor", NoShorthand: true},
 
-	// Gemini: personal work. Gemini 4 Argon runs through Oh My Pi on the
-	// personal Google AI Ultra subscription; Zeta Gemini work uses the
-	// explicit `hatch cursor gemini-4-argon` route instead.
-	{Surface: "gemini", Alias: "argon", Model: "google-antigravity/gemini-4-argon", Backend: "omp"},
+	// Gemini: personal work. Gemini 4 Argon runs on Google's Antigravity CLI
+	// (agy) with the personal Google AI Ultra subscription; Zeta Gemini work
+	// uses the explicit `hatch cursor gemini-4-argon` route instead.
+	// Antigravity model ids carry the reasoning tier (gemini-4-argon-low,
+	// -medium, -high), so the surfaced alias pins one model.
+	{Surface: "gemini", Alias: "argon", Model: "gemini-4-argon-medium", Backend: "antigravity"},
 
 	// OpenCode Go: personal flat-rate plan. `hatch deepseek` lands here. The
 	// workspace privacy region must be Global or DeepSeek calls are refused.

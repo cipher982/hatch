@@ -77,6 +77,23 @@ func TestReadOnlyCursorUsesAskModeWithoutForce(t *testing.T) {
 	}
 }
 
+func TestReadOnlyAntigravityUsesPlanMode(t *testing.T) {
+	invocation := readOnlyBuild(t, "antigravity", "gemini-4-argon-medium")
+	if argvValue(invocation.Argv, "--mode") != "plan" || slices.Contains(invocation.Argv, "--dangerously-skip-permissions") {
+		t.Fatalf("antigravity read-only argv = %v", invocation.Argv)
+	}
+	if invocation.RedactedArgv[len(invocation.RedactedArgv)-1] != "<prompt>" {
+		t.Fatalf("prompt not redacted last: %v", invocation.RedactedArgv)
+	}
+	ordinary, err := Build(Request{Backend: "antigravity", Model: "gemini-4-argon-medium", Prompt: "prompt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(ordinary.Argv, "--dangerously-skip-permissions") || slices.Contains(ordinary.Argv, "--mode") {
+		t.Fatalf("ordinary antigravity run changed: %v", ordinary.Argv)
+	}
+}
+
 func TestReadOnlyRawCodexUsesReadOnlySandbox(t *testing.T) {
 	invocation := readOnlyBuild(t, "codex", "")
 	if argvValue(invocation.Argv, "--sandbox") != "read-only" || slices.Contains(invocation.Argv, "--dangerously-bypass-approvals-and-sandbox") {

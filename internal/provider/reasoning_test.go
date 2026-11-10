@@ -50,6 +50,8 @@ func TestResolveReasoningPolicy(t *testing.T) {
 		{name: "raw codex unknown model requires explicit choice", backend: "codex", model: "gpt-test", wantErr: true},
 		{name: "expert known model without max", backend: "expert", model: "gpt-5.5", requested: "max", wantErr: true},
 		{name: "cursor unsupported", backend: "cursor", want: ReasoningPolicy{Source: "unsupported", Support: "unsupported"}},
+		{name: "antigravity unsupported", backend: "antigravity", model: "gemini-4-argon-medium", want: ReasoningPolicy{Source: "unsupported", Support: "unsupported"}},
+		{name: "antigravity rejects effort", backend: "antigravity", model: "gemini-4-argon-medium", requested: "high", wantErr: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
