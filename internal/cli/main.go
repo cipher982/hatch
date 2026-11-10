@@ -285,7 +285,7 @@ func renderConfigError(jsonOutput bool, stdout, stderr io.Writer, err error) int
 func identity(backend, model string) (string, string) {
 	switch backend {
 	case "claude":
-		for _, alias := range []string{"fable", "fable-5.1", "opus", "sonnet", "haiku"} {
+		for _, alias := range []string{"fable", "fable-5.2", "opus", "sonnet", "haiku"} {
 			if surfaces["claude"].models[alias] == model {
 				return "claude." + alias, "anthropic"
 			}
@@ -346,7 +346,7 @@ func identity(backend, model string) (string, string) {
 }
 
 const Help = `usage: hatch <model> [OPTIONS] "prompt"
-       hatch claude <haiku|sonnet|opus|fable|fable-5.1> [OPTIONS] "prompt"
+       hatch claude <haiku|sonnet|opus|fable|fable-5.2> [OPTIONS] "prompt"
        hatch bedrock <opus|sonnet|astra|sol|terra|luna> [OPTIONS] "prompt"
        hatch codex <astra|sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3|gemini-4-argon> [OPTIONS] "prompt"
@@ -364,7 +364,7 @@ Coding harness selection:
   --harness omp          Use Oh My Pi (default for gemini)
 
 Model-first aliases (each surface bills a different account):
-  Claude (personal Max subscription):   haiku, sonnet, opus, fable, fable-5.1
+  Claude (personal Max subscription):   haiku, sonnet, opus, fable, fable-5.2
   Bedrock (Zeta AWS, Claude + OpenAI):  opus, sonnet (Claude 5.5);
                                         astra, sol, terra, luna (GPT-6 / GPT-6.1)
   Codex (personal OpenAI, explicit):    hatch codex <astra|sol|terra|luna>

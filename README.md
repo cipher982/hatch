@@ -131,7 +131,7 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 
 | Command | What it uses |
 | --- | --- |
-| `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.1>` | Local Claude Code CLI login (David's personal subscription) |
+| `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.2>` | Local Claude Code CLI login (David's personal subscription) |
 | `hatch bedrock <opus\|sonnet\|astra\|sol\|terra\|luna>` | Claude 5.5 and OpenAI GPT-6/6.1 on Zeta's AWS Bedrock account via the selected harness |
 | `hatch codex <astra\|sol\|terra\|luna>` | OpenAI coding models on the personal OpenAI account (ChatGPT/Codex subscription or API key); the Zeta route is `hatch bedrock` |
 | `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
@@ -189,7 +189,7 @@ Each surface bills a different account:
 
 | Surface | Account | Surfaced models |
 | --- | --- | --- |
-| `claude` | Personal Claude Max subscription (Claude Code login) | haiku, sonnet, opus, fable, fable-5.1 |
+| `claude` | Personal Claude Max subscription (Claude Code login) | haiku, sonnet, opus, fable, fable-5.2 |
 | `bedrock` | Zeta AWS Bedrock, SSO profile `zh-ml-mlengineer` | Claude Opus/Sonnet 5.5 and OpenAI GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, GPT-6 Luna |
 | `codex` | Personal OpenAI account (ChatGPT/Codex subscription, or an OpenAI API key) | astra, sol, terra, luna (plus `nano`, `mini`, `max`) |
 | `cursor` | Zeta-account Cursor subscription | grok, kimi-k3, gemini-4-argon |

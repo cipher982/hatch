@@ -300,8 +300,8 @@ func TestMainCatalogJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "opus", Model: "claude-opus-5-5"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable", Model: "claude-fable-5-1"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable-5.1", Model: "claude-fable-5-1"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable", Model: "claude-fable-5-2"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable-5.2", Model: "claude-fable-5-2"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "argon", Model: "google-antigravity/gemini-4-argon"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol"}) ||

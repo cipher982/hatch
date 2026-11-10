@@ -11,8 +11,8 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"claude", "sonnet", "--json", "-"}, "claude", "claude-sonnet-5-5"},
 		{[]string{"bedrock", "opus", "--json", "-"}, "pi", "amazon-bedrock/global.anthropic.claude-opus-5-5"},
 		{[]string{"bedrock", "sonnet", "--json", "-"}, "pi", "amazon-bedrock/global.anthropic.claude-sonnet-5-5"},
-		{[]string{"claude", "fable", "--json", "-"}, "claude", "claude-fable-5-1"},
-		{[]string{"claude", "fable-5.1", "--json", "-"}, "claude", "claude-fable-5-1"},
+		{[]string{"claude", "fable", "--json", "-"}, "claude", "claude-fable-5-2"},
+		{[]string{"claude", "fable-5.2", "--json", "-"}, "claude", "claude-fable-5-2"},
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "grok-4.7-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"cursor", "gemini-4-argon", "--json", "-"}, "cursor", "gemini-4-argon-medium"},
@@ -82,8 +82,8 @@ func TestParseModelFirstShorthands(t *testing.T) {
 	}{
 		{"opus", "claude", "claude-opus-5-5"},
 		{"sonnet", "claude", "claude-sonnet-5-5"},
-		{"fable", "claude", "claude-fable-5-1"},
-		{"fable-5.1", "claude", "claude-fable-5-1"},
+		{"fable", "claude", "claude-fable-5-2"},
+		{"fable-5.2", "claude", "claude-fable-5-2"},
 		{"astra", "pi", "amazon-bedrock/global.openai.gpt-6-astra"},
 		{"sol", "pi", "amazon-bedrock/global.openai.gpt-6.1-sol"},
 		{"terra", "pi", "amazon-bedrock/global.openai.gpt-6.1-terra"},
@@ -146,14 +146,17 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 	}
 }
 
-func TestParseRejectsDeprecatedFable5Alias(t *testing.T) {
-	_, err := Parse([]string{"claude", "fable-5", "review"}, true)
-	if err == nil || err.Error() != `invalid claude model "fable-5". Choose one of: haiku, sonnet, opus, fable, fable-5.1` {
-		t.Fatalf("Parse deprecated Claude alias error = %v", err)
-	}
-	_, err = Parse([]string{"fable-5", "review"}, true)
-	if err == nil || err.Error() != `invalid claude model "fable-5". Choose one of: haiku, sonnet, opus, fable, fable-5.1` {
-		t.Fatalf("Parse deprecated Claude alias shorthand error = %v", err)
+func TestParseRejectsDeprecatedFableAliases(t *testing.T) {
+	for _, alias := range []string{"fable-5", "fable-5.1"} {
+		want := `invalid claude model "` + alias + `". Choose one of: haiku, sonnet, opus, fable, fable-5.2`
+		_, err := Parse([]string{"claude", alias, "review"}, true)
+		if err == nil || err.Error() != want {
+			t.Fatalf("Parse deprecated Claude alias %q error = %v", alias, err)
+		}
+		_, err = Parse([]string{alias, "review"}, true)
+		if err == nil || err.Error() != want {
+			t.Fatalf("Parse deprecated Claude alias %q shorthand error = %v", alias, err)
+		}
 	}
 }
 func TestParseRejectsDeprecatedOpus5Alias(t *testing.T) {
@@ -162,7 +165,7 @@ func TestParseRejectsDeprecatedOpus5Alias(t *testing.T) {
 		{"opus-5", "review"},
 	} {
 		_, err := Parse(args, true)
-		if err == nil || err.Error() != `invalid claude model "opus-5". Choose one of: haiku, sonnet, opus, fable, fable-5.1` {
+		if err == nil || err.Error() != `invalid claude model "opus-5". Choose one of: haiku, sonnet, opus, fable, fable-5.2` {
 			t.Fatalf("Parse deprecated Claude alias %v error = %v", args, err)
 		}
 	}
