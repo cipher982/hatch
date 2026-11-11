@@ -123,7 +123,7 @@ hatch claude opus "Review this diff"
 hatch bedrock opus "Review this diff"
 hatch codex astra --harness omp "Review this branch"
 hatch gemini "Summarize this code"
-hatch cursor gemini-4-argon "Summarize this code"
+hatch cursor gemini-4-carbon "Summarize this code"
 hatch opencode-go deepseek "Fix the failing tests"
 hatch openrouter deepseek "Fix the failing tests"
 hatch openrouter glm-5.3-flash "Fix the failing tests"
@@ -134,8 +134,8 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch claude <haiku\|sonnet\|opus\|fable\|fable-5.2>` | Local Claude Code CLI login (David's personal subscription) |
 | `hatch bedrock <opus\|sonnet\|astra\|sol\|terra\|luna>` | Claude 5.5 and OpenAI GPT-6/6.1 on Zeta's AWS Bedrock account via the selected harness |
 | `hatch codex <astra\|sol\|terra\|luna>` | OpenAI coding models on the personal OpenAI account (ChatGPT/Codex subscription or API key); the Zeta route is `hatch bedrock` |
-| `hatch cursor <grok|kimi-k3|gemini-4-argon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
-| `hatch gemini [argon]` | Google Antigravity CLI (`agy`) with `gemini-4-argon-medium` on the personal Google AI Ultra subscription |
+| `hatch cursor <grok|kimi-k3|gemini-4-carbon>` | Local Cursor Agent CLI login (Zeta-account Cursor subscription) for Grok, Kimi, and Zeta Gemini work |
+| `hatch gemini [carbon]` | Google Antigravity CLI (`agy`) with `gemini-4-carbon-medium` on the personal Google AI Ultra subscription |
 | `hatch opencode-go <deepseek>` | Pi with the OpenCode Go plan (`deepseek` = V4.1 Flash; bare `hatch deepseek` runs this) |
 | `hatch openrouter <deepseek\|glm-5.3-flash>` | Pi with an OpenRouter model alias (`deepseek` = V4.1 Flash 1017, pinned to the DeepSeek upstream) |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
@@ -144,8 +144,8 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.
 `hatch gemini` selects the personal Google AI Ultra route; `hatch gemini
-argon` selects it explicitly. Zeta Gemini work uses `hatch cursor
-gemini-4-argon`, which has no bare shorthand; pass another raw Cursor model ID
+carbon` selects it explicitly. Zeta Gemini work uses `hatch cursor
+gemini-4-carbon`, which has no bare shorthand; pass another raw Cursor model ID
 with `--model` to choose a different supported Cursor variant.
 
 `hatch gemini` runs Google's own Antigravity CLI (`agy`), so the agent loop,
@@ -173,15 +173,15 @@ the subscription route never falls back to Bedrock.
 
 ### Personal versus Zeta Gemini calls
 
-Gemini 4 Argon has two routes, chosen by who pays:
+Gemini 4 Carbon has two routes, chosen by who pays:
 
 - **Personal work** (Zerg, Longhouse, personal infrastructure): `hatch gemini`
-  (alias `argon`). This runs `gemini-4-argon-medium` through Google's Antigravity
+  (alias `carbon`). This runs `gemini-4-carbon-medium` through Google's Antigravity
   CLI (`agy`) on David's personal Google AI Ultra subscription. Antigravity model
   ids carry the reasoning tier, so Hatch surfaces `medium` and rejects
   `--reasoning-effort` instead of passing an override that would conflict.
-- **Zeta or other employer work**: `hatch cursor gemini-4-argon`. This runs
-  Cursor's `gemini-4-argon-medium` through the local Cursor Agent CLI on the
+- **Zeta or other employer work**: `hatch cursor gemini-4-carbon`. This runs
+  Cursor's `gemini-4-carbon-medium` through the local Cursor Agent CLI on the
   Zeta-account Cursor subscription.
 
 The Cursor alias has no bare shorthand, so `hatch gemini` can never reach the
@@ -196,8 +196,8 @@ Each surface bills a different account:
 | `claude` | Personal Claude Max subscription (Claude Code login) | haiku, sonnet, opus, fable, fable-5.2 |
 | `bedrock` | Zeta AWS Bedrock, SSO profile `zh-ml-mlengineer` | Claude Opus/Sonnet 5.5 and OpenAI GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, GPT-6 Luna |
 | `codex` | Personal OpenAI account (ChatGPT/Codex subscription, or an OpenAI API key) | astra, sol, terra, luna (plus `nano`, `mini`, `max`) |
-| `cursor` | Zeta-account Cursor subscription | grok, kimi-k3, gemini-4-argon |
-| `gemini` | Personal Google AI Ultra subscription (Antigravity CLI) | argon |
+| `cursor` | Zeta-account Cursor subscription | grok, kimi-k3, gemini-4-carbon |
+| `gemini` | Personal Google AI Ultra subscription (Antigravity CLI) | carbon |
 | `opencode-go` | OpenCode Go flat-rate plan | deepseek |
 | `openrouter` | OpenRouter balance | deepseek, glm-5.3-flash (explicit only) |
 

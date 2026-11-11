@@ -78,14 +78,14 @@ func TestReadOnlyCursorUsesAskModeWithoutForce(t *testing.T) {
 }
 
 func TestReadOnlyAntigravityUsesPlanMode(t *testing.T) {
-	invocation := readOnlyBuild(t, "antigravity", "gemini-4-argon-medium")
+	invocation := readOnlyBuild(t, "antigravity", "gemini-4-carbon-medium")
 	if argvValue(invocation.Argv, "--mode") != "plan" || slices.Contains(invocation.Argv, "--dangerously-skip-permissions") {
 		t.Fatalf("antigravity read-only argv = %v", invocation.Argv)
 	}
 	if invocation.RedactedArgv[len(invocation.RedactedArgv)-1] != "<prompt>" {
 		t.Fatalf("prompt not redacted last: %v", invocation.RedactedArgv)
 	}
-	ordinary, err := Build(Request{Backend: "antigravity", Model: "gemini-4-argon-medium", Prompt: "prompt"})
+	ordinary, err := Build(Request{Backend: "antigravity", Model: "gemini-4-carbon-medium", Prompt: "prompt"})
 	if err != nil {
 		t.Fatal(err)
 	}

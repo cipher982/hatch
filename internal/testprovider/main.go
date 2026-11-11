@@ -71,7 +71,7 @@ func main() {
 	case "success_antigravity":
 		emitJSON(map[string]any{
 			"event": "init", "conversation_id": "agy-session-oracle",
-			"init": map[string]any{"model": "gemini-4-argon-medium", "cwd": "/oracle"},
+			"init": map[string]any{"model": "gemini-4-carbon-medium", "cwd": "/oracle"},
 		})
 		emitJSON(map[string]any{
 			"event": "step_update",

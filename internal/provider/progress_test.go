@@ -38,12 +38,12 @@ func TestProgressParserDeduplicatesToolsAndReportsLifecycle(t *testing.T) {
 		{
 			name: "antigravity", adapter: "antigravity", label: "Gemini",
 			lines: []string{
-				`{"event":"init","conversation_id":"conv-123456789","init":{"model":"gemini-4-argon-medium"}}`,
+				`{"event":"init","conversation_id":"conv-123456789","init":{"model":"gemini-4-carbon-medium"}}`,
 				`{"event":"step_update","step_update":{"conversation_id":"conv-123456789","step_index":2,"state":"ACTIVE","step_type":"tool","tool_name":"run_command","tool_info":{"parameters":{"CommandLine":"go test ./..."}}}}`,
 				`{"event":"step_update","step_update":{"conversation_id":"conv-123456789","step_index":2,"state":"ACTIVE","step_type":"tool","tool_name":"run_command","tool_info":{"parameters":{"CommandLine":"go test ./..."}}}}`,
 				`{"event":"result","result":{"status":"SUCCESS","duration_seconds":2.5}}`,
 			},
-			want: []string{"[hatch] Antigravity started (gemini-4-argon-medium, session conv-123)", "[hatch] Antigravity run_command: go test ./...", "[hatch] Antigravity completed in 2.5s"},
+			want: []string{"[hatch] Antigravity started (gemini-4-carbon-medium, session conv-123)", "[hatch] Antigravity run_command: go test ./...", "[hatch] Antigravity completed in 2.5s"},
 		},
 	}
 	for _, test := range tests {

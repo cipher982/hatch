@@ -183,7 +183,7 @@ func normalizeSurface(args []string) ([]string, error) {
 			result := append([]string(nil), before...)
 			result = append(result, "--backend", surface.backend)
 			if !hasExplicitModel {
-				result = append(result, "--model", surface.models["argon"])
+				result = append(result, "--model", surface.models["carbon"])
 			}
 			return append(result, after...), nil
 		}
@@ -197,7 +197,7 @@ func normalizeSurface(args []string) ([]string, error) {
 			result := append([]string(nil), before...)
 			result = append(result, "--backend", surface.backend)
 			if !hasExplicitModel && surfaceName == "gemini" {
-				result = append(result, "--model", surface.models["argon"])
+				result = append(result, "--model", surface.models["carbon"])
 			}
 			return append(result, after...), nil
 		}
@@ -210,7 +210,7 @@ func normalizeSurface(args []string) ([]string, error) {
 			result := append([]string(nil), before...)
 			result = append(result, "--backend", surface.backend)
 			if !hasExplicitModel {
-				result = append(result, "--model", surface.models["argon"])
+				result = append(result, "--model", surface.models["carbon"])
 			}
 			return append(result, after...), nil
 		}

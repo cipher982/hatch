@@ -83,7 +83,7 @@ func TestCodexDoctorCoversEverySurfaceAlias(t *testing.T) {
 func TestCheckCursorModel(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3' 'gemini-4-argon-medium - Gemini 4 Argon Medium'\n"), 0o700); err != nil {
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3' 'gemini-4-carbon-medium - Gemini 4 Carbon Medium'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
@@ -120,7 +120,7 @@ func TestCheckAntigravityModels(t *testing.T) {
 	script := `#!/bin/sh
 printf 'Fetching available models...\n'
 printf 'gemini-4-carbon-medium\tGemini 4 Carbon (Medium)\n'
-printf 'gemini-4-argon-medium\tGemini 4 Argon (Medium)\n'
+printf 'gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n'
 `
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
@@ -136,14 +136,14 @@ func TestCheckAntigravityModelsReportsMissingModel(t *testing.T) {
 	directory := t.TempDir()
 	binary := filepath.Join(directory, "agy")
 	script := `#!/bin/sh
-printf 'gemini-4-carbon-medium\tGemini 4 Carbon (Medium)\n'
+printf 'gemini-4-argon-medium\tGemini 4 Argon (Medium)\n'
 `
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", directory)
-	check := checkAntigravityModels("gemini.catalog", []string{"gemini-4-argon-medium"})
-	if check.OK || !strings.Contains(check.Detail, "gemini-4-argon-medium") {
+	check := checkAntigravityModels("gemini.catalog", []string{"gemini-4-carbon-medium"})
+	if check.OK || !strings.Contains(check.Detail, "gemini-4-carbon-medium") {
 		t.Fatalf("check = %#v", check)
 	}
 }
@@ -151,7 +151,7 @@ printf 'gemini-4-carbon-medium\tGemini 4 Carbon (Medium)\n'
 func TestCheckCursorModelProbesUnlistedAliases(t *testing.T) {
 	directory := t.TempDir()
 	script := `#!/bin/sh
-if [ "$1" = "models" ]; then printf '%s\n' 'grok-4.7-high - Grok' 'gemini-4-argon-medium - Gemini 4 Argon Medium'; exit 0; fi
+if [ "$1" = "models" ]; then printf '%s\n' 'grok-4.7-high - Grok' 'gemini-4-carbon-medium - Gemini 4 Carbon Medium'; exit 0; fi
 while [ "$1" != "--model" ]; do shift; done
 case "$2" in
   kimi-k3) echo "ActionRequiredError: You've reached your monthly usage limit"; exit 1 ;;

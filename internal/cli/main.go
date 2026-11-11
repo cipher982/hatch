@@ -350,8 +350,8 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch claude <haiku|sonnet|opus|fable|fable-5.2> [OPTIONS] "prompt"
        hatch bedrock <opus|sonnet|astra|sol|terra|luna> [OPTIONS] "prompt"
        hatch codex <astra|sol|terra|luna> [OPTIONS] "prompt"
-       hatch cursor <grok|kimi-k3|gemini-4-argon> [OPTIONS] "prompt"
-       hatch gemini [argon] [OPTIONS] "prompt"
+       hatch cursor <grok|kimi-k3|gemini-4-carbon> [OPTIONS] "prompt"
+       hatch gemini [carbon] [OPTIONS] "prompt"
        hatch opencode-go <deepseek> [OPTIONS] "prompt"
        hatch openrouter <deepseek|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
@@ -369,8 +369,8 @@ Model-first aliases (each surface bills a different account):
   Bedrock (Zeta AWS, Claude + OpenAI):  opus, sonnet (Claude 5.5);
                                         astra, sol, terra, luna (GPT-6 / GPT-6.1)
   Codex (personal OpenAI, explicit):    hatch codex <astra|sol|terra|luna>
-  Cursor (Zeta Cursor subscription):    grok, kimi-k3, gemini-4-argon
-  Gemini (personal Google AI Ultra):    argon   (Google Antigravity CLI: agy)
+  Cursor (Zeta Cursor subscription):    grok, kimi-k3, gemini-4-carbon
+  Gemini (personal Google AI Ultra):    carbon   (Google Antigravity CLI: agy)
   OpenCode Go (flat-rate Go plan):      deepseek (the bare "hatch deepseek" alias)
   OpenRouter (OpenRouter balance):      deepseek, glm-5.3-flash (explicit only)
 
@@ -390,7 +390,7 @@ Start here:
   hatch claude sonnet "Review this diff"
   hatch cursor grok "Review this branch"
   hatch cursor kimi-k3 "Review this branch"
-  hatch cursor gemini-4-argon "Summarize this code"
+  hatch cursor gemini-4-carbon "Summarize this code"
   hatch expert "Is this refactor direction sound?"
 
 Follow up on an earlier run (any model, any surface):

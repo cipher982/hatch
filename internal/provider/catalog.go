@@ -76,17 +76,17 @@ var ModelRegistry = []ModelSpec{
 	{Surface: "bedrock", Alias: "luna", Model: "amazon-bedrock/global.openai.gpt-6-luna", Backend: "pi"},
 
 	// Cursor: Zeta work. Runs on the Cursor subscription (cursor-agent login
-	// drose@zetaglobal.com). gemini-4-argon carries no bare shorthand so a
+	// drose@zetaglobal.com). gemini-4-carbon carries no bare shorthand so a
 	// personal caller cannot silently bill the employer account.
 	{Surface: "cursor", Alias: "grok", Model: "grok-4.7-high", Backend: "cursor"},
-	{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium", Backend: "cursor", NoShorthand: true},
+	{Surface: "cursor", Alias: "gemini-4-carbon", Model: "gemini-4-carbon-medium", Backend: "cursor", NoShorthand: true, Deprecated: []string{"gemini-4-argon"}},
 
-	// Gemini: personal work. Gemini 4 Argon runs on Google's Antigravity CLI
+	// Gemini: personal work. Gemini 4 Carbon runs on Google's Antigravity CLI
 	// (agy) with the personal Google AI Ultra subscription; Zeta Gemini work
-	// uses the explicit `hatch cursor gemini-4-argon` route instead.
-	// Antigravity model ids carry the reasoning tier (gemini-4-argon-low,
+	// uses the explicit `hatch cursor gemini-4-carbon` route instead.
+	// Antigravity model ids carry the reasoning tier (gemini-4-carbon-low,
 	// -medium, -high), so the surfaced alias pins one model.
-	{Surface: "gemini", Alias: "argon", Model: "gemini-4-argon-medium", Backend: "antigravity"},
+	{Surface: "gemini", Alias: "carbon", Model: "gemini-4-carbon-medium", Backend: "antigravity", Deprecated: []string{"argon"}},
 
 	// OpenCode Go: personal flat-rate plan. `hatch deepseek` lands here. The
 	// workspace privacy region must be Global or DeepSeek calls are refused.

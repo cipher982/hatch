@@ -150,8 +150,8 @@ func TestMainSelectsAntigravityForSurfacedGeminiRun(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if !result.OK || result.Output != "fake antigravity output\n" || result.Run.Surface != "gemini.argon" ||
-		result.Run.Backend != "antigravity" || result.Run.Model != "gemini-4-argon-medium" {
+	if !result.OK || result.Output != "fake antigravity output\n" || result.Run.Surface != "gemini.carbon" ||
+		result.Run.Backend != "antigravity" || result.Run.Model != "gemini-4-carbon-medium" {
 		t.Fatalf("unexpected Antigravity Gemini result: %#v", result)
 	}
 }
@@ -172,8 +172,8 @@ func TestIdentityUsesStableSurfaceAliases(t *testing.T) {
 		{"openai/gpt-6-astra", "pi", "codex.astra"},
 		{"openai/gpt-5.4-nano", "pi", "codex.nano"},
 		{"kimi-k3", "cursor", "cursor.kimi-k3"},
-		{"gemini-4-argon-medium", "cursor", "cursor.gemini-4-argon"},
-		{"gemini-4-argon-medium", "antigravity", "gemini.argon"},
+		{"gemini-4-carbon-medium", "cursor", "cursor.gemini-4-carbon"},
+		{"gemini-4-carbon-medium", "antigravity", "gemini.carbon"},
 	} {
 		if got, _ := identity(test.backend, test.model); got != test.want {
 			t.Fatalf("identity(%q)=%q want=%q", test.model, got, test.want)
@@ -236,7 +236,7 @@ func TestMainFailsClosedBeforeProviderWhenArtifactRootUnavailable(t *testing.T) 
 func TestMainDoctorJSON(t *testing.T) {
 	directory := t.TempDir()
 	cursorBinary := filepath.Join(directory, "cursor-agent")
-	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3' 'gemini-4-argon-medium - Gemini 4 Argon Medium'\n"), 0o700); err != nil {
+	if err := os.WriteFile(cursorBinary, []byte("#!/bin/sh\nprintf '%s\\n' 'grok-4.7-high - Grok' 'kimi-k3 - Kimi K3' 'gemini-4-carbon-medium - Gemini 4 Carbon Medium'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	piBinary := filepath.Join(directory, "pi")
@@ -258,7 +258,7 @@ printf '%s\n' 'provider model context' \
 	agyBinary := filepath.Join(directory, "agy")
 	agyScript := `#!/bin/sh
 if [ "$1" = "--version" ]; then printf '%s\n' 'agy test'; exit 0; fi
-printf 'gemini-4-argon-medium\tGemini 4 Argon (Medium)\n'
+printf 'gemini-4-carbon-medium\tGemini 4 Carbon (Medium)\n'
 `
 	if err := os.WriteFile(agyBinary, []byte(agyScript), 0o700); err != nil {
 		t.Fatal(err)
@@ -306,8 +306,8 @@ func TestMainCatalogJSON(t *testing.T) {
 	if !slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "opus", Model: "claude-opus-5-5"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable", Model: "claude-fable-5-2"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "claude", Alias: "fable-5.2", Model: "claude-fable-5-2"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "cursor", Alias: "gemini-4-argon", Model: "gemini-4-argon-medium"}) ||
-		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "argon", Model: "gemini-4-argon-medium"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "cursor", Alias: "gemini-4-carbon", Model: "gemini-4-carbon-medium"}) ||
+		!slices.Contains(catalog, provider.CatalogEntry{Surface: "gemini", Alias: "carbon", Model: "gemini-4-carbon-medium"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "sol", Model: "openai/gpt-6.1-sol"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "codex", Alias: "luna", Model: "openai/gpt-6-luna"}) ||
 		!slices.Contains(catalog, provider.CatalogEntry{Surface: "openrouter", Alias: "deepseek", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017"}) ||

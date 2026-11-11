@@ -24,7 +24,7 @@ func TestInterpretCursorError(t *testing.T) {
 
 func TestInterpretAntigravitySuccess(t *testing.T) {
 	stdout := []byte(
-		`{"event":"init","conversation_id":"conv-1","init":{"model":"gemini-4-argon-medium"}}` + "\n" +
+		`{"event":"init","conversation_id":"conv-1","init":{"model":"gemini-4-carbon-medium"}}` + "\n" +
 			`{"event":"step_update","step_update":{"conversation_id":"conv-1","step_index":1,"state":"ACTIVE","step_type":"agent_response","text_delta":"partial"}}` + "\n" +
 			`{"event":"result","result":{"conversation_id":"conv-1","status":"SUCCESS","response":"final answer","duration_seconds":2,"num_turns":1}}` + "\n",
 	)
