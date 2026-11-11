@@ -28,7 +28,7 @@ func TestCrashLeavesInspectableRunningArtifact(t *testing.T) {
 			t.Fatalf("build %s: %v\n%s", output, err, data)
 		}
 	}
-	if err := os.Symlink(fakeBinary, filepath.Join(directory, "gemini")); err != nil {
+	if err := os.Symlink(fakeBinary, filepath.Join(directory, "codex")); err != nil {
 		t.Fatal(err)
 	}
 	root := filepath.Join(directory, "runs")
@@ -36,7 +36,7 @@ func TestCrashLeavesInspectableRunningArtifact(t *testing.T) {
 	if err := os.Mkdir(home, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	command := exec.Command(hatchBinary, "-b", "gemini", "--json", "--timeout", "30", "crash proof")
+	command := exec.Command(hatchBinary, "-b", "codex", "--api-key", "fake-test-key", "--json", "--timeout", "30", "crash proof")
 	command.Env = append(os.Environ(),
 		"HOME="+home,
 		"PATH="+directory+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -115,11 +115,11 @@ func TestCLIInterruptCommitsCancelledArtifact(t *testing.T) {
 			t.Fatalf("build %s: %v\n%s", output, err, data)
 		}
 	}
-	if err := os.Symlink(fakeBinary, filepath.Join(directory, "gemini")); err != nil {
+	if err := os.Symlink(fakeBinary, filepath.Join(directory, "codex")); err != nil {
 		t.Fatal(err)
 	}
 	root := filepath.Join(directory, "runs")
-	command := exec.Command(hatchBinary, "-b", "gemini", "--json", "--timeout", "30", "interrupt proof")
+	command := exec.Command(hatchBinary, "-b", "codex", "--api-key", "fake-test-key", "--json", "--timeout", "30", "interrupt proof")
 	command.Env = append(os.Environ(),
 		"PATH="+directory+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"HATCH_RUN_ARTIFACT_ROOT="+root,

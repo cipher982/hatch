@@ -30,7 +30,7 @@ func TestCoordinatorRawSuccess(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "runs")
 	coordinator := NewCoordinator(NewStore(root))
 	result := coordinator.Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Model: "gemini-3-pro-preview",
+		Surface: "codex.raw", Provider: "openai", Model: "gpt-test",
 		Prompt: "oracle prompt", Timeout: 5 * time.Second, Invocation: invocation, Automation: true,
 	})
 	if !result.OK || result.Output != "fake provider output\n" || result.Run == nil {
@@ -131,7 +131,7 @@ func (s transientCommitStore) CommitTerminal(artifact *Artifact, outcome Outcome
 func TestCoordinatorPersistsLaunchFailure(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "runs")
 	result := NewCoordinator(NewStore(root)).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: time.Second,
 		Invocation: provider.Invocation{Argv: []string{filepath.Join(t.TempDir(), "missing-provider")}},
 	})
 	if result.OK || result.Status != "not_found" || result.ExitCode != -2 || result.Run == nil || result.ArtifactPath == nil ||
@@ -148,7 +148,7 @@ func TestCoordinatorPersistsLaunchFailure(t *testing.T) {
 func TestCoordinatorReturnsCanonicalRunWhenStreamsUnavailable(t *testing.T) {
 	store := unavailableStreamStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: time.Second,
 		Invocation: provider.Invocation{Argv: []string{"unused-provider"}},
 	})
 	if result.OK || result.ExitCode != -3 || result.Run == nil || result.ArtifactPath != nil ||
@@ -163,7 +163,7 @@ func TestCoordinatorWritesProjectionBeforeTerminalManifest(t *testing.T) {
 	events := []string{}
 	store := orderingStore{Store: NewStore(filepath.Join(t.TempDir(), "runs")), events: &events}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || len(events) < 2 || events[0] != "result.json" || events[1] != "terminal manifest" {
@@ -176,7 +176,7 @@ func TestCoordinatorRetriesTerminalCommitAsDegraded(t *testing.T) {
 	attempts := 0
 	store := transientCommitStore{Store: NewStore(filepath.Join(t.TempDir(), "runs")), attempts: &attempts}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || attempts != 2 || result.Run == nil || result.Run.Lifecycle != LifecycleTerminal ||
@@ -193,7 +193,7 @@ func TestCoordinatorReturnsAnswerWhenMarkRunningPersistenceFails(t *testing.T) {
 	fake := buildTestProvider(t)
 	store := markRunningFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || result.Output != "fake provider output\n" || result.Run == nil || result.Run.Capture.State != "degraded" || result.ArtifactPath != nil {
@@ -205,7 +205,7 @@ func TestCoordinatorCleansUpTimeoutWhenMarkRunningPersistenceFails(t *testing.T)
 	fake := buildTestProvider(t)
 	store := markRunningFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 50 * time.Millisecond,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 50 * time.Millisecond,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang"}},
 	})
 	if result.Run == nil || result.Run.Outcome == nil || *result.Run.Outcome != OutcomeTimedOut || result.Run.Process == nil ||
@@ -218,7 +218,7 @@ func TestCoordinatorReturnsAnswerWhenResultPersistenceFails(t *testing.T) {
 	fake := buildTestProvider(t)
 	store := writeResultFailureStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || result.Output != "fake provider output\n" || result.Run == nil || result.Run.Result.OutputFile != nil || result.Run.Capture.State != "degraded" || result.ArtifactPath != nil {
@@ -245,7 +245,7 @@ func TestCoordinatorReturnsAnswerWhenArtifactStreamFails(t *testing.T) {
 	fake := buildTestProvider(t)
 	store := failingStreamStore{Store: NewStore(filepath.Join(t.TempDir(), "runs"))}
 	result := NewCoordinator(store).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 	})
 	if !result.OK || result.Output != "fake provider output\n" || result.ArtifactPath != nil || result.Run == nil ||
@@ -258,7 +258,7 @@ func TestCoordinatorRawFailure(t *testing.T) {
 	fake := buildTestProvider(t)
 	coordinator := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs")))
 	result := coordinator.Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "stderr_nonzero"}},
 	})
 	if result.OK || result.ExitCode != 23 || result.Error == nil || *result.Error != "fake provider failure\n" {
@@ -376,7 +376,7 @@ func TestCoordinatorTimeoutKillsProcessGroup(t *testing.T) {
 	coordinator := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs")))
 	started := time.Now()
 	result := coordinator.Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang"}},
 	})
 	if result.OK || result.ExitCode != -1 || result.Status != "timeout" {
@@ -398,7 +398,7 @@ func TestCoordinatorCancellationKillsProcessGroup(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(100*time.Millisecond, cancel)
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Context: ctx, Surface: "gemini.raw", Backend: "gemini", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Context: ctx, Surface: "codex.raw", Backend: "codex", Provider: "openai", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang"}},
 	})
 	if result.OK || result.Status != "cancelled" || result.ExitCode != -4 || result.CLIExitCode() != 130 || result.Run == nil || result.Run.Outcome == nil ||
@@ -422,7 +422,7 @@ func TestCoordinatorCancelledBeforeProviderLaunch(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Context: ctx, Surface: "gemini.raw", Backend: "gemini", Provider: "google", Prompt: "prompt",
+		Context: ctx, Surface: "codex.raw", Backend: "codex", Provider: "openai", Prompt: "prompt",
 		Invocation: provider.Invocation{Argv: []string{filepath.Join(t.TempDir(), "provider-must-not-start")}},
 	})
 	if result.OK || result.Status != "cancelled" || result.CLIExitCode() != 130 || result.Run == nil || result.Run.Outcome == nil ||
@@ -529,7 +529,7 @@ func TestCoordinatorTimeoutKillsDescendants(t *testing.T) {
 	fake := buildTestProvider(t)
 	sentinel := filepath.Join(t.TempDir(), "child-survived")
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 300 * time.Millisecond,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 300 * time.Millisecond,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang_with_child", "HATCH_CHILD_SENTINEL": sentinel}},
 	})
 	if result.Status != "timeout" {
@@ -546,7 +546,7 @@ func TestCoordinatorTimeoutKillsDetachedDescendants(t *testing.T) {
 	sentinel := filepath.Join(t.TempDir(), "child-survived")
 	var progress []string
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 300 * time.Millisecond,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 300 * time.Millisecond,
 		Progress:   func(line string) { progress = append(progress, line) },
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang_with_detached_sentinel_child", "HATCH_CHILD_SENTINEL": sentinel}},
 	})
@@ -567,7 +567,7 @@ func TestCoordinatorKillsDescendantsLeftAfterProviderExits(t *testing.T) {
 	sentinel := filepath.Join(t.TempDir(), "child-survived")
 	var progress []string
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 10 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 10 * time.Second,
 		Progress:   func(line string) { progress = append(progress, line) },
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "exit_with_detached_sentinel_child", "HATCH_CHILD_SENTINEL": sentinel}},
 	})
@@ -587,7 +587,7 @@ func TestCoordinatorTimeoutBoundsDetachedDescendantPipes(t *testing.T) {
 	fake := buildTestProvider(t)
 	started := time.Now()
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 250 * time.Millisecond,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 250 * time.Millisecond,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "hang_with_detached_child"}},
 	})
 	if result.Status != "timeout" || time.Since(started) > 3*time.Second {
@@ -603,7 +603,7 @@ func TestCoordinatorTimeoutBoundsDetachedDescendantPipes(t *testing.T) {
 func TestCoordinatorPreservesInvalidUTF8Evidence(t *testing.T) {
 	fake := buildTestProvider(t)
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 5 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 5 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "invalid_utf8"}},
 	})
 	if !result.OK || result.ArtifactPath == nil {
@@ -619,7 +619,7 @@ func TestCoordinatorPreservesInvalidUTF8Evidence(t *testing.T) {
 func TestCoordinatorBoundsPublicMemoryWhilePreservingLargeRawEvidence(t *testing.T) {
 	fake := buildTestProvider(t)
 	result := NewCoordinator(NewStore(filepath.Join(t.TempDir(), "runs"))).Execute(Request{
-		Surface: "gemini.raw", Provider: "google", Prompt: "prompt", Timeout: 10 * time.Second,
+		Surface: "codex.raw", Provider: "openai", Prompt: "prompt", Timeout: 10 * time.Second,
 		Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "large_output"}},
 	})
 	if result.OK || result.Error == nil || !strings.Contains(*result.Error, "public interpretation limit") || result.ArtifactPath == nil {
@@ -689,7 +689,7 @@ func TestCoordinatorThirtyTwoConcurrentRunsAreIsolated(t *testing.T) {
 		go func() {
 			defer group.Done()
 			results <- NewCoordinator(store).Execute(Request{
-				Surface: "gemini.raw", Provider: "google", Prompt: "concurrent", Timeout: 5 * time.Second,
+				Surface: "codex.raw", Provider: "openai", Prompt: "concurrent", Timeout: 5 * time.Second,
 				Invocation: provider.Invocation{Argv: []string{fake}, SetEnv: map[string]string{"HATCH_TEST_SCENARIO": "success_text"}},
 			})
 		}()

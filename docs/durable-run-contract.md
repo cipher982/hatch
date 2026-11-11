@@ -55,7 +55,7 @@ declared the review unrecoverable, and launched a duplicate:
 4. Did Longhouse archive the run?
 
 The immediate OpenCode fix now preserves its isolated database and raw streams,
-but Claude, Cursor, Expert, raw Codex, and Gemini still have different result and
+but Claude, Cursor, Expert, raw Codex, and Antigravity still have different result and
 durability contracts. The legacy async Python `run()` also bypasses the streamed
 CLI and artifact paths entirely; the Go migration retires that unsupported
 library surface rather than porting its split execution path. Fixing one backend
@@ -514,7 +514,6 @@ session manager. Four small adapters plus a raw-text adapter are enough.
 | surfaced Bedrock/Codex/OpenRouter through OpenCode | `sessionID` from step event | successful: discarded; abnormal: `hatch_preserved` allowlisted XDG database | identify; inspect abnormal snapshot; same-version timeout recovery hint | Keep config dependencies/cache in a shared version-keyed namespace; discard successful native state; for abnormal outcomes copy a hash-stable allowlisted snapshot into `provider/opencode-snapshot` and retire the live XDG tree |
 | `hatch expert` | OpenAI `response_id` | `remote_provider` plus local raw-response snapshots | identify, poll while active, inspect | Create Hatch run before POST; store every response snapshot and terminal projection; unify old Expert cache artifact into the run directory |
 | raw `codex exec` | unavailable unless a stable structured event is added | `provider_owned` or `unknown`; do not guess | none initially | Use raw-text adapter; durable request/stdout/stderr/result still guaranteed |
-| raw Gemini | unavailable unless CLI exposes one | `unknown` | none initially | Use raw-text adapter; durable request/stdout/stderr/result still guaranteed |
 | disabled z.ai | Claude adapter if re-enabled | same as selected Claude runtime | only proven Claude operations | No special durability fork |
 
 Provider notes:
@@ -748,7 +747,7 @@ a Phase 1 gate, not cleanup.
   mismatch, concurrency.
 - Expert: response creation, polling snapshots, terminal success, remote timeout,
   HTTP error before/after response ID.
-- Raw text: Codex/Gemini success, stderr, nonzero exit, no identity.
+- Raw text: Codex success, stderr, nonzero exit, no identity.
 
 Each adapter suite stays small: fixture recognition, terminal success/failure,
 identity/capability claims, and an `adapter_recognition_empty` drift tripwire.
@@ -778,7 +777,7 @@ entrypoint may call a provider subprocess or HTTP client beneath the coordinator
 
 Provider fixture tests are authoritative for CI mechanics. Optional credentialed
 integration smokes prove current native seams for Claude, Cursor, OpenCode-backed
-Codex/OpenRouter, Expert, raw Codex, and Gemini. A provider outage is reported as
+Codex/OpenRouter, Expert, raw Codex, and Antigravity. A provider outage is reported as
 live-proof failure, not allowed to invalidate the hermetic contract suite.
 
 ## Migration plan
@@ -864,7 +863,7 @@ risk handling for approval-bypass flags.
 - Every Hatch entrypoint creates a prelaunch run record and private artifact.
 - Every terminal JSON explicitly reports result, capture, provider-state, and
   archive axes.
-- Claude, Cursor, OpenCode, Expert, raw Codex, and Gemini have concrete adapters
+- Claude, Cursor, OpenCode, Expert, raw Codex, and Antigravity have concrete adapters
   with no unproven capability claims.
 - Raw evidence written before the failure survives success, failure, timeout,
   caller loss, and Hatch crash; no claim exceeds the retained evidence.

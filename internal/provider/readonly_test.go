@@ -102,9 +102,9 @@ func TestReadOnlyRawCodexUsesReadOnlySandbox(t *testing.T) {
 }
 
 func TestReadOnlyRefusedWhereNoMechanismExists(t *testing.T) {
-	_, err := Build(Request{Backend: "gemini", Model: "gemini-3-pro-preview", Prompt: "prompt", ReadOnly: true})
+	_, err := Build(Request{Backend: "unmapped", Model: "model", Prompt: "prompt", ReadOnly: true})
 	if err == nil || !strings.Contains(err.Error(), "--read-only is not supported") {
-		t.Fatalf("raw gemini must refuse read-only rather than run unrestricted: %v", err)
+		t.Fatalf("a backend with no mechanism must refuse read-only rather than run unrestricted: %v", err)
 	}
 }
 

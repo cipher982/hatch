@@ -447,7 +447,7 @@ compared the ledger with fresh `pytest --collect-only` output. After deletion,
 ### 2. Hermetic fake-provider executable
 
 Build one Go test helper that can impersonate `claude`, `cursor-agent`,
-`opencode`, `codex`, and `gemini` based on argv zero plus a scenario variable.
+`opencode`, and `codex` based on argv zero plus a scenario variable.
 It records:
 
 - argv as an array;
@@ -621,7 +621,7 @@ Status: complete.
 - Implement the raw-text adapter first.
 - Add fault injection, crash subprocess tests, race tests, and fuzz seeds.
 
-Gate: the raw Codex/Gemini fixture matrix and target durable-storage suite pass,
+Gate: the raw Codex fixture matrix and target durable-storage suite pass,
 including large streams, concurrency, crash evidence, and every persistence
 failure boundary.
 

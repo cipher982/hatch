@@ -58,7 +58,7 @@ func TestApplyHostContext(t *testing.T) {
 	}
 
 	containerInvocation := provider.Invocation{}
-	if err := applyHostContext(&containerInvocation, "gemini", ExecutionContext{InContainer: true, HomeWritable: false, Home: "/readonly"}); err != nil {
+	if err := applyHostContext(&containerInvocation, "antigravity", ExecutionContext{InContainer: true, HomeWritable: false, Home: "/readonly"}); err != nil {
 		t.Fatal(err)
 	}
 	if containerInvocation.SetEnv["HOME"] != os.TempDir() {

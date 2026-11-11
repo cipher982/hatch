@@ -189,17 +189,6 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION",
 			},
 		}, len(argv)-1), nil
-	case "gemini":
-		model := req.Model
-		if model == "" {
-			model = "gemini-3-pro-preview"
-		}
-		return redactInvocation(Invocation{
-			Argv:         []string{"gemini", "--model", model, "--yolo", "--skip-trust", "-p", "-"},
-			Stdin:        []byte(prompt),
-			StreamFormat: "text", Adapter: "raw", ReasoningPolicy: policy,
-			UnsetEnv: []string{"CLAUDE_CODE_USE_BEDROCK"},
-		}), nil
 	default:
 		return Invocation{}, fmt.Errorf("unsupported backend %q", req.Backend)
 	}

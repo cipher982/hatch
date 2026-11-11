@@ -17,7 +17,7 @@ import (
 func TestCLILargeResultAndFailureKeepFullEvidence(t *testing.T) {
 	root := t.TempDir()
 	fake := buildTestProviderForCLI(t, root)
-	if err := os.Symlink(fake, filepath.Join(root, "gemini")); err != nil {
+	if err := os.Symlink(fake, filepath.Join(root, "codex")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -26,7 +26,7 @@ func TestCLILargeResultAndFailureKeepFullEvidence(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			t.Setenv("HATCH_TEST_SCENARIO", scenario)
 			var stdout, stderr bytes.Buffer
-			exit := Main([]string{"-b", "gemini", "--title", "Review oversized provider output safely", "--caller-session", "regression:large", "-"}, strings.NewReader("request"), &stdout, &stderr, false)
+			exit := Main([]string{"-b", "codex", "--api-key", "fake-test-key", "--title", "Review oversized provider output safely", "--caller-session", "regression:large", "-"}, strings.NewReader("request"), &stdout, &stderr, false)
 			if (scenario == "large_answer") != (exit == 0) {
 				t.Fatalf("scenario %s exit=%d", scenario, exit)
 			}
@@ -79,7 +79,7 @@ func TestCLILargeResultAndFailureKeepFullEvidence(t *testing.T) {
 func TestCLIScopedRecoveryAndExecutableContinuation(t *testing.T) {
 	root := t.TempDir()
 	fake := buildTestProviderForCLI(t, root)
-	if err := os.Symlink(fake, filepath.Join(root, "gemini")); err != nil {
+	if err := os.Symlink(fake, filepath.Join(root, "codex")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -94,7 +94,7 @@ func TestCLIScopedRecoveryAndExecutableContinuation(t *testing.T) {
 	launch := func(session string) string {
 		t.Helper()
 		var out, diag bytes.Buffer
-		if exit := Main([]string{"-b", "gemini", "--title", "Review provider factory release readiness", "--caller-session", session, "--caller-request", "review-pair", "-C", target, "request"}, bytes.NewReader(nil), &out, &diag, false); exit != 0 {
+		if exit := Main([]string{"-b", "codex", "--api-key", "fake-test-key", "--title", "Review provider factory release readiness", "--caller-session", session, "--caller-request", "review-pair", "-C", target, "request"}, bytes.NewReader(nil), &out, &diag, false); exit != 0 {
 			t.Fatalf("launch exit=%d %s", exit, diag.String())
 		}
 		var result runner.PublicResult

@@ -14,7 +14,7 @@ import (
 	"github.com/cipher982/hatch/internal/provider"
 )
 
-func TestMainRawGeminiVerticalSlice(t *testing.T) {
+func TestMainRawCodexVerticalSlice(t *testing.T) {
 	root := t.TempDir()
 	fake := filepath.Join(root, "testprovider")
 	command := exec.Command("go", "build", "-o", fake, "./internal/testprovider")
@@ -22,7 +22,7 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("build test provider: %v\n%s", err, output)
 	}
-	if err := os.Symlink(fake, filepath.Join(root, "gemini")); err != nil {
+	if err := os.Symlink(fake, filepath.Join(root, "codex")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -31,7 +31,7 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 	t.Setenv("HATCH_TEST_RECORD", filepath.Join(root, "invocation.json"))
 
 	var stdout, stderr bytes.Buffer
-	exitCode := Main([]string{"-b", "gemini", "--json", "-"}, bytes.NewBufferString("oracle prompt"), &stdout, &stderr, true)
+	exitCode := Main([]string{"-b", "codex", "--api-key", "fake-test-key", "--json", "-"}, bytes.NewBufferString("oracle prompt"), &stdout, &stderr, true)
 	if exitCode != 0 {
 		t.Fatalf("exit=%d stderr=%s stdout=%s", exitCode, stderr.String(), stdout.String())
 	}
@@ -52,7 +52,7 @@ func TestMainRawGeminiVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !result.OK || result.Output != "fake provider output\n" || result.Run.Lifecycle != "terminal" || result.Run.Outcome != "succeeded" ||
-		result.Run.Surface != "gemini.raw" || result.Run.Backend != "gemini" || result.Run.Provider != "google" {
+		result.Run.Surface != "codex.raw" || result.Run.Backend != "codex" || result.Run.Provider != "unknown" {
 		t.Fatalf("unexpected result: %#v", result)
 	}
 	if result.ArtifactPath == "" || result.Run.RunID == "" {
@@ -220,7 +220,7 @@ func TestMainFailsClosedBeforeProviderWhenArtifactRootUnavailable(t *testing.T) 
 	}
 	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", root)
 	var stdout, stderr bytes.Buffer
-	exitCode := Main([]string{"-b", "gemini", "--json", "prompt"}, bytes.NewReader(nil), &stdout, &stderr, true)
+	exitCode := Main([]string{"-b", "codex", "--api-key", "fake-test-key", "--json", "prompt"}, bytes.NewReader(nil), &stdout, &stderr, true)
 	if exitCode == 0 {
 		t.Fatalf("unexpected success: %s", stdout.String())
 	}

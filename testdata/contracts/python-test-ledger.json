@@ -833,25 +833,25 @@
     {
       "node_id": "tests/test_cli.py::TestResultToExitCode::test_success",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
       "node_id": "tests/test_cli.py::TestResultToExitCode::test_timeout",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
       "node_id": "tests/test_cli.py::TestResultToExitCode::test_not_found",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
       "node_id": "tests/test_cli.py::TestResultToExitCode::test_agent_error",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -983,25 +983,25 @@
     {
       "node_id": "tests/test_cli.py::TestMain::test_success_output",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
       "node_id": "tests/test_cli.py::TestMain::test_json_output",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
       "node_id": "tests/test_cli.py::TestMain::test_error_to_stderr",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
       "node_id": "tests/test_cli.py::TestMain::test_json_error",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -1061,13 +1061,13 @@
     {
       "node_id": "tests/test_cli.py::TestMain::test_cli_not_found",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
       "node_id": "tests/test_cli.py::TestMain::test_bare_prompt_requires_explicit_provider",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -1139,7 +1139,7 @@
     {
       "node_id": "tests/test_cli.py::TestMain::test_skip_git_repo_check_rejected_for_surfaced_codex",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -1181,7 +1181,7 @@
     {
       "node_id": "tests/test_cli.py::TestMain::test_surfaced_codex_json_still_passes_progress_handler",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -1217,7 +1217,7 @@
     {
       "node_id": "tests/test_cli.py::TestMain::test_strips_trailing_whitespace",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -1229,7 +1229,7 @@
     {
       "node_id": "tests/test_cli.py::TestMain::test_hydrated_kwargs_passed_to_get_config",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -1541,13 +1541,13 @@
     {
       "node_id": "tests/test_integration.py::TestGeminiIntegration::test_simple_math_question",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/raw_gemini_success",
+      "proof": "internal/contracts.TestContractLegacyParity/raw_codex_success",
       "reason": null
     },
     {
       "node_id": "tests/test_integration.py::TestErrorHandling::test_missing_api_key",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -1583,7 +1583,7 @@
     {
       "node_id": "tests/test_integration.py::TestDurationTracking::test_duration_reported",
       "disposition": "preserved_by_go_unit",
-      "proof": "internal/cli.TestMainRawGeminiVerticalSlice",
+      "proof": "internal/cli.TestMainRawCodexVerticalSlice",
       "reason": null
     },
     {
@@ -1871,13 +1871,13 @@
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[raw_gemini_nonzero]",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/raw_gemini_nonzero",
+      "proof": "internal/contracts.TestContractLegacyParity/raw_codex_nonzero",
       "reason": null
     },
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[raw_gemini_success]",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/raw_gemini_success",
+      "proof": "internal/contracts.TestContractLegacyParity/raw_codex_success",
       "reason": null
     },
     {
@@ -1901,13 +1901,13 @@
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[raw_gemini_malformed]",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/raw_gemini_malformed",
+      "proof": "internal/contracts.TestContractLegacyParity/raw_codex_malformed",
       "reason": null
     },
     {
       "node_id": "tests/test_contract_harness.py::test_python_hatch_executes_shared_fake_provider[raw_gemini_timeout]",
       "disposition": "preserved_by_contract",
-      "proof": "internal/contracts.TestContractLegacyParity/raw_gemini_timeout",
+      "proof": "internal/contracts.TestContractLegacyParity/raw_codex_timeout",
       "reason": null
     }
   ]

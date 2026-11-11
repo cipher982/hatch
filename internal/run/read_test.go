@@ -13,7 +13,7 @@ func TestListAndInspectCurrentAndLegacyRecords(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "runs")
 	store := NewStore(root)
 	store.IDGen = func(time.Time) (string, error) { return "hatch_current", nil }
-	artifact, err := store.Prepare(PreparedRun{Surface: "gemini.raw", Provider: "google", Request: "prompt"})
+	artifact, err := store.Prepare(PreparedRun{Surface: "codex.raw", Provider: "openai", Request: "prompt"})
 	if err != nil {
 		t.Fatal(err)
 	}

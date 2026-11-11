@@ -36,7 +36,7 @@ func runHatch(t *testing.T, stdin string, args ...string) (followUpResult, int, 
 func TestResumeContinuesAnEarlierRunOnAnyProvider(t *testing.T) {
 	root := t.TempDir()
 	fake := buildTestProviderForCLI(t, root)
-	if err := os.Symlink(fake, filepath.Join(root, "gemini")); err != nil {
+	if err := os.Symlink(fake, filepath.Join(root, "codex")); err != nil {
 		t.Fatal(err)
 	}
 	record := filepath.Join(root, "invocation.json")
@@ -45,7 +45,7 @@ func TestResumeContinuesAnEarlierRunOnAnyProvider(t *testing.T) {
 	t.Setenv("HATCH_TEST_SCENARIO", "success_text")
 	t.Setenv("HATCH_TEST_RECORD", record)
 
-	first, code, _ := runHatch(t, "", "-b", "gemini", "--json", "-C", root, "Investigate the parking lot spin")
+	first, code, _ := runHatch(t, "", "-b", "codex", "--api-key", "fake-test-key", "--json", "-C", root, "Investigate the parking lot spin")
 	if code != 0 || first.Run.RunID == "" {
 		t.Fatalf("first run failed: code=%d %#v", code, first)
 	}
@@ -90,14 +90,14 @@ func TestResumeContinuesAnEarlierRunOnAnyProvider(t *testing.T) {
 func TestResumeRefusesToCrossAccountsAndUnknownRuns(t *testing.T) {
 	root := t.TempDir()
 	fake := buildTestProviderForCLI(t, root)
-	if err := os.Symlink(fake, filepath.Join(root, "gemini")); err != nil {
+	if err := os.Symlink(fake, filepath.Join(root, "codex")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", filepath.Join(root, "runs"))
 	t.Setenv("HATCH_TEST_SCENARIO", "success_text")
 
-	first, code, _ := runHatch(t, "", "-b", "gemini", "--json", "personal question")
+	first, code, _ := runHatch(t, "", "-b", "codex", "--api-key", "fake-test-key", "--json", "personal question")
 	if code != 0 {
 		t.Fatalf("first run failed: %#v", first)
 	}

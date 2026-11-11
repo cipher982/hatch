@@ -37,7 +37,7 @@ func TestParseSurfacedCommands(t *testing.T) {
 	}
 }
 func TestParseMachineDefaults(t *testing.T) {
-	got, err := Parse([]string{"-b", "gemini", "prompt"}, false)
+	got, err := Parse([]string{"-b", "codex", "prompt"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		want []string
 	}{
 		{"explicit backend wins", []string{"-b", "zai", "codex", "review"}, []string{"-b", "zai", "codex", "review"}},
-		{"explicit backend equals wins", []string{"--backend=gemini", "claude", "review"}, []string{"--backend=gemini", "claude", "review"}},
+		{"explicit backend equals wins", []string{"--backend=codex", "claude", "review"}, []string{"--backend=codex", "claude", "review"}},
 		{"explicit model wins", []string{"codex", "--model", "openai/gpt-5.4", "review"}, []string{"--backend", "pi", "--model", "openai/gpt-5.4", "review"}},
 		{"explicit model equals routes", []string{"--model=openai/gpt-5.4", "review"}, []string{"--backend", "pi", "--model=openai/gpt-5.4", "review"}},
 		{"model shorthand", []string{"astra", "review"}, []string{"--backend", "pi", "--model", "amazon-bedrock/global.openai.gpt-6-astra", "review"}},

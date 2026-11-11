@@ -94,8 +94,8 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if request.Backend == "" {
 		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("No default model is configured; choose an explicit provider"))
 	}
-	if !oneOf(request.Backend, "antigravity", "claude", "cursor", "codex", "gemini", "pi", "omp") {
-		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: antigravity, claude, cursor, codex, gemini, pi, omp", request.Backend))
+	if !oneOf(request.Backend, "antigravity", "claude", "cursor", "codex", "pi", "omp") {
+		return renderConfigError(request.JSON, stdout, stderr, fmt.Errorf("invalid backend %q. Choose one of: antigravity, claude, cursor, codex, pi, omp", request.Backend))
 	}
 	if request.CWD != "" {
 		info, statErr := os.Stat(request.CWD)
@@ -300,8 +300,6 @@ func identity(backend, model string) (string, string) {
 			}
 		}
 		return "cursor.raw", "cursor"
-	case "gemini":
-		return "gemini.raw", "google"
 	case "antigravity":
 		for alias, configured := range surfaces["gemini"].models {
 			if configured == model {

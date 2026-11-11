@@ -1,8 +1,22 @@
 {
   "schema_version": 1,
-  "name": "raw_gemini_nonzero",
-  "provider_binaries": ["gemini"],
-  "arguments": ["-b", "gemini", "--json", "-"],
+  "name": "raw_codex_nonzero",
+  "provider_binaries": [
+    "codex"
+  ],
+  "arguments": [
+    "-b",
+    "codex",
+    "--api-key",
+    "fake-test-key",
+    "--model",
+    "gpt-test",
+    "--reasoning-effort",
+    "high",
+    "--skip-git-repo-check",
+    "--json",
+    "-"
+  ],
   "stdin": "oracle prompt",
   "scenario": "stderr_nonzero",
   "expected": {
@@ -19,13 +33,16 @@
       "resume_command": null
     },
     "provider_argv": [
-      "gemini",
-      "--model",
-      "gemini-3-pro-preview",
-      "--yolo",
-      "--skip-trust",
-      "-p",
-      "-"
+      "codex",
+      "exec",
+      "--dangerously-bypass-approvals-and-sandbox",
+      "--ignore-user-config",
+      "--ephemeral",
+      "-m",
+      "gpt-test",
+      "-c",
+      "model_reasoning_effort=high",
+      "--skip-git-repo-check"
     ],
     "provider_stdin_sha256": "987672f6b029408c0180c161b46526f70b9de4c8ad147bb41790f329e0ea4723",
     "provider_stdin_bytes": 2268

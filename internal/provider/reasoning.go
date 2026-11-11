@@ -82,7 +82,7 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 		return resolveNativeReasoning("Expert", requested, model)
 	case "pi", "omp":
 		return resolvePiLikeReasoning(backend, model, requested)
-	case "cursor", "gemini":
+	case "cursor":
 		if requested != "" {
 			return ReasoningPolicy{}, fmt.Errorf("--reasoning-effort is unsupported for %s", backend)
 		}

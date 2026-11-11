@@ -25,8 +25,8 @@ func TestStorePreparesPrivateDurableRun(t *testing.T) {
 	store.IDGen = func(time.Time) (string, error) { return "hatch_test_run", nil }
 
 	artifact, err := store.Prepare(PreparedRun{
-		Surface: "gemini.raw", Provider: "google", Model: "gemini-3-pro-preview", CWD: "/repo",
-		Request: "secret prompt", RedactedArgv: []string{"gemini", "<prompt>"}, CredentialNames: []string{"GEMINI_API_KEY"},
+		Surface: "codex.raw", Provider: "openai", Model: "gpt-test", CWD: "/repo",
+		Request: "secret prompt", RedactedArgv: []string{"codex", "<prompt>"}, CredentialNames: []string{"OPENAI_API_KEY"},
 		ReasoningPolicy: provider.ReasoningPolicy{Source: "unsupported", Support: "unsupported"},
 	})
 	if err != nil {
@@ -153,7 +153,7 @@ func TestAtomicPrivatePropagatesEveryPersistenceBoundary(t *testing.T) {
 func TestStoreLifecycleAndEvidenceDigest(t *testing.T) {
 	store := NewStore(filepath.Join(t.TempDir(), "runs"))
 	store.IDGen = func(time.Time) (string, error) { return "hatch_lifecycle", nil }
-	artifact, err := store.Prepare(PreparedRun{Surface: "gemini.raw", Provider: "google", Model: "model", CWD: "/repo", Request: "prompt", RedactedArgv: []string{"gemini"}})
+	artifact, err := store.Prepare(PreparedRun{Surface: "codex.raw", Provider: "openai", Model: "model", CWD: "/repo", Request: "prompt", RedactedArgv: []string{"codex"}})
 	if err != nil {
 		t.Fatal(err)
 	}
