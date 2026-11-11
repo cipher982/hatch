@@ -16,7 +16,7 @@ export default function (pi) {
     const runner = process.env.HATCH_DCG_RUNNER;
     if (!runner) return block("DCG guard failed: HATCH_DCG_RUNNER is not set");
 
-    const env = { ...process.env, DCG_NO_SELF_HEAL: "1", DCG_HARNESS: "hatch-pi" };
+    const env = { ...process.env, DCG_NO_SELF_HEAL: "1", DCG_HARNESS: process.env.DCG_HARNESS || "hatch-pi" };
     delete env.DCG_BYPASS;
     const run = spawnSync(runner, ["--protocol", "json"], {
       input: JSON.stringify({ command, cwd: ctx?.cwd || process.cwd() }),

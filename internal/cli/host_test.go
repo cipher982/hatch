@@ -114,6 +114,28 @@ func TestApplyDCGLoadsGuardExtensionIntoPi(t *testing.T) {
 	}
 }
 
+func TestApplyDCGLoadsGuardExtensionIntoOMP(t *testing.T) {
+	home := t.TempDir()
+	binary := filepath.Join(home, ".local", "bin", "dcg")
+	if err := os.MkdirAll(filepath.Dir(binary), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	runner := writeFakeGuardRunner(t, home)
+	invocation, err := provider.Build(provider.Request{Backend: "omp", Model: "openai/gpt-6.1-sol", Prompt: "p", APIKey: "key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyDCG(&invocation, "omp", ExecutionContext{Home: home, HomeWritable: true}); err != nil {
+		t.Fatal(err)
+	}
+	if invocation.PiDCGRunner != runner {
+		t.Fatalf("OMP run does not carry the DCG guard runner: %#v", invocation)
+	}
+}
+
 func TestApplyDCGRequiredFailsClosed(t *testing.T) {
 	home := t.TempDir()
 	declaration := filepath.Join(home, "git", "me", "config", "dcg", "release.json")

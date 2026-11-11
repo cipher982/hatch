@@ -463,6 +463,9 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 	if pi.SetEnv["HATCH_DCG_RUNNER"] != "/home/u/.config/dcg/hook-runner" || pi.Argv[last-2] != "-e" || pi.Argv[last-1] != guard || pi.Argv[last] != provider.PreparePrompt("prompt") {
 		t.Fatalf("DCG guard not loaded before the prompt: env=%#v argv=%#v", pi.SetEnv, pi.Argv)
 	}
+	if pi.SetEnv["DCG_HARNESS"] != "hatch-pi" {
+		t.Fatalf("DCG harness label = %q", pi.SetEnv["DCG_HARNESS"])
+	}
 	if len(pi.RedactedArgv) != len(pi.Argv) || pi.RedactedArgv[len(pi.RedactedArgv)-1] != "<prompt>" {
 		t.Fatalf("redaction drift: %#v", pi.RedactedArgv)
 	}
@@ -721,4 +724,22 @@ func buildTestProvider(t *testing.T) string {
 		t.Fatalf("build test provider: %v\n%s", err, output)
 	}
 	return path
+}
+
+func TestCursorRunHomeLinksDCGHooks(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.MkdirAll(filepath.Join(home, ".cursor"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	hooks := filepath.Join(home, ".cursor", "hooks.json")
+	if err := os.WriteFile(hooks, []byte(`{"version":1}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	linkUserCursorConfig(root)
+	target, err := os.Readlink(filepath.Join(root, ".cursor", "hooks.json"))
+	if err != nil || target != hooks {
+		t.Fatalf("Cursor per-run home lacks the user's hooks.json (guard would not run): %q %v", target, err)
+	}
 }

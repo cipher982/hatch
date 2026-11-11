@@ -732,7 +732,7 @@ func linkUserCursorConfig(targetRoot string) {
 	cursorDir := filepath.Join(targetRoot, ".cursor")
 	if err := secureMkdirAll(cursorDir); err == nil {
 		userCursorDir := filepath.Join(home, ".cursor")
-		for _, name := range []string{"auth.json", "cli-config.json", "argv.json", "mcp.json", "ide_state.json"} {
+		for _, name := range []string{"auth.json", "cli-config.json", "argv.json", "mcp.json", "ide_state.json", "hooks.json"} {
 			src := filepath.Join(userCursorDir, name)
 			if info, err := os.Stat(src); err == nil && !info.IsDir() {
 				_ = os.Symlink(src, filepath.Join(cursorDir, name))
@@ -773,6 +773,7 @@ func writePiRuntimeFiles(root string, invocation *provider.Invocation) error {
 			return err
 		}
 		invocation.SetEnv["HATCH_DCG_RUNNER"] = invocation.PiDCGRunner
+		invocation.SetEnv["DCG_HARNESS"] = "hatch-" + invocation.Adapter
 		last := len(invocation.Argv) - 1
 		invocation.Argv = append(invocation.Argv[:last], "-e", path, invocation.Argv[last])
 		redacted := len(invocation.RedactedArgv) - 1

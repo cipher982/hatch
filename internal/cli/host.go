@@ -113,7 +113,7 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 		insert := index + 2
 		invocation.Argv = append(invocation.Argv[:insert], append([]string{"--settings", string(settings)}, invocation.Argv[insert:]...)...)
 		invocation.RedactedArgv = append(invocation.RedactedArgv[:insert], append([]string{"--settings", string(settings)}, invocation.RedactedArgv[insert:]...)...)
-	case "pi":
+	case "pi", "omp":
 		invocation.PiDCGRunner = runner
 	}
 	return nil
