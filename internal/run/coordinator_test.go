@@ -437,7 +437,7 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pi.PiDCGBinary = "/usr/local/bin/dcg"
+	pi.PiDCGRunner = "/home/u/.config/dcg/hook-runner"
 	artifact, err := store.Prepare(PreparedRun{Surface: "openrouter.deepseek", Backend: "pi", Provider: "openrouter", Model: "openrouter/deepseek/deepseek-v4.1-flash-1017", Request: "prompt", ReasoningPolicy: pi.ReasoningPolicy})
 	if err != nil {
 		t.Fatal(err)
@@ -460,7 +460,7 @@ func TestProviderStateIsolationUsesPerRunNamespaces(t *testing.T) {
 	}
 	guard := filepath.Join(configDir, "dcg-guard.mjs")
 	last := len(pi.Argv) - 1
-	if pi.SetEnv["HATCH_DCG_BINARY"] != "/usr/local/bin/dcg" || pi.Argv[last-2] != "-e" || pi.Argv[last-1] != guard || pi.Argv[last] != provider.PreparePrompt("prompt") {
+	if pi.SetEnv["HATCH_DCG_RUNNER"] != "/home/u/.config/dcg/hook-runner" || pi.Argv[last-2] != "-e" || pi.Argv[last-1] != guard || pi.Argv[last] != provider.PreparePrompt("prompt") {
 		t.Fatalf("DCG guard not loaded before the prompt: env=%#v argv=%#v", pi.SetEnv, pi.Argv)
 	}
 	if len(pi.RedactedArgv) != len(pi.Argv) || pi.RedactedArgv[len(pi.RedactedArgv)-1] != "<prompt>" {

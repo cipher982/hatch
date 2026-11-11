@@ -767,12 +767,12 @@ func writePiRuntimeFiles(root string, invocation *provider.Invocation) error {
 			return err
 		}
 	}
-	if invocation.PiDCGBinary != "" {
+	if invocation.PiDCGRunner != "" {
 		path := filepath.Join(root, "dcg-guard.mjs")
 		if err := os.WriteFile(path, provider.PiDCGGuardSource(), 0o600); err != nil {
 			return err
 		}
-		invocation.SetEnv["HATCH_DCG_BINARY"] = invocation.PiDCGBinary
+		invocation.SetEnv["HATCH_DCG_RUNNER"] = invocation.PiDCGRunner
 		last := len(invocation.Argv) - 1
 		invocation.Argv = append(invocation.Argv[:last], "-e", path, invocation.Argv[last])
 		redacted := len(invocation.RedactedArgv) - 1

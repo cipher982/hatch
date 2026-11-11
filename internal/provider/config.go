@@ -44,9 +44,10 @@ type Invocation struct {
 	// PiModelsJSON, when set, is written into the per-run Pi config dir as
 	// models.json before launch (see PiModelsJSON). Never contains credentials.
 	PiModelsJSON []byte
-	// PiDCGBinary, when set, loads the DCG guard extension into the Pi run and
-	// tells it which dcg executable to ask before every bash command.
-	PiDCGBinary string
+	// PiDCGRunner, when set, loads the DCG guard extension into the Pi run and
+	// names the Agent Home guard runner (~/.config/dcg/hook-runner) it asks
+	// before every bash command.
+	PiDCGRunner string
 	// ReadOnlyMechanism names how a ReadOnly request is enforced; empty
 	// when the run is not read-only.
 	ReadOnlyMechanism string

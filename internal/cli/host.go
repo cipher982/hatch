@@ -83,19 +83,24 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 	if err != nil {
 		return err
 	}
-	binary := filepath.Join(home, ".local", "bin", "dcg")
-	info, binaryErr := os.Stat(binary)
-	if binaryErr != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-		if required {
-			return fmt.Errorf("Agent Home requires DCG but %s is missing or not executable; run `agents guard install`", binary)
+	// Every harness asks the Agent Home guard runner (guard.py in front of the
+	// dcg binary), never dcg directly, so Hatch runs get the same tiers and
+	// check-in codes as interactive sessions.
+	runner := filepath.Join(home, ".config", "dcg", "hook-runner")
+	for _, path := range []string{filepath.Join(home, ".local", "bin", "dcg"), runner} {
+		info, statErr := os.Stat(path)
+		if statErr != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+			if required {
+				return fmt.Errorf("Agent Home requires DCG but %s is missing or not executable; run `agents guard install`", path)
+			}
+			return nil
 		}
-		return nil
 	}
 	switch backend {
 	case "claude":
 		settings, err := json.Marshal(map[string]any{
 			"hooks": map[string]any{"PreToolUse": []any{map[string]any{
-				"matcher": "Bash", "hooks": []any{map[string]any{"type": "command", "command": binary}},
+				"matcher": "Bash", "hooks": []any{map[string]any{"type": "command", "command": runner}},
 			}}},
 		})
 		if err != nil {
@@ -109,7 +114,7 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 		invocation.Argv = append(invocation.Argv[:insert], append([]string{"--settings", string(settings)}, invocation.Argv[insert:]...)...)
 		invocation.RedactedArgv = append(invocation.RedactedArgv[:insert], append([]string{"--settings", string(settings)}, invocation.RedactedArgv[insert:]...)...)
 	case "pi":
-		invocation.PiDCGBinary = binary
+		invocation.PiDCGRunner = runner
 	}
 	return nil
 }

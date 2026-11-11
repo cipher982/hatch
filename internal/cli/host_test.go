@@ -75,6 +75,7 @@ func TestApplyDCGClaudeOverlay(t *testing.T) {
 	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	runner := writeFakeGuardRunner(t, home)
 	invocation, err := provider.Build(provider.Request{Backend: "claude", Model: "haiku", Prompt: "p"})
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +84,7 @@ func TestApplyDCGClaudeOverlay(t *testing.T) {
 		t.Fatal(err)
 	}
 	index := flagValueIndex(invocation.Argv, "--settings")
-	if index < 0 || !strings.Contains(invocation.Argv[index+1], binary) {
+	if index < 0 || !strings.Contains(invocation.Argv[index+1], runner) || strings.Contains(invocation.Argv[index+1], binary) {
 		t.Fatalf("Claude args = %#v", invocation.Argv)
 	}
 	if len(invocation.RedactedArgv) != len(invocation.Argv) {
@@ -100,6 +101,7 @@ func TestApplyDCGLoadsGuardExtensionIntoPi(t *testing.T) {
 	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	runner := writeFakeGuardRunner(t, home)
 	invocation, err := provider.Build(provider.Request{Backend: "pi", Model: "openai/gpt-6.1-sol", Prompt: "p", APIKey: "key"})
 	if err != nil {
 		t.Fatal(err)
@@ -107,8 +109,8 @@ func TestApplyDCGLoadsGuardExtensionIntoPi(t *testing.T) {
 	if err := applyDCG(&invocation, "pi", ExecutionContext{Home: home, HomeWritable: true}); err != nil {
 		t.Fatal(err)
 	}
-	if invocation.PiDCGBinary != binary {
-		t.Fatalf("Pi run does not carry the DCG binary: %#v", invocation)
+	if invocation.PiDCGRunner != runner {
+		t.Fatalf("Pi run does not carry the DCG guard runner: %#v", invocation)
 	}
 }
 
@@ -125,4 +127,16 @@ func TestApplyDCGRequiredFailsClosed(t *testing.T) {
 	if err := applyDCG(&invocation, "claude", ExecutionContext{Home: home, HomeWritable: true}); err == nil || !strings.Contains(err.Error(), "agents guard install") {
 		t.Fatalf("error = %v", err)
 	}
+}
+
+func writeFakeGuardRunner(t *testing.T, home string) string {
+	t.Helper()
+	runner := filepath.Join(home, ".config", "dcg", "hook-runner")
+	if err := os.MkdirAll(filepath.Dir(runner), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(runner, []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return runner
 }
