@@ -115,6 +115,8 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 		invocation.RedactedArgv = append(invocation.RedactedArgv[:insert], append([]string{"--settings", string(settings)}, invocation.RedactedArgv[insert:]...)...)
 	case "pi", "omp":
 		invocation.PiDCGRunner = runner
+	case "antigravity":
+		invocation.AntigravityDCGRunner = runner
 	}
 	return nil
 }

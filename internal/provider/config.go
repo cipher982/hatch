@@ -48,6 +48,9 @@ type Invocation struct {
 	// names the Agent Home guard runner (~/.config/dcg/hook-runner) it asks
 	// before every bash command.
 	PiDCGRunner string
+	// AntigravityDCGRunner, when set, writes a dcg-guard hook entry in the
+	// per-run .gemini/config/hooks.json pointing at Agent Home's hook-runner.
+	AntigravityDCGRunner string
 	// ReadOnlyMechanism names how a ReadOnly request is enforced; empty
 	// when the run is not read-only.
 	ReadOnlyMechanism string
@@ -182,11 +185,15 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		argv = append(argv, "--output-format", "stream-json", "--model", model, "-p", prompt)
 		return redactInvocation(Invocation{
 			Argv: argv, StreamFormat: "jsonl", Adapter: "antigravity", ReasoningPolicy: policy,
+			SetEnv: map[string]string{},
 			UnsetEnv: []string{
 				"OPENAI_API_KEY", "OPENROUTER_API_KEY", "OPENCODE_API_KEY", "ANTHROPIC_API_KEY",
 				"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_BASE_URL",
 				"GEMINI_API_KEY", "CODEX_API_KEY", "CURSOR_API_KEY", "CLAUDE_CODE_USE_BEDROCK",
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION",
+				"LONGHOUSE_HOME", "LONGHOUSE_HOOK_TOKEN", "LONGHOUSE_HOOK_URL",
+				"LONGHOUSE_MANAGED_SESSION_ID", "LONGHOUSE_MANAGED_PROVIDER", "LONGHOUSE_RUN_ID",
+				"LONGHOUSE_ANTIGRAVITY_INBOX_DIR", "LONGHOUSE_ANTIGRAVITY_STATE_DIR",
 			},
 		}, len(argv)-1), nil
 	default:

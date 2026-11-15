@@ -3,6 +3,7 @@ package run
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -331,7 +332,7 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	if interpretation.NativeID != "" {
 		state.NativeID = &interpretation.NativeID
 	}
-	if req.Invocation.Adapter == "pi" || req.Invocation.Adapter == "omp" {
+	if req.Invocation.Adapter == "pi" || req.Invocation.Adapter == "omp" || req.Invocation.Adapter == "antigravity" {
 		state.Retention = "unavailable"
 		state.Capabilities["state_isolation"] = "hatch_per_run"
 		state.Capabilities["session_persistence"] = "disabled_ephemeral"
@@ -664,6 +665,17 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 		invocation.SetEnv["HOME"] = root
 		return func() { _ = discardProviderRuntime(artifact, "cursor") }, nil
 	}
+	if invocation.Adapter == "antigravity" {
+		root := filepath.Join(artifact.Path, "provider", "antigravity")
+		if err := secureMkdirAll(root); err != nil {
+			return nil, err
+		}
+		if err := prepareAntigravityHome(root, invocation); err != nil {
+			return nil, err
+		}
+		invocation.SetEnv["HOME"] = root
+		return func() { _ = discardProviderRuntime(artifact, "antigravity") }, nil
+	}
 	return func() {}, nil
 }
 
@@ -713,11 +725,7 @@ func linkUserPiLikeConfig(adapter, targetRoot string) {
 		}
 	}
 }
-func linkUserCursorConfig(targetRoot string) {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return
-	}
+func linkUserMacLibrary(targetRoot, home string) {
 	libraryDir := filepath.Join(targetRoot, "Library")
 	if err := secureMkdirAll(libraryDir); err == nil {
 		keychains := filepath.Join(home, "Library", "Keychains")
@@ -729,6 +737,14 @@ func linkUserCursorConfig(targetRoot string) {
 			_ = os.Symlink(appSupport, filepath.Join(libraryDir, "Application Support"))
 		}
 	}
+}
+
+func linkUserCursorConfig(targetRoot string) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return
+	}
+	linkUserMacLibrary(targetRoot, home)
 	cursorDir := filepath.Join(targetRoot, ".cursor")
 	if err := secureMkdirAll(cursorDir); err == nil {
 		userCursorDir := filepath.Join(home, ".cursor")
@@ -739,6 +755,104 @@ func linkUserCursorConfig(targetRoot string) {
 			}
 		}
 	}
+}
+
+func prepareAntigravityHome(targetRoot string, invocation *provider.Invocation) error {
+	targetCLI := filepath.Join(targetRoot, ".gemini", "antigravity-cli")
+	if err := secureMkdirAll(filepath.Join(targetCLI, "cache")); err != nil {
+		return err
+	}
+	home, err := os.UserHomeDir()
+	if err == nil && home != "" {
+		linkUserMacLibrary(targetRoot, home)
+		srcCLI := filepath.Join(home, ".gemini", "antigravity-cli")
+		for _, rel := range []string{
+			"settings.json",
+			"jetski_state.pbtxt",
+			"installation_id",
+			filepath.Join("cache", "onboarding.json"),
+			filepath.Join("cache", "nux_state.json"),
+			filepath.Join("cache", "default_project_id.txt"),
+		} {
+			if err := copyRegularFile(filepath.Join(srcCLI, rel), filepath.Join(targetCLI, rel)); err != nil {
+				return err
+			}
+		}
+		srcConfig := filepath.Join(home, ".gemini", "config", "config.json")
+		if info, err := os.Stat(srcConfig); err == nil && info.Mode().IsRegular() {
+			if data, err := os.ReadFile(srcConfig); err == nil {
+				var raw map[string]any
+				if json.Unmarshal(data, &raw) == nil {
+					filtered := map[string]any{}
+					if userSettings, ok := raw["userSettings"]; ok {
+						filtered["userSettings"] = userSettings
+					}
+					encoded, err := json.MarshalIndent(filtered, "", "  ")
+					if err != nil {
+						return err
+					}
+					cfgDir := filepath.Join(targetRoot, ".gemini", "config")
+					if err := secureMkdirAll(cfgDir); err != nil {
+						return err
+					}
+					if err := writePrivate(filepath.Join(cfgDir, "config.json"), append(encoded, '\n')); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	if invocation.AntigravityDCGRunner != "" {
+		cfgDir := filepath.Join(targetRoot, ".gemini", "config")
+		if err := secureMkdirAll(cfgDir); err != nil {
+			return err
+		}
+		hooksPayload := map[string]any{
+			"dcg-guard": map[string]any{
+				"PreToolUse": []any{
+					map[string]any{
+						"matcher": "run_command",
+						"hooks": []any{
+							map[string]any{
+								"type":    "command",
+								"command": invocation.AntigravityDCGRunner + " --protocol agy",
+								"timeout": 15,
+							},
+						},
+					},
+				},
+			},
+		}
+		encoded, err := json.MarshalIndent(hooksPayload, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := writePrivate(filepath.Join(cfgDir, "hooks.json"), append(encoded, '\n')); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func copyRegularFile(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return nil
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	if err := secureMkdirAll(filepath.Dir(dst)); err != nil {
+		return err
+	}
+	return writePrivate(dst, data)
 }
 
 func displayReasoningEffort(policy provider.ReasoningPolicy) string {

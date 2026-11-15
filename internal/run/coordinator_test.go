@@ -743,3 +743,158 @@ func TestCursorRunHomeLinksDCGHooks(t *testing.T) {
 		t.Fatalf("Cursor per-run home lacks the user's hooks.json (guard would not run): %q %v", target, err)
 	}
 }
+
+func TestPrepareAntigravityHomeIsolatesAndWiresDCG(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.MkdirAll(filepath.Join(home, ".gemini", "antigravity-cli", "brain", "old"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".gemini", "config"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"), []byte(`{"telemetryEnabled":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".gemini", "antigravity-cli", "brain", "old", "file"), []byte("stale"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".gemini", "config", "config.json"), []byte(`{"plugins":{"longhouse-runtime":{}},"userSettings":{"themeMode":"dark"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".gemini", "config", "hooks.json"), []byte(`{"longhouse-runtime":{}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStore(t.TempDir())
+	invocation := provider.Invocation{
+		Adapter:              "antigravity",
+		StreamFormat:         "jsonl",
+		ReasoningPolicy:      provider.ReasoningPolicy{Source: "unsupported", Support: "unsupported"},
+		SetEnv:               map[string]string{},
+		AntigravityDCGRunner: "/real/home/.config/dcg/hook-runner",
+	}
+	artifact, err := store.Prepare(PreparedRun{
+		Surface:         "gemini",
+		Backend:         "antigravity",
+		Provider:        "google",
+		Model:           "gemini-3.1-pro",
+		Request:         "prompt",
+		ReasoningPolicy: invocation.ReasoningPolicy,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanup, err := prepareProviderState(artifact, &invocation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	wantHome := filepath.Join(artifact.Path, "provider", "antigravity")
+	if invocation.SetEnv["HOME"] != wantHome {
+		t.Fatalf("HOME = %q, want %q", invocation.SetEnv["HOME"], wantHome)
+	}
+	info, err := os.Lstat(filepath.Join(wantHome, ".gemini", "antigravity-cli", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		t.Fatalf("expected regular non-symlink settings.json, got mode %v", info.Mode())
+	}
+	if _, err := os.Stat(filepath.Join(wantHome, ".gemini", "antigravity-cli", "brain")); !os.IsNotExist(err) {
+		t.Fatalf("expected no brain dir in isolated home, got err=%v", err)
+	}
+	cfgBytes, err := os.ReadFile(filepath.Join(wantHome, ".gemini", "config", "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(cfgBytes, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if _, hasUserSettings := cfg["userSettings"]; !hasUserSettings {
+		t.Fatalf("expected userSettings preserved in config.json: %s", string(cfgBytes))
+	}
+	if _, hasPlugins := cfg["plugins"]; hasPlugins {
+		t.Fatalf("expected plugins stripped from isolated config.json: %s", string(cfgBytes))
+	}
+	hooksBytes, err := os.ReadFile(filepath.Join(wantHome, ".gemini", "config", "hooks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hooksStr := string(hooksBytes)
+	if strings.Contains(hooksStr, "longhouse-runtime") {
+		t.Fatalf("expected longhouse-runtime excluded from hooks.json: %s", hooksStr)
+	}
+	if !strings.Contains(hooksStr, "dcg-guard") || !strings.Contains(hooksStr, "/real/home/.config/dcg/hook-runner --protocol agy") {
+		t.Fatalf("expected dcg-guard wired in hooks.json: %s", hooksStr)
+	}
+}
+
+func TestAntigravityRunDiscardsEphemeralHomeAndPassesAudit(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	fakeBinDir := t.TempDir()
+	fakeAgy := filepath.Join(fakeBinDir, "agy")
+	script := `#!/bin/sh
+mkdir -p "$HOME/.gemini/antigravity-cli/brain/conv-test/.system_generated/logs"
+echo '{"step":1}' > "$HOME/.gemini/antigravity-cli/brain/conv-test/.system_generated/logs/transcript_full.jsonl"
+printf '%s\n' '{"event":"init","conversation_id":"conv-test","init":{}}'
+printf '%s\n' '{"event":"result","result":{"conversation_id":"conv-test","status":"SUCCESS","response":"fake antigravity ok\n"}}'
+`
+	if err := os.WriteFile(fakeAgy, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	runsRoot := filepath.Join(t.TempDir(), "runs")
+	coordinator := NewCoordinator(NewStore(runsRoot))
+	result := coordinator.Execute(Request{
+		Surface:    "gemini",
+		Backend:    "antigravity",
+		Provider:   "google",
+		Model:      "gemini-3.1-pro",
+		Prompt:     "Reply PONG",
+		Timeout:    5 * time.Second,
+		Automation: true,
+		Invocation: provider.Invocation{
+			Argv:            []string{fakeAgy, "-p", "Reply PONG"},
+			RedactedArgv:    []string{fakeAgy, "-p", "<redacted>"},
+			StreamFormat:    "jsonl",
+			Adapter:         "antigravity",
+			ReasoningPolicy: provider.ReasoningPolicy{Source: "unsupported", Support: "unsupported"},
+			SetEnv:          map[string]string{},
+		},
+	})
+	if !result.OK {
+		t.Fatalf("expected OK result, got %#v", result)
+	}
+	if result.SessionID == nil || *result.SessionID != "conv-test" {
+		t.Fatalf("SessionID = %#v, want conv-test", result.SessionID)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".gemini", "antigravity-cli", "brain")); !os.IsNotExist(err) {
+		t.Fatalf("real HOME was polluted with antigravity brain dir: err=%v", err)
+	}
+	if result.ArtifactPath == nil {
+		t.Fatalf("expected durable artifact path, got nil")
+	}
+	if _, err := os.Stat(filepath.Join(*result.ArtifactPath, "provider")); !os.IsNotExist(err) {
+		t.Fatalf("expected <artifact>/provider discarded, got err=%v", err)
+	}
+	if result.Run == nil {
+		t.Fatalf("expected non-nil Run manifest")
+	}
+	if got := result.Run.ProviderState.Capabilities["state_isolation"]; got != "hatch_per_run" {
+		t.Fatalf("state_isolation = %q, want hatch_per_run", got)
+	}
+	if got := result.Run.ProviderState.Capabilities["session_persistence"]; got != "disabled_ephemeral" {
+		t.Fatalf("session_persistence = %q, want disabled_ephemeral", got)
+	}
+	audit, err := AuditFieldEvidence(runsRoot, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if audit.Observed != 1 || audit.Unsafe != 0 || audit.UnexplainedUnsafe != 0 || !audit.Passed() {
+		t.Fatalf("expected passing field audit, got %#v", audit)
+	}
+}

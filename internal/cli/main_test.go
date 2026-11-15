@@ -74,6 +74,9 @@ func TestMainSelectsOMPForSurfacedCodexRun(t *testing.T) {
 	if err := os.Symlink(fake, filepath.Join(root, "omp")); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(root, "aws"), []byte("#!/bin/sh\nprintf '{\"Account\":\"123\"}\\n'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("OPENAI_API_KEY", "test-key")
 	t.Setenv("HATCH_TEST_SCENARIO", "success_omp")

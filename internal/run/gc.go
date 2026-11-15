@@ -86,6 +86,7 @@ func CollectGarbage(root string, apply bool) (GarbageReport, error) {
 			{GarbageProviderState, filepath.Join(runPath, "provider", "codex")},
 			{GarbageProviderState, filepath.Join(runPath, "provider", "pi")},
 			{GarbageProviderState, filepath.Join(runPath, "provider", "omp")},
+			{GarbageProviderState, filepath.Join(runPath, "provider", "antigravity")},
 		}
 		if !manifest.CreatedAt.IsZero() && manifest.CreatedAt.Before(time.Now().UTC().Add(-14*24*time.Hour)) {
 			for _, name := range []string{"opencode-snapshot", "cursor"} {
