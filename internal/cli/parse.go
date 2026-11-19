@@ -179,26 +179,15 @@ func normalizeSurface(args []string) ([]string, error) {
 	}
 	before, after := args[:index], args[index+1:]
 	if len(after) == 0 {
-		if surfaceName == "gemini" {
-			result := append([]string(nil), before...)
-			result = append(result, "--backend", surface.backend)
-			if !hasExplicitModel {
-				result = append(result, "--model", surface.models["carbon"])
-			}
-			return append(result, after...), nil
-		}
 		return nil, fmt.Errorf("%s requires an explicit model: %s", surfaceName, modelChoices(surface.models))
 	}
 	if strings.HasPrefix(after[0], "-") {
 		if after[0] == "-h" || after[0] == "--help" || after[0] == "--advanced-help" {
 			return append([]string(nil), args...), nil
 		}
-		if hasExplicitModel || surfaceName == "gemini" {
+		if hasExplicitModel {
 			result := append([]string(nil), before...)
 			result = append(result, "--backend", surface.backend)
-			if !hasExplicitModel && surfaceName == "gemini" {
-				result = append(result, "--model", surface.models["carbon"])
-			}
 			return append(result, after...), nil
 		}
 		return nil, fmt.Errorf("%s requires an explicit model: %s", surfaceName, modelChoices(surface.models))
@@ -206,14 +195,6 @@ func normalizeSurface(args []string) ([]string, error) {
 	alias := after[0]
 	model, ok := surface.models[alias]
 	if !ok {
-		if surfaceName == "gemini" && !provider.IsDeprecatedAlias(surfaceName, alias) {
-			result := append([]string(nil), before...)
-			result = append(result, "--backend", surface.backend)
-			if !hasExplicitModel {
-				result = append(result, "--model", surface.models["carbon"])
-			}
-			return append(result, after...), nil
-		}
 		message := fmt.Sprintf("invalid %s model %q. Choose one of: %s", surfaceName, alias, modelChoices(surface.models))
 		if surfaceName == "cursor" {
 			message += `. For a raw Cursor model ID, use: hatch cursor grok --model <cursor-model-id> "prompt"`

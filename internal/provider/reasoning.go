@@ -89,7 +89,7 @@ func ResolveReasoning(backend, model, requested string) (ReasoningPolicy, error)
 		return ReasoningPolicy{Source: "unsupported", Support: "unsupported"}, nil
 	case "antigravity":
 		if requested != "" {
-			return ReasoningPolicy{}, fmt.Errorf("--reasoning-effort is unsupported for antigravity: the model id carries the tier (gemini-4-carbon-low, gemini-4-carbon-medium, gemini-4-carbon-high)")
+			return ReasoningPolicy{}, fmt.Errorf("--reasoning-effort is unsupported for antigravity: the model id carries the tier (e.g. gemini-4-neon-high, gemini-4-carbon-medium, gemini-4-hydrogen-low)")
 		}
 		return ReasoningPolicy{Source: "unsupported", Support: "unsupported"}, nil
 	default:

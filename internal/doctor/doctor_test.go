@@ -119,7 +119,9 @@ func TestCheckAntigravityModels(t *testing.T) {
 	binary := filepath.Join(directory, "agy")
 	script := `#!/bin/sh
 printf 'Fetching available models...\n'
+printf 'gemini-4-neon-medium\tGemini 4 Neon (Medium)\n'
 printf 'gemini-4-carbon-medium\tGemini 4 Carbon (Medium)\n'
+printf 'gemini-4-hydrogen-medium\tGemini 4 Hydrogen (Medium)\n'
 printf 'gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n'
 `
 	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {

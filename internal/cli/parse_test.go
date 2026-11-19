@@ -16,8 +16,9 @@ func TestParseSurfacedCommands(t *testing.T) {
 		{[]string{"cursor", "grok", "--json", "-"}, "cursor", "grok-4.7-high"},
 		{[]string{"cursor", "kimi-k3", "--json", "-"}, "cursor", "kimi-k3"},
 		{[]string{"cursor", "gemini-4-carbon", "--json", "-"}, "cursor", "gemini-4-carbon-medium"},
-		{[]string{"gemini", "--json", "-"}, "antigravity", "gemini-4-carbon-medium"},
+		{[]string{"gemini", "neon", "--json", "-"}, "antigravity", "gemini-4-neon-medium"},
 		{[]string{"gemini", "carbon", "--json", "-"}, "antigravity", "gemini-4-carbon-medium"},
+		{[]string{"gemini", "hydrogen", "--json", "-"}, "antigravity", "gemini-4-hydrogen-medium"},
 		{[]string{"codex", "astra", "--json", "-"}, "pi", "openai/gpt-6-astra"},
 		{[]string{"codex", "sol", "--json", "-"}, "pi", "openai/gpt-6.1-sol"},
 		{[]string{"codex", "terra", "--json", "-"}, "pi", "openai/gpt-6.1-terra"},
@@ -90,7 +91,9 @@ func TestParseModelFirstShorthands(t *testing.T) {
 		{"luna", "pi", "amazon-bedrock/global.openai.gpt-6-luna"},
 		{"grok", "cursor", "grok-4.7-high"},
 		{"kimi-k3", "cursor", "kimi-k3"},
+		{"neon", "antigravity", "gemini-4-neon-medium"},
 		{"carbon", "antigravity", "gemini-4-carbon-medium"},
+		{"hydrogen", "antigravity", "gemini-4-hydrogen-medium"},
 		{"deepseek", "pi", "opencode-go/deepseek-v4.1-flash"},
 		{"glm-5.3-flash", "pi", "openrouter/z-ai/glm-5.3-flash"},
 	}
@@ -124,8 +127,10 @@ func TestNormalizeSurfaceCompatibility(t *testing.T) {
 		{"double dash", []string{"--", "claude", "review"}, []string{"--", "claude", "review"}},
 		{"surface help", []string{"codex", "--help"}, []string{"codex", "--help"}},
 		{"surface advanced help", []string{"claude", "--advanced-help"}, []string{"claude", "--advanced-help"}},
-		{"gemini default prompt", []string{"gemini", "review"}, []string{"--backend", "antigravity", "--model", "gemini-4-carbon-medium", "review"}},
-		{"gemini shorthand", []string{"carbon", "review"}, []string{"--backend", "antigravity", "--model", "gemini-4-carbon-medium", "review"}},
+		{"gemini neon shorthand", []string{"neon", "review"}, []string{"--backend", "antigravity", "--model", "gemini-4-neon-medium", "review"}},
+		{"gemini carbon shorthand", []string{"carbon", "review"}, []string{"--backend", "antigravity", "--model", "gemini-4-carbon-medium", "review"}},
+		{"gemini hydrogen shorthand", []string{"hydrogen", "review"}, []string{"--backend", "antigravity", "--model", "gemini-4-hydrogen-medium", "review"}},
+		{"gemini explicit raw model", []string{"gemini", "--model", "gemini-4-neon-high", "review"}, []string{"--backend", "antigravity", "--model", "gemini-4-neon-high", "review"}},
 		{"cursor gemini surface", []string{"cursor", "gemini-4-carbon", "review"}, []string{"--backend", "cursor", "--model", "gemini-4-carbon-medium", "review"}},
 	}
 	for _, test := range tests {
@@ -183,7 +188,7 @@ func TestParseRejectsDeprecatedDeepSeekAliases(t *testing.T) {
 	}
 }
 func TestParseRejectsDeprecatedGeminiArgonAliases(t *testing.T) {
-	want := `invalid gemini model "argon". Choose one of: carbon`
+	want := `invalid gemini model "argon". Choose one of: neon, carbon, hydrogen`
 	for _, args := range [][]string{
 		{"gemini", "argon", "review"},
 		{"argon", "review"},
@@ -192,6 +197,18 @@ func TestParseRejectsDeprecatedGeminiArgonAliases(t *testing.T) {
 		if err == nil || err.Error() != want {
 			t.Fatalf("Parse deprecated Gemini alias %v error = %v", args, err)
 		}
+	}
+	for _, args := range [][]string{
+		{"gemini"},
+		{"gemini", "--json", "-"},
+	} {
+		_, err := Parse(args, true)
+		if err == nil || err.Error() != `gemini requires an explicit model: neon, carbon, hydrogen` {
+			t.Fatalf("Parse bare gemini %v error = %v", args, err)
+		}
+	}
+	if _, err := Parse([]string{"gemini", "review"}, true); err == nil || err.Error() != `invalid gemini model "review". Choose one of: neon, carbon, hydrogen` {
+		t.Fatalf("Parse bare gemini prompt error = %v", err)
 	}
 	cursorWant := `invalid cursor model "gemini-4-argon". Choose one of: grok, gemini-4-carbon, kimi-k3. For a raw Cursor model ID, use: hatch cursor grok --model <cursor-model-id> "prompt"`
 	for _, args := range [][]string{

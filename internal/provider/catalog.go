@@ -81,12 +81,14 @@ var ModelRegistry = []ModelSpec{
 	{Surface: "cursor", Alias: "grok", Model: "grok-4.7-high", Backend: "cursor"},
 	{Surface: "cursor", Alias: "gemini-4-carbon", Model: "gemini-4-carbon-medium", Backend: "cursor", NoShorthand: true, Deprecated: []string{"gemini-4-argon"}},
 
-	// Gemini: personal work. Gemini 4 Carbon runs on Google's Antigravity CLI
-	// (agy) with the personal Google AI Ultra subscription; Zeta Gemini work
-	// uses the explicit `hatch cursor gemini-4-carbon` route instead.
-	// Antigravity model ids carry the reasoning tier (gemini-4-carbon-low,
-	// -medium, -high), so the surfaced alias pins one model.
+	// Gemini: personal work. Runs on Google's Antigravity CLI (agy) with the
+	// personal Google AI Ultra subscription; Zeta Gemini work uses the
+	// explicit `hatch cursor gemini-4-carbon` route instead. Antigravity model
+	// ids carry the reasoning tier (-low, -medium, -high, -xhigh), so each
+	// surfaced alias pins the -medium tier.
+	{Surface: "gemini", Alias: "neon", Model: "gemini-4-neon-medium", Backend: "antigravity"},
 	{Surface: "gemini", Alias: "carbon", Model: "gemini-4-carbon-medium", Backend: "antigravity", Deprecated: []string{"argon"}},
+	{Surface: "gemini", Alias: "hydrogen", Model: "gemini-4-hydrogen-medium", Backend: "antigravity"},
 
 	// OpenCode Go: personal flat-rate plan. `hatch deepseek` lands here. The
 	// workspace privacy region must be Global or DeepSeek calls are refused.

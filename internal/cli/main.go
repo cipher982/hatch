@@ -349,7 +349,7 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch bedrock <opus|sonnet|astra|sol|terra|luna> [OPTIONS] "prompt"
        hatch codex <astra|sol|terra|luna> [OPTIONS] "prompt"
        hatch cursor <grok|kimi-k3|gemini-4-carbon> [OPTIONS] "prompt"
-       hatch gemini [carbon] [OPTIONS] "prompt"
+       hatch gemini <neon|carbon|hydrogen> [OPTIONS] "prompt"
        hatch opencode-go <deepseek> [OPTIONS] "prompt"
        hatch openrouter <deepseek|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
@@ -368,7 +368,7 @@ Model-first aliases (each surface bills a different account):
                                         astra, sol, terra, luna (GPT-6 / GPT-6.1)
   Codex (personal OpenAI, explicit):    hatch codex <astra|sol|terra|luna>
   Cursor (Zeta Cursor subscription):    grok, kimi-k3, gemini-4-carbon
-  Gemini (personal Google AI Ultra):    carbon   (Google Antigravity CLI: agy)
+  Gemini (personal Google AI Ultra):    neon, carbon, hydrogen (Antigravity CLI: agy)
   OpenCode Go (flat-rate Go plan):      deepseek (the bare "hatch deepseek" alias)
   OpenRouter (OpenRouter balance):      deepseek, glm-5.3-flash (explicit only)
 
@@ -379,7 +379,9 @@ Model-first aliases (each surface bills a different account):
   aliases stay explicit-only, so bare opus/sonnet remain the personal Claude route.
 Start here:
   hatch opus "Review this diff"
-  hatch gemini "Review this branch"
+  hatch neon "Review this branch"
+  hatch carbon "Review this branch"
+  hatch hydrogen "Review this branch"
   hatch astra --harness omp "Review this branch"
   hatch terra "Review this branch"
   hatch grok "Review this branch"
