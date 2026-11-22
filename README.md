@@ -142,7 +142,6 @@ hatch openrouter glm-5.3-flash "Fix the failing tests"
 | `hatch opencode-go <deepseek>` | Pi with the OpenCode Go plan (`deepseek` = V4.1 Flash; bare `hatch deepseek` runs this) |
 | `hatch openrouter <deepseek\|glm-5.3-flash>` | Pi with an OpenRouter model alias (`deepseek` = V4.1 Flash 1017, pinned to the DeepSeek upstream) |
 | `hatch expert` | One synchronous OpenAI Responses API consultation |
-| `hatch review <MODEL ...>` | Explicitly requested two-phase independent code review; execs `hatch-review` (review-hub in `~/git/me`), requires a model, takes no prompt; receipts are optional audit data, not shipping gates |
 
 The model aliases are intentionally small and opinionated. For raw or
 backend-specific options, use `hatch --advanced-help`.

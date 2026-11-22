@@ -38,9 +38,6 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 	if len(args) > 0 && args[0] == "catalog" {
 		return runCatalog(args[1:], stdout, stderr)
 	}
-	if len(args) > 0 && args[0] == "review" {
-		return runReview(args[1:], stderr)
-	}
 	request, err := Parse(args, stdoutTTY)
 	if err != nil {
 		return renderConfigError(request.JSON || !stdoutTTY, stdout, stderr, err)
@@ -354,7 +351,6 @@ const Help = `usage: hatch <model> [OPTIONS] "prompt"
        hatch openrouter <deepseek|glm-5.3-flash> [OPTIONS] "prompt"
        hatch expert [OPTIONS] "prompt"
        hatch runs <list|inspect|read|audit|gc> [OPTIONS]
-       hatch review MODEL... [--reasoning-effort LEVEL] [--base REF] [--pass-timeout SEC]   (explicit model; two-phase, read-only review; no prompt)
 
 One headless CLI for Claude, Bedrock, Codex, Cursor, Gemini, OpenCode Go, OpenRouter, and expert calls
 
