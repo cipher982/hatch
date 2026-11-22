@@ -898,3 +898,27 @@ printf '%s\n' '{"event":"result","result":{"conversation_id":"conv-test","status
 		t.Fatalf("expected passing field audit, got %#v", audit)
 	}
 }
+
+func TestPrepareAntigravityHomeCarriesLinuxLogin(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	src := filepath.Join(home, ".gemini", "antigravity-cli")
+	if err := os.MkdirAll(src, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "antigravity-oauth-token"), []byte("token"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	target := t.TempDir()
+	if err := prepareAntigravityHome(target, &provider.Invocation{}); err != nil {
+		t.Fatal(err)
+	}
+	got := filepath.Join(target, ".gemini", "antigravity-cli", "antigravity-oauth-token")
+	data, err := os.ReadFile(got)
+	if err != nil || string(data) != "token" {
+		t.Fatalf("login token not carried into the run home: %q %v", data, err)
+	}
+	if info, _ := os.Stat(got); info.Mode().Perm() != 0o600 {
+		t.Fatalf("token mode %v, want 0600", info.Mode().Perm())
+	}
+}

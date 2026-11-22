@@ -768,6 +768,9 @@ func prepareAntigravityHome(targetRoot string, invocation *provider.Invocation) 
 		srcCLI := filepath.Join(home, ".gemini", "antigravity-cli")
 		for _, rel := range []string{
 			"settings.json",
+			// On Linux agy keeps its Google login here; on macOS it is in the
+			// Keychain, reached through linkUserMacLibrary.
+			"antigravity-oauth-token",
 			"jetski_state.pbtxt",
 			"installation_id",
 			filepath.Join("cache", "onboarding.json"),
