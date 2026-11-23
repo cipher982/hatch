@@ -82,9 +82,6 @@ func (c Coordinator) Execute(req Request) PublicResult {
 		}
 		req.Progress(receipt)
 		req.Progress(fmt.Sprintf("[hatch] reasoning effort=%s source=%s support=%s", displayReasoningEffort(req.Invocation.ReasoningPolicy), req.Invocation.ReasoningPolicy.Source, req.Invocation.ReasoningPolicy.Support))
-		if req.Invocation.ReadOnlyMechanism != "" {
-			req.Progress("[hatch] read-only: " + req.Invocation.ReadOnlyMechanism)
-		}
 		if req.ProgressLabel != "" && (req.Invocation.Adapter == "" || req.Invocation.Adapter == "raw") {
 			req.Progress(fmt.Sprintf("[hatch] %s started", req.ProgressLabel))
 		}

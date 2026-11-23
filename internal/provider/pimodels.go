@@ -1,7 +1,9 @@
 package provider
 
 import (
+	"bytes"
 	"embed"
+	"encoding/json"
 	"strings"
 )
 
@@ -135,4 +137,16 @@ func PiModelsJSON(model, effort string) []byte {
 func PiDeclaresModel(model string) bool {
 	_, declared := piCatalogGaps[model]
 	return declared
+}
+
+// marshalPlain is json.Marshal without HTML escaping, so the redirect pattern
+// `*>*` stays readable in the config instead of becoming `*\u003e*`.
+func marshalPlain(value any) ([]byte, error) {
+	var out bytes.Buffer
+	encoder := json.NewEncoder(&out)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return nil, err
+	}
+	return bytes.TrimRight(out.Bytes(), "\n"), nil
 }

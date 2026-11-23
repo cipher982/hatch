@@ -154,7 +154,7 @@ func MainContext(ctx context.Context, args []string, stdin io.Reader, stdout, st
 		ReasoningEffort: request.ReasoningEffort, OutputFormat: request.OutputFormat, APIKey: apiKey,
 		RawStructuredOutput:    request.OutputFormatExplicit && request.OutputFormat == "stream-json",
 		SkipGitRepoCheck:       request.SkipGitRepoCheck,
-		IncludePartialMessages: request.IncludePartialMessages, ReadOnly: request.ReadOnly,
+		IncludePartialMessages: request.IncludePartialMessages,
 	})
 	if err != nil {
 		return renderConfigError(request.JSON, stdout, stderr, err)
@@ -406,7 +406,6 @@ Common options:
   --harness NAME       Select pi or omp for bedrock/codex/opencode-go/openrouter
   --reasoning-effort LEVEL  none|low|medium|high|xhigh|max
   -r, --resume RUN_ID  Continue an earlier Hatch run (see above)
-  --read-only          No file edits and no builds, tests or other programs (every surface)
   --json               Emit exactly one JSON document on stdout
   --advanced-help      Show raw/backend-specific flags
 

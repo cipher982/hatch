@@ -26,13 +26,6 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 	if req.CWD != "" && command == "omp" {
 		argv = append(argv, "--cwd", req.CWD)
 	}
-	if req.ReadOnly {
-		tools := piReadOnlyTools
-		if command == "omp" {
-			tools = ompReadOnlyTools
-		}
-		argv = append(argv, "--tools", tools)
-	}
 	argv = append(argv, "--model", req.Model)
 	if policy.Effort != "" && policy.Support != "unsupported" {
 		argv = append(argv, "--thinking", piThinkingLevel(policy.Effort))

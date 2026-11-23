@@ -25,10 +25,6 @@ type Request struct {
 	APIKey                 string
 	SkipGitRepoCheck       bool
 	IncludePartialMessages bool
-	// ReadOnly restricts the run to reading: no file edits, no builds, tests or
-	// other programs. Each backend enforces it with its own permission, tool
-	// or sandbox mechanism (see readonly.go); a backend with none refuses.
-	ReadOnly bool
 }
 
 type Invocation struct {
@@ -51,9 +47,6 @@ type Invocation struct {
 	// AntigravityDCGRunner, when set, writes a dcg-guard hook entry in the
 	// per-run .gemini/config/hooks.json pointing at Agent Home's hook-runner.
 	AntigravityDCGRunner string
-	// ReadOnlyMechanism names how a ReadOnly request is enforced; empty
-	// when the run is not read-only.
-	ReadOnlyMechanism string
 }
 
 func PreparePrompt(prompt string) string {
@@ -65,15 +58,7 @@ func Build(req Request) (Invocation, error) {
 	if err != nil {
 		return Invocation{}, err
 	}
-	readOnlyMechanism := ""
-	if req.ReadOnly {
-		if readOnlyMechanism, err = ReadOnlyMechanism(req.Backend); err != nil {
-			return Invocation{}, err
-		}
-	}
-	invocation, err := buildInvocation(req, policy)
-	invocation.ReadOnlyMechanism = readOnlyMechanism
-	return invocation, err
+	return buildInvocation(req, policy)
 }
 
 func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
@@ -92,15 +77,10 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		if outputFormat == "stream-json" {
 			argv = append(argv, "--verbose")
 		}
-		permissionFlags, tools := []string{"--dangerously-skip-permissions"}, "default"
-		if req.ReadOnly {
-			permissionFlags, tools = claudeReadOnlyPermissionFlags, claudeReadOnlyTools
-		}
-		argv = append(argv, "--print", "-", "--output-format", outputFormat, "--model", model)
-		argv = append(argv, permissionFlags...)
-		argv = append(argv,
+		argv = append(argv, "--print", "-", "--output-format", outputFormat, "--model", model,
+			"--dangerously-skip-permissions",
 			"--setting-sources", "local",
-			"--no-session-persistence", "--tools", tools, "--effort", policy.Effort,
+			"--no-session-persistence", "--tools", "default", "--effort", policy.Effort,
 		)
 		if req.IncludePartialMessages || req.OutputFormat == "" || req.OutputFormat == "text" {
 			argv = append(argv, "--include-partial-messages")
@@ -125,12 +105,7 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		if model == "" {
 			model = CursorSurfaceModels["grok"]
 		}
-		argv := []string{"cursor-agent", "--print", "--trust", "--model", model, "--output-format", "stream-json"}
-		if req.ReadOnly {
-			argv = append(argv, cursorReadOnlyFlags...)
-		} else {
-			argv = append(argv, "--force")
-		}
+		argv := []string{"cursor-agent", "--print", "--trust", "--model", model, "--output-format", "stream-json", "--force"}
 		invocation := Invocation{
 			Argv: append(argv, prompt), StreamFormat: "jsonl", Adapter: "cursor", ReasoningPolicy: policy, SetEnv: map[string]string{},
 			UnsetEnv: []string{
@@ -149,12 +124,7 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		if req.APIKey == "" {
 			return Invocation{}, fmt.Errorf("OPENAI_API_KEY not set and no api_key provided")
 		}
-		sandboxFlags := []string{"--dangerously-bypass-approvals-and-sandbox"}
-		if req.ReadOnly {
-			sandboxFlags = codexReadOnlyFlags
-		}
-		argv := append([]string{"codex", "exec"}, sandboxFlags...)
-		argv = append(argv, "--ignore-user-config", "--ephemeral")
+		argv := []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral"}
 		if req.Model != "" {
 			argv = append(argv, "-m", req.Model)
 		}
@@ -176,13 +146,7 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		if model == "" {
 			return Invocation{}, invalidModelForBackend(req.Backend)
 		}
-		argv := []string{"agy"}
-		if req.ReadOnly {
-			argv = append(argv, antigravityReadOnlyFlags...)
-		} else {
-			argv = append(argv, "--dangerously-skip-permissions")
-		}
-		argv = append(argv, "--output-format", "stream-json", "--model", model, "-p", prompt)
+		argv := []string{"agy", "--dangerously-skip-permissions", "--output-format", "stream-json", "--model", model, "-p", prompt}
 		return redactInvocation(Invocation{
 			Argv: argv, StreamFormat: "jsonl", Adapter: "antigravity", ReasoningPolicy: policy,
 			SetEnv: map[string]string{},

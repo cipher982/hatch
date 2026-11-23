@@ -10,9 +10,7 @@ import (
 // inheritFromPriorRun fills what a follow-up left unsaid from the run it
 // continues, so `hatch --resume <run-id> "task"` needs nothing else: the same
 // model and harness, reasoning effort and working directory. Naming a model,
-// harness, effort or --cwd overrides the inherited value; the earlier run's
-// read-only restriction is deliberately not inherited, since the usual
-// follow-up to an investigation is to make the change.
+// harness, effort or --cwd overrides the inherited value.
 func inheritFromPriorRun(request *Request, prior runner.PriorRun) {
 	if request.Backend == "" && request.Model == "" {
 		request.Backend, request.Model = prior.Backend, prior.Model

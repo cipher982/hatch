@@ -272,16 +272,3 @@ func TestParseSurfaceHelpDoesNotRequireModel(t *testing.T) {
 		t.Fatalf("Parse help = %#v, %v", got, err)
 	}
 }
-
-func TestParseReadOnlyFlag(t *testing.T) {
-	req, err := Parse([]string{"openrouter", "deepseek", "--read-only", "--timeout", "300", "prompt"}, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !req.ReadOnly || req.TimeoutSeconds != 300 || req.Backend != "pi" || len(req.PromptArgs) != 1 {
-		t.Fatalf("request = %#v", req)
-	}
-	if plain, err := Parse([]string{"openrouter", "deepseek", "prompt"}, false); err != nil || plain.ReadOnly {
-		t.Fatalf("read-only must be opt-in: %#v %v", plain, err)
-	}
-}

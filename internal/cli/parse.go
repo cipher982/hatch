@@ -26,7 +26,6 @@ type Request struct {
 	Resume                 string
 	SkipGitRepoCheck       bool
 	IncludePartialMessages bool
-	ReadOnly               bool
 	JSON                   bool
 	Automation             bool
 	Help                   bool
@@ -91,8 +90,6 @@ func Parse(args []string, stdoutTTY bool) (Request, error) {
 			req.SkipGitRepoCheck = true
 		case "--include-partial-messages":
 			req.IncludePartialMessages = true
-		case "--read-only":
-			req.ReadOnly = true
 		case "-b", "--backend", "--model", "-C", "--cwd", "-t", "--timeout", "--reasoning-effort", "--output-format", "--api-key", "-r", "--resume", "--harness", "--title", "--caller-session", "--caller-request", "--max-output-bytes":
 			value := inlineValue
 			if !hasInlineValue {
