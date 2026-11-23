@@ -12,12 +12,12 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 	if command == "pi" {
 		argv = append(argv,
 			"--print", "--mode", "json", "--no-session", "--approve",
-			"--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes",
+			"--no-extensions", "--no-prompt-templates", "--no-themes",
 		)
 	} else {
 		argv = append(argv,
 			"-p", "--mode", "json", "--no-session", "--no-title",
-			"--no-extensions", "--no-skills", "--no-rules",
+			"--no-extensions", "--no-rules",
 			"--auto-approve", "--approval-mode", "yolo",
 		)
 	}

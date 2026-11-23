@@ -143,6 +143,7 @@ explicit surfaced provider.
 
 - (2026-09-29) [process cleanup] A run left an orphaned `cargo test`: OpenCode spawned each bash command detached, so killing the run's process group never reached it. The kill now also takes descendants (process-table walk before the kill) and any survivor carrying the run's `HATCH_RUN_ID` (`ps -E` on macOS, `/proc/*/environ` on Linux), on timeout, cancellation and after a normal exit.
 - (2026-11-23) [read-only] `--read-only` removed (David). Each backend enforced it differently (Gemini kept web search, Pi lost every tool but file reads), and a review is just a prompt: an agent asked to review reviews.
+- (2026-11-23) [skills] Pi and OMP runs no longer pass `--no-skills`, so they load David's skills from `~/.agents/skills`. Without them a `hatch deepseek` run never saw the `web-research` skill and had no way to search the web; with them it uses `search-hub` (Exa) through its shell, the only web search David wants agents to use. VERSION 0.3.11.
 
 - (2026-03-29) [design] Backend builders stay pure; hatch credential policy lives in one preflight resolver using the canonical `infisical-get.py` helper, not ad hoc backend fallbacks.
 - (2026-04-09) [auth] Bedrock launches must clear inherited `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`; otherwise Claude takes the wrong auth path and fails before reaching AWS.

@@ -45,7 +45,6 @@
       "--no-session",
       "--approve",
       "--no-extensions",
-      "--no-skills",
       "--no-prompt-templates",
       "--no-themes",
       "--model",
