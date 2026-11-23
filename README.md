@@ -281,13 +281,14 @@ pins and models missing from Pi's catalog, and Oh My Pi receives
 configuration. The raw Codex backend has no equivalent and stays on the
 standard tier.
 
-Provider session state is isolated per run. Raw Codex receives a
-private `CODEX_HOME`, ignores user configuration, and runs ephemerally, so a
-previous local Codex session cannot silently affect a Hatch run or be mistaken
-for a recoverable Hatch session.
-Pi and Oh My Pi receive private `PI_CODING_AGENT_DIR` and
-`PI_CODING_AGENT_SESSION_DIR` paths, disable native session persistence for
-one-shot runs, and record their JSON event streams in the Hatch artifact.
+Every run sees the same setup as a normal launch of its CLI: the user's
+instructions, skills, hooks and config. Raw Codex uses the user's own
+`CODEX_HOME`; Hatch passes its key as `CODEX_API_KEY`, which `codex exec` bills
+instead of a stored ChatGPT login, and runs it ephemerally.
+Pi and Oh My Pi receive per-run `PI_CODING_AGENT_DIR` and
+`PI_CODING_AGENT_SESSION_DIR` paths that link the user's config, disable native
+session persistence for one-shot runs, and record their JSON event streams in
+the Hatch artifact.
 
 `hatch runs gc` is deliberately narrower than evidence retention. It removes
 old per-run provider config installations (including those from the retired OpenCode harness) and caches that were never declared

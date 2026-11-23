@@ -44,9 +44,6 @@ type Invocation struct {
 	// names the Agent Home guard runner (~/.config/dcg/hook-runner) it asks
 	// before every bash command.
 	PiDCGRunner string
-	// AntigravityDCGRunner, when set, writes a dcg-guard hook entry in the
-	// per-run .gemini/config/hooks.json pointing at Agent Home's hook-runner.
-	AntigravityDCGRunner string
 }
 
 func PreparePrompt(prompt string) string {
@@ -79,7 +76,6 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		}
 		argv = append(argv, "--print", "-", "--output-format", outputFormat, "--model", model,
 			"--dangerously-skip-permissions",
-			"--setting-sources", "local",
 			"--no-session-persistence", "--tools", "default", "--effort", policy.Effort,
 		)
 		if req.IncludePartialMessages || req.OutputFormat == "" || req.OutputFormat == "text" {
@@ -124,7 +120,7 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		if req.APIKey == "" {
 			return Invocation{}, fmt.Errorf("OPENAI_API_KEY not set and no api_key provided")
 		}
-		argv := []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral"}
+		argv := []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ephemeral"}
 		if req.Model != "" {
 			argv = append(argv, "-m", req.Model)
 		}
@@ -135,8 +131,10 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 		return redactInvocation(Invocation{
 			Argv: argv, Stdin: []byte(prompt), StreamFormat: "text", Adapter: "raw",
 			ReasoningPolicy: policy,
-			SetEnv:          map[string]string{"OPENAI_API_KEY": req.APIKey},
-			UnsetEnv:        []string{"CODEX_API_KEY", "CODEX_HOME", "CLAUDE_CODE_USE_BEDROCK"},
+			// codex exec bills CODEX_API_KEY even when ~/.codex holds David's
+			// ChatGPT login, and never writes the key into that login.
+			SetEnv:   map[string]string{"CODEX_API_KEY": req.APIKey},
+			UnsetEnv: []string{"CODEX_HOME", "CLAUDE_CODE_USE_BEDROCK"},
 		}), nil
 	case "antigravity":
 		// Google's Antigravity CLI. Its print flag takes the prompt as its
@@ -155,9 +153,6 @@ func buildInvocation(req Request, policy ReasoningPolicy) (Invocation, error) {
 				"ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_BASE_URL",
 				"GEMINI_API_KEY", "CODEX_API_KEY", "CURSOR_API_KEY", "CLAUDE_CODE_USE_BEDROCK",
 				"AWS_PROFILE", "AWS_REGION", "AWS_DEFAULT_REGION",
-				"LONGHOUSE_HOME", "LONGHOUSE_HOOK_TOKEN", "LONGHOUSE_HOOK_URL",
-				"LONGHOUSE_MANAGED_SESSION_ID", "LONGHOUSE_MANAGED_PROVIDER", "LONGHOUSE_RUN_ID",
-				"LONGHOUSE_ANTIGRAVITY_INBOX_DIR", "LONGHOUSE_ANTIGRAVITY_STATE_DIR",
 			},
 		}, len(argv)-1), nil
 	default:

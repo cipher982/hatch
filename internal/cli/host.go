@@ -106,18 +106,20 @@ func applyDCG(invocation *provider.Invocation, backend string, ctx ExecutionCont
 		if err != nil {
 			return err
 		}
-		index := flagValueIndex(invocation.Argv, "--setting-sources")
+		// David's user settings carry the same hook; Claude runs an identical
+		// command once, and this keeps the guard when those settings lack it.
+		index := flagValueIndex(invocation.Argv, "--dangerously-skip-permissions")
 		if index < 0 {
-			return fmt.Errorf("Claude invocation lacks --setting-sources")
+			return fmt.Errorf("Claude invocation lacks --dangerously-skip-permissions")
 		}
-		insert := index + 2
+		insert := index + 1
 		invocation.Argv = append(invocation.Argv[:insert], append([]string{"--settings", string(settings)}, invocation.Argv[insert:]...)...)
 		invocation.RedactedArgv = append(invocation.RedactedArgv[:insert], append([]string{"--settings", string(settings)}, invocation.RedactedArgv[insert:]...)...)
 	case "pi", "omp":
 		invocation.PiDCGRunner = runner
-	case "antigravity":
-		invocation.AntigravityDCGRunner = runner
 	}
+	// Cursor and Antigravity run in David's real home and load his own guard
+	// hooks (~/.cursor/hooks.json, the agy dcg-guard plugin).
 	return nil
 }
 

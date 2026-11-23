@@ -176,8 +176,8 @@ execution and is copied into the public result.
 
 Provider state namespaces are also assigned before launch. OpenCode gets
 per-run XDG data/state paths; config dependencies and cache use a shared,
-version-keyed runtime namespace outside the artifact. Raw Codex gets a per-run `CODEX_HOME`, ignores user
-configuration, and uses ephemeral execution. Its recovery capability is
+version-keyed runtime namespace outside the artifact. Raw Codex uses the user's `CODEX_HOME` and configuration
+and ephemeral execution. Its recovery capability is
 explicitly unsupported because no native session is retained.
 
 ## Vocabulary and state model

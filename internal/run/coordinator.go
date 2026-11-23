@@ -3,7 +3,6 @@ package run
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -316,20 +315,13 @@ func (c Coordinator) Execute(req Request) PublicResult {
 	}
 	if isRawCodexInvocation(req.Invocation) {
 		state.Retention = "unavailable"
-		state.Capabilities["state_isolation"] = "hatch_per_run"
 		state.Capabilities["session_persistence"] = "disabled_ephemeral"
 		state.Capabilities["recovery"] = "unsupported_ephemeral"
-		if pruneErr := discardProviderRuntime(artifact, "codex"); pruneErr != nil {
-			warnings = append(warnings, Warning{Code: "capture_persistence_failed", Message: pruneErr.Error()})
-			if outcome == OutcomeSucceeded {
-				outcome = OutcomeSucceededWarnings
-			}
-		}
 	}
 	if interpretation.NativeID != "" {
 		state.NativeID = &interpretation.NativeID
 	}
-	if req.Invocation.Adapter == "pi" || req.Invocation.Adapter == "omp" || req.Invocation.Adapter == "antigravity" {
+	if req.Invocation.Adapter == "pi" || req.Invocation.Adapter == "omp" {
 		state.Retention = "unavailable"
 		state.Capabilities["state_isolation"] = "hatch_per_run"
 		state.Capabilities["session_persistence"] = "disabled_ephemeral"
@@ -539,6 +531,12 @@ func buildEnvironment(invocation provider.Invocation, runID string, provenance *
 			values["LONGHOUSE_OPENCODE_SESSION_METADATA_ROOT"] = filepath.Join(home, "provider-session-metadata", "opencode")
 		}
 	}
+	// The run loads David's Longhouse hooks like any of his sessions, so it must
+	// not inherit the calling session's identity, or its hooks would act on the
+	// caller's Longhouse session.
+	for _, name := range longhouseSessionIdentityEnv {
+		delete(values, name)
+	}
 	for name, value := range invocation.SetEnv {
 		values[name] = value
 	}
@@ -564,6 +562,24 @@ func buildEnvironment(invocation provider.Invocation, runID string, provenance *
 		result = append(result, name+"="+value)
 	}
 	return result
+}
+
+// longhouseSessionIdentityEnv is the session identity Longhouse's own
+// launchers never pass to a provider process (NEVER_INHERITED_KEYS in
+// longhouse/engine/src/managed_identity_contract.rs), minus the launch
+// provenance a caller may set on purpose.
+var longhouseSessionIdentityEnv = []string{
+	"LONGHOUSE_SESSION_ID", "LONGHOUSE_MANAGED_SESSION_ID", "LONGHOUSE_MANAGED_PROVIDER",
+	"LONGHOUSE_RUN_ID", "LONGHOUSE_CHANNEL_SESSION_ID", "LONGHOUSE_CHANNEL_CWD",
+	"LONGHOUSE_PROVIDER_SESSION_ID", "LONGHOUSE_COORDINATION_TOKEN",
+	"LONGHOUSE_HOOK_URL", "LONGHOUSE_HOOK_TOKEN", "LONGHOUSE_CODEX_BRIDGE_TOKEN",
+	"LONGHOUSE_PI_HELM_TOKEN", "LONGHOUSE_PI_HELM_URL", "LONGHOUSE_PI_HELM_CHANNEL_PATH",
+	"LONGHOUSE_PI_HELM_CHANNEL_TOKEN", "LONGHOUSE_PI_HELM_INITIAL_PROMPT",
+	"LONGHOUSE_OMP_HELM_TOKEN", "LONGHOUSE_OMP_HELM_URL", "LONGHOUSE_OMP_HELM_CHANNEL_PATH",
+	"LONGHOUSE_OMP_HELM_CHANNEL_TOKEN", "LONGHOUSE_OMP_HELM_INITIAL_PROMPT",
+	"LONGHOUSE_OMP_HELM_INITIAL_PROMPT_DELIVERED", "LONGHOUSE_PERMISSION_HOOK_ENABLED",
+	"LONGHOUSE_CURSOR_LAUNCH_ID", "LONGHOUSE_CURSOR_REGISTRATION_READY", "LONGHOUSE_CURSOR_PRINT_MODE",
+	"LONGHOUSE_ANTIGRAVITY_STATE_DIR", "LONGHOUSE_ANTIGRAVITY_INBOX_DIR",
 }
 
 func copyFirstEnvironment(values map[string]string, target string, sources ...string) {
@@ -627,6 +643,8 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 	if invocation.SetEnv == nil {
 		invocation.SetEnv = map[string]string{}
 	}
+	// Pi and OMP get a per-run agent dir that links David's config: it holds
+	// the run's own models.json (models Pi's catalog lacks) and session files.
 	if invocation.Adapter == "pi" || invocation.Adapter == "omp" {
 		root := filepath.Join(artifact.Path, "provider", invocation.Adapter)
 		if err := secureMkdirAll(root); err != nil {
@@ -645,51 +663,11 @@ func prepareProviderState(artifact *Artifact, invocation *provider.Invocation) (
 		}
 		return func() { _ = discardProviderRuntime(artifact, invocation.Adapter) }, nil
 	}
-	if isRawCodexInvocation(*invocation) {
-		root := filepath.Join(artifact.Path, "provider", "codex")
-		if err := secureMkdirAll(root); err != nil {
-			return nil, err
-		}
-		invocation.SetEnv["CODEX_HOME"] = root
-		return func() { _ = discardProviderRuntime(artifact, "codex") }, nil
-	}
-	if invocation.Adapter == "cursor" {
-		root := filepath.Join(artifact.Path, "provider", "cursor")
-		if err := secureMkdirAll(root); err != nil {
-			return nil, err
-		}
-		linkUserCursorConfig(root)
-		invocation.SetEnv["HOME"] = root
-		return func() { _ = discardProviderRuntime(artifact, "cursor") }, nil
-	}
-	if invocation.Adapter == "antigravity" {
-		root := filepath.Join(artifact.Path, "provider", "antigravity")
-		if err := secureMkdirAll(root); err != nil {
-			return nil, err
-		}
-		if err := prepareAntigravityHome(root, invocation); err != nil {
-			return nil, err
-		}
-		invocation.SetEnv["HOME"] = root
-		return func() { _ = discardProviderRuntime(artifact, "antigravity") }, nil
-	}
 	return func() {}, nil
 }
 
 func isRawCodexInvocation(invocation provider.Invocation) bool {
-	if len(invocation.Argv) == 0 || invocation.Adapter != "raw" {
-		return false
-	}
-	return filepath.Base(invocation.Argv[0]) == "codex" || hasInvocationArg(invocation.Argv, "--ignore-user-config")
-}
-
-func hasInvocationArg(argv []string, want string) bool {
-	for _, arg := range argv {
-		if arg == want {
-			return true
-		}
-	}
-	return false
+	return len(invocation.Argv) > 0 && invocation.Adapter == "raw" && filepath.Base(invocation.Argv[0]) == "codex"
 }
 
 func linkUserPiLikeConfig(adapter, targetRoot string) {
@@ -722,139 +700,6 @@ func linkUserPiLikeConfig(adapter, targetRoot string) {
 		}
 	}
 }
-func linkUserMacLibrary(targetRoot, home string) {
-	libraryDir := filepath.Join(targetRoot, "Library")
-	if err := secureMkdirAll(libraryDir); err == nil {
-		keychains := filepath.Join(home, "Library", "Keychains")
-		if info, err := os.Stat(keychains); err == nil && info.IsDir() {
-			_ = os.Symlink(keychains, filepath.Join(libraryDir, "Keychains"))
-		}
-		appSupport := filepath.Join(home, "Library", "Application Support")
-		if info, err := os.Stat(appSupport); err == nil && info.IsDir() {
-			_ = os.Symlink(appSupport, filepath.Join(libraryDir, "Application Support"))
-		}
-	}
-}
-
-func linkUserCursorConfig(targetRoot string) {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return
-	}
-	linkUserMacLibrary(targetRoot, home)
-	cursorDir := filepath.Join(targetRoot, ".cursor")
-	if err := secureMkdirAll(cursorDir); err == nil {
-		userCursorDir := filepath.Join(home, ".cursor")
-		for _, name := range []string{"auth.json", "cli-config.json", "argv.json", "mcp.json", "ide_state.json", "hooks.json"} {
-			src := filepath.Join(userCursorDir, name)
-			if info, err := os.Stat(src); err == nil && !info.IsDir() {
-				_ = os.Symlink(src, filepath.Join(cursorDir, name))
-			}
-		}
-	}
-}
-
-func prepareAntigravityHome(targetRoot string, invocation *provider.Invocation) error {
-	targetCLI := filepath.Join(targetRoot, ".gemini", "antigravity-cli")
-	if err := secureMkdirAll(filepath.Join(targetCLI, "cache")); err != nil {
-		return err
-	}
-	home, err := os.UserHomeDir()
-	if err == nil && home != "" {
-		linkUserMacLibrary(targetRoot, home)
-		srcCLI := filepath.Join(home, ".gemini", "antigravity-cli")
-		for _, rel := range []string{
-			"settings.json",
-			// On Linux agy keeps its Google login here; on macOS it is in the
-			// Keychain, reached through linkUserMacLibrary.
-			"antigravity-oauth-token",
-			"jetski_state.pbtxt",
-			"installation_id",
-			filepath.Join("cache", "onboarding.json"),
-			filepath.Join("cache", "nux_state.json"),
-			filepath.Join("cache", "default_project_id.txt"),
-		} {
-			if err := copyRegularFile(filepath.Join(srcCLI, rel), filepath.Join(targetCLI, rel)); err != nil {
-				return err
-			}
-		}
-		srcConfig := filepath.Join(home, ".gemini", "config", "config.json")
-		if info, err := os.Stat(srcConfig); err == nil && info.Mode().IsRegular() {
-			if data, err := os.ReadFile(srcConfig); err == nil {
-				var raw map[string]any
-				if json.Unmarshal(data, &raw) == nil {
-					filtered := map[string]any{}
-					if userSettings, ok := raw["userSettings"]; ok {
-						filtered["userSettings"] = userSettings
-					}
-					encoded, err := json.MarshalIndent(filtered, "", "  ")
-					if err != nil {
-						return err
-					}
-					cfgDir := filepath.Join(targetRoot, ".gemini", "config")
-					if err := secureMkdirAll(cfgDir); err != nil {
-						return err
-					}
-					if err := writePrivate(filepath.Join(cfgDir, "config.json"), append(encoded, '\n')); err != nil {
-						return err
-					}
-				}
-			}
-		}
-	}
-	if invocation.AntigravityDCGRunner != "" {
-		cfgDir := filepath.Join(targetRoot, ".gemini", "config")
-		if err := secureMkdirAll(cfgDir); err != nil {
-			return err
-		}
-		hooksPayload := map[string]any{
-			"dcg-guard": map[string]any{
-				"PreToolUse": []any{
-					map[string]any{
-						"matcher": "run_command",
-						"hooks": []any{
-							map[string]any{
-								"type":    "command",
-								"command": invocation.AntigravityDCGRunner + " --protocol agy",
-								"timeout": 15,
-							},
-						},
-					},
-				},
-			},
-		}
-		encoded, err := json.MarshalIndent(hooksPayload, "", "  ")
-		if err != nil {
-			return err
-		}
-		if err := writePrivate(filepath.Join(cfgDir, "hooks.json"), append(encoded, '\n')); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func copyRegularFile(src, dst string) error {
-	info, err := os.Stat(src)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-	if !info.Mode().IsRegular() {
-		return nil
-	}
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	if err := secureMkdirAll(filepath.Dir(dst)); err != nil {
-		return err
-	}
-	return writePrivate(dst, data)
-}
-
 func displayReasoningEffort(policy provider.ReasoningPolicy) string {
 	if policy.Effort == "" {
 		return "unsupported"

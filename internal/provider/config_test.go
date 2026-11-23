@@ -155,7 +155,7 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 		}
 		want := []string{
 			"claude", "--verbose", "--print", "-", "--output-format", "stream-json",
-			"--model", "claude-opus-5-5", "--dangerously-skip-permissions", "--setting-sources", "local",
+			"--model", "claude-opus-5-5", "--dangerously-skip-permissions",
 			"--no-session-persistence", "--tools", "default", "--effort", "high", "--include-partial-messages",
 		}
 		if !reflect.DeepEqual(got.Argv, want) || got.ReasoningPolicy != (ReasoningPolicy{Effort: "high", Source: "explicit", Support: "native"}) {
@@ -182,10 +182,12 @@ func TestBuildAdvancedBackendInvocations(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := []string{
-			"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ignore-user-config", "--ephemeral", "-m", "gpt-6.1-sol",
+			"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--ephemeral", "-m", "gpt-6.1-sol",
 			"-c", "model_reasoning_effort=high", "--skip-git-repo-check",
 		}
-		if !reflect.DeepEqual(got.Argv, want) || got.SetEnv["OPENAI_API_KEY"] != "secret" {
+		// The key rides in CODEX_API_KEY so codex bills it instead of the
+		// ChatGPT login in the user's own CODEX_HOME.
+		if !reflect.DeepEqual(got.Argv, want) || got.SetEnv["CODEX_API_KEY"] != "secret" || got.SetEnv["CODEX_HOME"] != "" {
 			t.Fatalf("codex invocation = %#v", got)
 		}
 	})

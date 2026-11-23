@@ -136,28 +136,6 @@ func TestApplyDCGLoadsGuardExtensionIntoOMP(t *testing.T) {
 	}
 }
 
-func TestApplyDCGSetsGuardRunnerOnAntigravity(t *testing.T) {
-	home := t.TempDir()
-	binary := filepath.Join(home, ".local", "bin", "dcg")
-	if err := os.MkdirAll(filepath.Dir(binary), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	runner := writeFakeGuardRunner(t, home)
-	invocation, err := provider.Build(provider.Request{Backend: "antigravity", Model: "gemini-4-carbon-medium", Prompt: "p"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := applyDCG(&invocation, "antigravity", ExecutionContext{Home: home, HomeWritable: true}); err != nil {
-		t.Fatal(err)
-	}
-	if invocation.AntigravityDCGRunner != runner {
-		t.Fatalf("Antigravity run does not carry the DCG guard runner: %#v", invocation)
-	}
-}
-
 func TestApplyDCGRequiredFailsClosed(t *testing.T) {
 	home := t.TempDir()
 	declaration := filepath.Join(home, "git", "me", "config", "dcg", "release.json")

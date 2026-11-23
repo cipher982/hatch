@@ -37,7 +37,6 @@
       "codex",
       "exec",
       "--dangerously-bypass-approvals-and-sandbox",
-      "--ignore-user-config",
       "--ephemeral",
       "-m",
       "gpt-test",

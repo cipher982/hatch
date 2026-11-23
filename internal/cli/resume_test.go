@@ -44,6 +44,10 @@ func TestResumeContinuesAnEarlierRunOnAnyProvider(t *testing.T) {
 	t.Setenv("HATCH_RUN_ARTIFACT_ROOT", filepath.Join(root, "runs"))
 	t.Setenv("HATCH_TEST_SCENARIO", "success_text")
 	t.Setenv("HATCH_TEST_RECORD", record)
+	// The follow-up resolves its key like any run; keep it off the real helper.
+	t.Setenv("OPENAI_API_KEY", "fake-test-key")
+	t.Setenv("HATCH_CREDENTIAL_HELPER", "")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	first, code, _ := runHatch(t, "", "-b", "codex", "--api-key", "fake-test-key", "--json", "-C", root, "Investigate the parking lot spin")
 	if code != 0 || first.Run.RunID == "" {

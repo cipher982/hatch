@@ -9,6 +9,8 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 
 	command := req.Backend
 	argv := []string{command}
+	// --no-extensions: Hatch loads its own copy of David's DCG guard extension
+	// with -e (writePiRuntimeFiles), and his other extensions are interactive-only.
 	if command == "pi" {
 		argv = append(argv,
 			"--print", "--mode", "json", "--no-session", "--approve",
@@ -17,7 +19,7 @@ func buildPiLikeInvocation(req Request, policy ReasoningPolicy) (Invocation, err
 	} else {
 		argv = append(argv,
 			"-p", "--mode", "json", "--no-session", "--no-title",
-			"--no-extensions", "--no-rules",
+			"--no-extensions",
 			"--auto-approve", "--approval-mode", "yolo",
 		)
 	}
