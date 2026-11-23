@@ -15,14 +15,13 @@ CLI-only headless runner for complete one-turn Claude, Codex, Cursor, Gemini
 
 The installer is Go-only and never falls back per invocation, and keeps only the
 three newest installed builds (current plus two rollbacks). Bump `VERSION` when
-the binary's behavior changes. The retired
-Python 0.1.0 source remains available from tag `python-v0.1.0-final` for an
-explicit emergency rollback.
+the binary's behavior changes. The retired Python 0.1.0 source remains available
+from tag `python-v0.1.0-final` for an explicit emergency rollback.
 
 ## Entrypoints
 
-CLI surface (also covered in the global `~/git/me/AGENTS.md`; the status quo
-here is authoritative when they differ):
+CLI surface (also covered in the `hatch` agent skill; the status quo here is
+authoritative when they differ):
 
 - `hatch claude <haiku|sonnet|opus|fable|fable-5.2>` → Claude via the official local Claude Code CLI OAuth/subscription path — **personal work only** (`opus` = Opus 5.5, `sonnet` = Sonnet 5.5, `haiku` = Haiku 5.5, pinned as `claude-haiku-5-5`; `opus-5`, `fable-5`, `fable-5.1` are deprecated; `fable`/`fable-5.2` = Claude Fable 5.2)
 - `hatch bedrock <opus|sonnet|astra|sol|terra|luna>` → Zeta's AWS Bedrock (`zh-ml-mlengineer`, `us-east-1`) via Pi by default, or `--harness omp` — **Zeta/employer work by default**; an explicitly named Bedrock model from David is always honored, from any directory, and the surface word is binding. Claude: `amazon-bedrock/global.anthropic.claude-{opus,sonnet}-5-5`, effort `low|medium|high|xhigh|max` (default `low`), no bare shorthand. OpenAI: `amazon-bedrock/global.openai.gpt-6-astra`, `.gpt-6.1-sol`, `.gpt-6.1-terra`, `.gpt-6-luna`; the bare `astra|sol|terra|luna` aliases resolve here, with OpenAI reasoning (default `medium`)
@@ -31,7 +30,7 @@ here is authoritative when they differ):
 - `hatch gemini <neon|carbon|hydrogen>` (bare `hatch neon`, `hatch carbon`, `hatch hydrogen`) → Gemini 4 Neon, Carbon, and Hydrogen (`gemini-4-{neon,carbon,hydrogen}-medium`) via Google's own Antigravity CLI (`agy`) on the personal Google AI Ultra subscription (**personal work only**; Zeta Gemini work uses `hatch cursor gemini-4-carbon`). Bare `hatch gemini` requires an explicit model; `argon` is deprecated (superseded by `carbon`). Gemini takes no `--harness` override and no `--reasoning-effort`: Antigravity model ids carry the tier, so Hatch surfaces `medium` and refuses an effort override instead of letting it conflict with the model.
 - `hatch opencode-go <deepseek>` → DeepSeek V4.1 Flash (`opencode-go/deepseek-v4.1-flash`) on the personal OpenCode Go flat-rate plan via Pi; this is what bare `hatch deepseek` runs. Key `OPENCODE_API_KEY_HATCH` (personal-shell/dev) through the credential helper; registry `~/git/me/registry/opencode-keys.toml`
 - `hatch openrouter <deepseek|glm-5.3-flash>` → OpenRouter models via Pi (explicit only; bare `deepseek` no longer resolves here)
-- `hatch expert` → one synchronous GPT pro Responses API consultation with web search on by default, not an agent
+- `hatch expert` → one synchronous Responses API consultation (default model: `DefaultModel` in `internal/expert/expert.go`) with web search on by default, not an agent
 - Raw `-b codex` / `-b cursor` still invoke the underlying CLIs directly as escape hatches (the raw `-b bedrock` Claude Code backend is retired; use `hatch bedrock`)
 
 Default tiers: `opus` (Claude Opus 5.5) for Claude (supersedes `sonnet`/`fable` for most work as of 2026-09-22), `astra` for OpenAI (Bedrock by default); `sol` is the cost-balanced coding choice, `terra` the fast/vision/writing choice, and `luna` high-volume. GPT-6 Astra and GPT-6.1 Sol default to `medium` and support `low|medium|high|xhigh|max` (not `none`); GPT-6.1 Terra and GPT-6 Luna also accept `none`. `fable` (Fable 5.2) only when always-on adaptive thinking is wanted. **Anthropic routing is by who pays:** personal repos (Zerg, Longhouse, personal infra) → `hatch opus|sonnet` (Max subscription); Zeta/employer repos → `hatch bedrock opus|sonnet` (AWS SSO). Neither route falls back to the other. **OpenAI routing is by who pays:** Zeta/employer work → `hatch bedrock astra|sol|terra|luna` (bare aliases resolve there); personal work → `hatch codex <alias>` on the personal OpenAI account. Bedrock hosts both Claude and OpenAI models. **An explicitly named surface always beats this routing:** `hatch bedrock astra` is never silently replaced by `hatch codex astra` (the aliases collide across both surfaces, so the surface word decides the account). **Gemini routing is also by who pays:** personal → `hatch neon|carbon|hydrogen` (Google AI Ultra via the Antigravity CLI, `agy`); Zeta/employer → `hatch cursor gemini-4-carbon` (Cursor subscription).
@@ -78,7 +77,7 @@ Machine callers:
 - non-interactive agent runs default to JSON output and automation mode; `expert` requires explicit `--json`
 - agent prompts automatically receive a bounded-run contract: stay within scope,
   investigate proportionally, synthesize once evidence is sufficient
-- set `HATCH_DISABLE_SECRET_HELPER=1` when you need tests or subprocesses to fail fast instead of loading secrets from the local helper
+- to make tests or subprocesses fail fast instead of loading secrets from the local helper, leave `HATCH_CREDENTIAL_HELPER` unset and point `XDG_CONFIG_HOME` at an empty directory
 - surfaced Claude/Codex/Cursor runs stream terse live progress to stderr while preserving only the final answer on stdout/JSON
 - every run allocates a durable artifact before provider launch and preserves raw stdout/stderr under `~/.local/state/hatch/runs/`; JSON results carry the run ID, artifact path, capture state, and provider identity when available
 - Give agent calls a short `--title` and the actual caller session/request IDs (`--caller-session` / `--caller-request`, or `HATCH_CALLER_SESSION_ID` / `HATCH_CALLER_REQUEST_ID`). Keep the returned run IDs; do not recover ownership by model and timestamp.
@@ -95,7 +94,7 @@ cmd/hatch → internal/cli → internal/run.Coordinator → provider process or 
                     raw evidence + result + terminal manifest
 ```
 
-**Active backends:** `antigravity`, `claude`, `cursor`, `codex`, `gemini`, `pi`, `omp` (OpenCode was removed 2026-11-05)
+**Active backends:** `antigravity`, `claude`, `cursor`, `codex`, `pi`, `omp`
 
 `zai` / GLM-5.1 is intentionally disabled until the z.ai coding plan/resource
 package is active again. Bare `hatch "prompt"` has no default model; use an
@@ -105,7 +104,8 @@ explicit surfaced provider.
 | File | Purpose |
 |------|---------|
 | `cmd/hatch/main.go` | Release entrypoint |
-| `internal/cli/` | Parsing, command construction, credentials, doctor, run inspection |
+| `internal/cli/` | Parsing, command construction, credentials, run inspection |
+| `internal/doctor/doctor.go` | `hatch doctor` checks |
 | `internal/run/coordinator.go` | Single execution path and lifecycle ownership |
 | `internal/run/store.go` | Ordered durable artifact commits |
 | `internal/provider/` | Thin provider interpretation and progress adapters |
@@ -117,7 +117,7 @@ explicit surfaced provider.
 - **CLI-only public surface** - agent callers invoke `hatch` as a subprocess; no MCP facade or persistent agent runtime
 - **Prefer prompt via stdin when the backend supports it** - raw Claude/Codex paths use stdin; Cursor Agent takes prompt via argv (stdin hangs); Pi takes prompt text via argv
 - **Container-aware** - auto-sets HOME=/tmp for read-only filesystems
-- **Keep the surfaced CLI small** - `codex`, `claude`, and `cursor` are the human/agent-facing entrypoints; raw backend flags are escape hatches
+- **Keep the surfaced CLI small** - the `surfaces` map in `internal/cli/parse.go` lists the human/agent-facing entrypoints; raw backend flags are escape hatches
 - **Do not leak internal runtime nouns into the public contract** - `pi` is an implementation detail, not part of the default user/agent mental model
 - **Machine callers should not remember flags** - non-interactive agent runs default to JSON output + automation mode; `expert` retains explicit `--json` selection
 - **Nested Hatch is permitted, but bounded** - a surfaced run may launch a small number of narrowly scoped child `hatch` runs for parallel/independent subwork. Children need deadlines, recursion requires explicit authorization, and the parent synthesizes surviving results instead of waiting indefinitely for a child.
